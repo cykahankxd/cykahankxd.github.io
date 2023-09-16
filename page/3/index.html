@@ -166,6 +166,526 @@
           <div id="js-content" class="content-ll">
             
   
+    <article id="post-NSILAB一月赛——逆向部分题解" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="../../2023/01/09/NSILAB%E4%B8%80%E6%9C%88%E8%B5%9B%E2%80%94%E2%80%94%E9%80%86%E5%90%91%E9%83%A8%E5%88%86%E9%A2%98%E8%A7%A3/">NSILAB一月赛——逆向部分题解</a>
+    </h1>
+  
+
+        
+        <a href="../../2023/01/09/NSILAB%E4%B8%80%E6%9C%88%E8%B5%9B%E2%80%94%E2%80%94%E9%80%86%E5%90%91%E9%83%A8%E5%88%86%E9%A2%98%E8%A7%A3/" class="archive-article-date">
+  	<time datetime="2023-01-09T12:42:38.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-01-09</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h4 id="minidump"><a href="#minidump" class="headerlink" title="minidump"></a>minidump</h4><p>这道题其实是实验室的会长安排的，我一开始也没反应过来。</p>
+<p>dmp文件其实是dbg或者系统错误时产生的内存转储，但是，我们不一定需要专业的软件来打开它，就比如这题，出题人摆明这是c++程序的内存转储，而整个程序的源代码其实在运行时写入了内存，以便后续处理，所以我们直接winhex或者010editor打开，搜索相关字样，比方说“#include”即可，就可以快速跳转到对应代码：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/minidump_1.png"></p>
+<p>我们把代码扒出来，稍微小修小补一阵，看一看，就是个很简单的输出，运行，结束。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/minidump_2.png"></p>
+<h4 id="好像有点不对"><a href="#好像有点不对" class="headerlink" title="好像有点不对"></a>好像有点不对</h4><p>其实，前半截加密就是base64，只不过我把密码表改成了各位没见过的样子（</p>
+<p>后半段嘛……其实跟随机数的生成本身也没太大关系，既然不知道它生成的随机数值到底是什么，那么就粗暴一点，直接爆破。</p>
+<p>那么，思路很清楚了，对结果串从0~89暴力爆破，产生的产物，能看的直接塞到cyberchef里，换个base64的表挨个试一遍（下面的代码用c++实现）：</p>
+<pre><code>#include &lt;bits/stdc++.h&gt;
+using namespace std;
+const char data_0[] = &#123;37,29,51,58,33,123,57,35,30,78,93,95,91,117,99,74,123,13,6,85,127,125,115,65,80,11,89,87,44,120,51,50,15,22,47,119&#125;;
+int main()
+&#123;
+    freopen(&quot;output.txt&quot;,&quot;w&quot;,stdout);
+    for(int i=0;i&lt;=114-24;i++)&#123;
+        bool jud = true;
+        char data_1[114];
+        strcpy(data_1,data_0);
+        for(int j=0;j&lt;strlen(data_0);j++)&#123;
+            data_1[(j+i)%strlen(data_0)] ^= i+j;
+        &#125;
+            puts(data_1);
+    &#125;
+    return 0;
+&#125;
+</code></pre>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E5%A5%BD%E5%83%8F%E6%9C%89%E7%82%B9%E4%B8%8D%E5%AF%B9_1.png"></p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E5%A5%BD%E5%83%8F%E6%9C%89%E7%82%B9%E4%B8%8D%E5%AF%B9_2.png"></p>
+<h4 id="山外青山楼外楼"><a href="#山外青山楼外楼" class="headerlink" title="山外青山楼外楼"></a>山外青山楼外楼</h4><p>顾题思义，这题的flag藏在你的视野之外。</p>
+<p>实现这题的技术来自于<a target="_blank" rel="noopener" href="https://www.youtube.com/watch?v=HlUe0TUHOIc">DEF CON 23</a>，名叫REpsych，可以实现将位图贴到你的程序的控制流图，也就是所谓的ast语法树在ida中的表现上。我在Nepctf2022做到了相关的题目，相关<a target="_blank" rel="noopener" href="https://github.com/xoreaxeaxeax/REpsych">github链接</a>我也放在这，方便各位查阅。</p>
+<p>那么知道这是位图了，我们怎么在ida里看呢？很简单，你需要进入ida的设置，调节一下流图显示的上限。打开options-&gt;general-&gt;graph，将Max number of nodes 调到一定大小即可，比方说114514（。</p>
+<p>至于要看的更清楚的话，可以options-&gt;color-&gt;graph，把背景全部涂黑，这样，一张图片就显示出来了：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E5%B1%B1%E5%A4%96%E9%9D%92%E5%B1%B1%E6%A5%BC%E5%A4%96%E6%A5%BC_1.png"></p>
+<p>顺带，可能低版本ida的流图显示和高版本有一定差距，还请注意</p>
+<h4 id="看不见-走位-走位"><a href="#看不见-走位-走位" class="headerlink" title="看不见 ~ 走位 ~ 走位 ~"></a>看不见 ~ 走位 ~ 走位 ~</h4><p>我摊牌了，这本来是一个经典的迷宫，但是我塞进去了一些隐形墙。</p>
+<p>宋师傅几次与正解失之交臂，估计也是因为没能理解隐形墙的实现方式。</p>
+<p>我们来对比一下隐形墙函数在ida中和在源代码中的表现：</p>
+<pre><code>_BYTE *func_0()
+&#123;
+  _BYTE *result; // rax
+  int i; // [rsp+Ch] [rbp-4h]
+
+  for ( i = 0; i &lt;= 13; i += 2 )
+  &#123;
+    result = &amp;data_1[12 * data_4[i] + data_4[i + 1]];
+    *result = 42;
+  &#125;
+  return result;
+&#125;
+------------------------------------------------
+int data_4[14] = &#123;1,1,1,8,9,2,4,9,3,10,7,4,3,5&#125;;
+
+int func_0()
+&#123;
+    for(int i=0;i&lt;14;i+=2)
+        data_1[data_4[i]][data_4[i+1]]=&#39;*&#39;;
+&#125;
+</code></pre>
+<p>我故意将坐标数组合二为一，但如果能理解经典地图题的实现，就能发现，每一个i和i+1对应的就是地图上的纵横坐标。</p>
+<p>此外，我还在func_2对输入数据做了一些预处理，使上下左右四个方向能直接对应上数组的下标：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%9C%8B%E4%B8%8D%E8%A7%81%7E%E8%B5%B0%E4%BD%8D%7E%E8%B5%B0%E4%BD%8D_1.png"></p>
+<p>那么，接下来就轮到解题了。老规矩，你可以把地图拷下来，再把隐形墙贴上去，然后，要么手动走一遍，要么用算法脚本：</p>
+<pre><code>#include &lt;bits/stdc++.h&gt;
+using namespace std;
+char mp[12][12] = &#123;
+&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,
+&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;_&#39;,&#39;_&#39;,&#39;_&#39;,&#39;_&#39;,&#39;_&#39;,&#39;*&#39;,&#39;_&#39;,&#39;_&#39;,&#39;_&#39;,
+&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;_&#39;,&#39;_&#39;,&#39;*&#39;,
+&#39;*&#39;,&#39;_&#39;,&#39;_&#39;,&#39;_&#39;,&#39;_&#39;,&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;T&#39;,&#39;*&#39;,&#39;*&#39;,
+&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;_&#39;,&#39;_&#39;,&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,
+&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;_&#39;,&#39;T&#39;,&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;_&#39;,&#39;_&#39;,&#39;_&#39;,&#39;*&#39;,
+&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,
+&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;_&#39;,&#39;*&#39;,&#39;_&#39;,&#39;_&#39;,&#39;_&#39;,&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,
+&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;_&#39;,&#39;_&#39;,&#39;*&#39;,
+&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;*&#39;,
+&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;*&#39;,
+&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;S&#39;,&#39;_&#39;,&#39;_&#39;,&#39;*&#39;,&#39;*&#39;
+&#125;;
+int walked[12][12];
+int mvy[4] = &#123;-1,1,0,0&#125;;
+int mvx[4] = &#123;0,0,-1,1&#125;;
+int path[114];
+int shortest[114];
+int total=0xff;
+void dfs(int stp,int y,int x)&#123;
+    if(mp[y][x]==&#39;T&#39;)&#123;
+        if(stp&lt;total)&#123;
+            total = stp;
+            for(int i=0;i&lt;stp;i++)shortest[i]=path[i];
+        &#125;
+        return;
+    &#125;
+    for(int i=0;i&lt;4;i++)&#123;
+        path[stp]=i;
+        if(y+mvy[i]&lt;12&amp;&amp;x+mvx[i]&lt;12&amp;&amp;y+mvy[i]&gt;=0&amp;&amp;x+mvx[i]&gt;=0&amp;&amp;mp[y+mvy[i]][x+mvx[i]]!=&#39;*&#39;&amp;&amp;!walked[y+mvy[i]][x+mvx[i]])&#123;
+            walked[y+mvy[i]][x+mvx[i]]=1;
+            dfs(stp+1,y+mvy[i],x+mvx[i]);
+            walked[y+mvy[i]][x+mvx[i]]=0;
+        &#125;
+        path[stp]=0xff;
+    &#125;
+    return;
+&#125;
+int main()
+&#123;
+    memset(path,0xff,sizeof(path));
+    walked[11][7]=1;
+    dfs(0,11,7);
+    for(int i=0;i&lt;total;i++)&#123;
+        if(shortest[i]==0)printf(&quot;u&quot;);
+        if(shortest[i]==1)printf(&quot;d&quot;);
+        if(shortest[i]==2)printf(&quot;l&quot;);
+        if(shortest[i]==3)printf(&quot;r&quot;);
+    &#125;
+    printf(&quot;\n&quot;);
+    return 0;
+&#125;
+</code></pre>
+<p>各位如果有时间，掌握一些简单算法是必要的，在比赛时绝对有效。比如同样是曾经的nepctf就考了一道广度优先搜索，那是另一种类型的迷宫，各位有兴趣可以看看<a target="_blank" rel="noopener" href="https://ctf.webvpn.nefu.edu.cn/bbs/d/345">我以前的复现</a>或者其他dalao的题解，在此不多赘述。</p>
+<h4 id="分块式处理"><a href="#分块式处理" class="headerlink" title="分块式处理"></a>分块式处理</h4><p>从10分的hint可以看出来，这是一道原题。</p>
+<p>感兴趣的各位可以查看<a target="_blank" rel="noopener" href="https://ctf.webvpn.nefu.edu.cn/bbs/d/207-re-to-2022123">我曾经写过的文章</a>，这道题是BMZCTF的逆向_RE2，各位研究出来了也可以去BMZCTF蹭点分，这里不再赘述。</p>
+<h4 id="彻底疯狂"><a href="#彻底疯狂" class="headerlink" title="彻底疯狂"></a>彻底疯狂</h4><p>如果你点进func_0或者是其它同系列函数稍微观察一下，你就会发现，它们的结构都非常相似：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E5%BD%BB%E5%BA%95%E7%96%AF%E7%8B%82_1.png"></p>
+<p>都是对全局变量value进行异或，只是异或的值有点不同，函数的运行顺序从编号0到99。</p>
+<p>为了方便把这些值提取出来，你需要在汇编代码里列出所有的异或语句：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E5%BD%BB%E5%BA%95%E7%96%AF%E7%8B%82_2.png"></p>
+<p>这时候你就不用一个函数一个函数的点了，直接从这里手动把东西全扒下来。当然，如果要操作优雅一点，你可以按字节码和地址去用脚本拔下来这些东西，这里就不演示了。</p>
+<p>如果将数据以十进制的方式提取出来，那它大概长这样：</p>
+<pre><code>920682
+1261524
+338231
+563319
+1167774
+……
+</code></pre>
+<p>异或具有自反性，所以接下来只要让结果值对其中的数据按顺序异或就行了：</p>
+<pre><code>f = open(&quot;randata.txt&quot;, &quot;r&quot;)
+data_0 = f.read().splitlines()
+data_1 = []
+for line in data_0:
+    data_1.append(int(line))
+print(data_1)
+
+finale = 0xF8B3E
+
+l = len(data_1)
+for i in range(l):
+    finale ^= data_1[l - (i + 1)]
+print(&quot;flag&#123;&quot;+str(finale)+&quot;&#125;&quot;)
+</code></pre>
+<p>顺带，这里是我用来出题的脚本，各位可以研究一下（一些库函数和main的内容我就懒得在这里fwrite了）：</p>
+<pre><code>import random
+
+f0 = open(&quot;randata.txt&quot;, &quot;w&quot;)
+for i in range(100):
+    f0.write(str(random.randint(114514, 1919810))+&quot;\n&quot;)
+f0.close()
+
+fa = open(&quot;randata.txt&quot;, &quot;r&quot;)
+data_0 = fa.read().splitlines()
+data_1 = []
+for line in data_0:
+    data_1.append(int(line))
+
+f1 = open(&quot;craaaaazy_encode.c&quot;, &#39;w&#39;)
+
+for i in range(100):
+    f1.write(&quot;void func_&quot; + str(100-(i+1)) + &quot;()&#123;\n&quot;)
+    f1.write(&quot;  value ^= &quot; + str(data_1[i]) + &quot;;\n&quot;)
+    f1.write(&quot;  func_&quot; + str(100-i) + &quot;();\n&quot;)
+    f1.write(&quot;&#125;\n&quot;)
+
+f2 = open(&quot;creaaaazy.c&quot;, &quot;w&quot;)
+
+for i in range(100):
+    f2.write(&quot;void func_&quot; + str(100 - (i+1)) + &quot;()&#123;\n&quot;)
+    f2.write(&quot;  value ^= &quot; + str(data_1[100-(i+1)]) + &quot;;\n&quot;)
+    f2.write(&quot;  func_&quot; + str(100 - i) + &quot;();\n&quot;)
+    f2.write(&quot;&#125;\n&quot;)
+</code></pre>
+<hr>
+<h3 id="后记"><a href="#后记" class="headerlink" title="后记"></a>后记</h3><p>老实说，虽然我在大一因为有着信息学竞赛的基础，所以对程序和代码的理解会稍微轻松一些，可能对于很多非常常规的题也没有太放在心上</p>
+<p>但当我真的成为了出题人，才发现自己因此缺少了一个很重要的能力：对难度的把控</p>
+<p>更难受的是，一些更高深的内容，碍于自己实践经验太少，无法完全掌握，故也无法加入题目中，作为经验传授给自己的学弟。</p>
+<p>总而言之，自己太菜，缺乏做题与实践，但环境不断在变。我现在需要担心的，不光是战力下滑的自己，更有一群嗷嗷待哺的学弟们。</p>
+<p>共勉。</p>
+<p><em><strong>fin.</strong></em></p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="../../2023/01/09/NSILAB%E4%B8%80%E6%9C%88%E8%B5%9B%E2%80%94%E2%80%94%E9%80%86%E5%90%91%E9%83%A8%E5%88%86%E9%A2%98%E8%A7%A3/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
+    <article id="post-BUUCTF-Crackme6究极折磨失败实录" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="../../2022/11/06/BUUCTF-Crackme6%E7%A9%B6%E6%9E%81%E6%8A%98%E7%A3%A8%E5%A4%B1%E8%B4%A5%E5%AE%9E%E5%BD%95/">BUUCTF-Crackme6究极折磨失败实录</a>
+    </h1>
+  
+
+        
+        <a href="../../2022/11/06/BUUCTF-Crackme6%E7%A9%B6%E6%9E%81%E6%8A%98%E7%A3%A8%E5%A4%B1%E8%B4%A5%E5%AE%9E%E5%BD%95/" class="archive-article-date">
+  	<time datetime="2022-11-06T12:33:31.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-11-06</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>f5无门，遂动调，硬看汇编。</p>
+<p>在主逻辑之前加载数据时有一段call strlen：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Crackme6_strlen.png"></p>
+<p>反复提到0D，应当是判断输入长度的位置，长度存储于ebp寄存器偏移-0x50的位置，多次动调输入后确认输入总长度至少大于13，同时确认大量临时数据位于ebp栈。</p>
+<p>第一段主逻辑在此：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Crackme6_decrypt1st_fir.png"></p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Crackme6_decrypt1st_sec.png"></p>
+<p>1、如图，第一段逻辑一开始又检查了一遍输入长度，长度达标则跳到第二段逻辑，ecx存储输入数据；循环次数为9，每次对于数据的某一位位先异或一个地址为ebp-64h的序列的对应位，再进行一个41（字符A）的减，结果对应的ascii码存储在ebp-48h中，每次跳四字节存储。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Crackme6_decrypt1st_thi.png"></p>
+<p>2、之后如上，进行从小到大的顺序判断，若发现逆序对跳出。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Crackme6_decrypt1st_for.png"></p>
+<p>3、还有一段如上，计算所得到ebp-48h中所有内容的乘积。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Crackme6_decrypt1st_fif.png"></p>
+<p>4、接下来如上，得出的结果会被减0xd4c2086，作为分母除0x64。之后进入一段未知领域。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Crackme6_decrypt1st_sixth.png"></p>
+<p>线索到这里就因为整除0的报错而夹断了。不过，我们确实可以知道flag的前9个字母是什么了。根据其为顺序数列，并且前9位乘积为0xd4c2086，我们完全可以做质因数分解：</p>
+<pre><code>from sympy import nextprime
+
+p = 2
+a = 0xd4c2086
+ans = []
+while a != 1:
+    while a % p:
+        p = nextprime(p)
+    a /= p
+    ans.append(p)
+
+print(ans)
+</code></pre>
+<p>得到的刚好是从2开始九个顺序的质数，对上了。我们直接进行一个解密：</p>
+<pre><code>#include &lt;bits/stdc++.h&gt;
+using namespace std;
+int a[9]=&#123;2,3,5,7,11,13,17,19,23&#125;;
+int b[9]=&#123;0x33,0x21,0x22,0x21,0x35,0x7C,0x62,0x65,0x6e&#125;;
+int main()
+&#123;
+    for(int i=0;i&lt;9;i++)&#123;
+        a[i]+=&#39;A&#39;;
+        a[i]^=b[i];
+        printf(&quot;%c&quot;,a[i]);
+    &#125;
+    printf(&quot;\n&quot;);
+    return 0;
+&#125;
+</code></pre>
+<p>得到前9位为pediy2016……猜都猜得出来。</p>
+<p>那么后四位呢？回到刚才被夹断的部分，在动调的时候，寄存器的值是可以修改的，我们把ecx的值修改为任意非0值就可以无伤跳过了。</p>
+<p>但是，继续动态调试的时候，我们发现一件非常可怕的事情——程序自动往结束的地方走了。</p>
+<p>考虑到代码一般是顺序执行的，我们看看这之后的函数究竟干了些啥：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Crackme6_hellprint.png"></p>
+<p>我超，地狱绘图！</p>
+<p>这种情况的代码一般已经不可读了。后续看题解才知道这是<strong>虚拟机保护</strong>产生的大量中间数据，也就是说，一串代码被改编成了这种没人能看懂的样子。</p>
+<p>一般在这种情况下，我们有几个选择：</p>
+<p>1、从第九位开始爆破，这种方法慢的一批，但可能可以出flag</p>
+<p>2、尝试逐个解读指令，同样慢的一批，而且极其考验技术</p>
+<p>3、尝试绕过报错指令，trace一波</p>
+<p>不过嘛，之后就会明白，我们需要的不是13位密码，而是20位密码……至于为什么，因为实在是卡思路了，所以去dasctf群和NEPCTF群问了dalao，dasctf方面使用动调手动爆破出了第10到13位，又用ida trace硬调分析逻辑，将爆破位数压到了四位。而NEPCTF群的dalao直接表示血压高了，血压高就会生气，生气就会angry，angry了就会想着angr硬搓，但是angr我不会。</p>
+<p>得，从这里爆破不现实了，解读指令又慢的离谱，我们干脆尝试绕过报错。</p>
+<p>从刚才的idiv开始，正常来讲在跳过报错继续执行的过程中会跳转到loc_401373，但是，loc_401373只有通到sub_404284的入口，那里可是程序的出口啊QAQ。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Crackme6_falseloaction.png"></p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Crackme6_falseway.png"></p>
+<p>不过嘛，loc_401373上面还有一段没有被正确识别到函数sub_401120内的东西：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Crackme6_trueway.png"></p>
+<p>似乎在idiv报错被跳过之后，退出了函数就会跑到这里来。那么直接修改报错语句，让程序直接跳到这里不是一个样吗？于是我们动调的时候就做一些手脚：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Crackme6_littlechange.png"></p>
+<p>总算可以trace了。于是我们可以得到一串又臭又长的逻辑：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Crackme6_helltrace.png"></p>
+<p>但是这一串逻辑太不可读了，本人的读汇编能力并不像写出这题的题解的dalao一样nb，只能放了。不过手法还是可以活用于下一次的。</p>
+<p>所以，就算假设我们手动过了后4位，那么后面连接的串长度未知，也只能尝试爆破剩下的n位了。下面是在下和do1phin一起搞出来的搞毛玩意：</p>
+<pre><code>import time
+from pymouse import PyMouse
+from pykeyboard import PyKeyboard
+
+k = PyKeyboard()
+m = PyMouse()
+
+m.click(139, 68)
+s1 = &quot;pediy2016cool15&quot;
+global s2
+s2=&quot;&quot;
+k.type_string(s1+s2)
+k.tap_key(k.enter_key)
+
+# while 1:    # 确定你的鼠标位置
+#     print(m.position())
+#     time.sleep(1)
+
+
+def f(len, stp=1):    # 浅浅做一波回溯
+    global s1, s2
+    for i in range(0, 10):    # 每一位从0到9直接硬爆
+        s2 += str(i)
+        if stp+1&lt;len:
+            f(len, stp+1)
+        else:
+            k.type_string(s1+s2)
+            k.tap_key(k.enter_key)
+            time.sleep(0.02)
+            for j in range(20):
+                k.tap_key(k.backspace_key)
+            # print(s1 + s2+&quot;\n&quot;)
+        s2=s2[:-1]
+
+
+for i in range(5, 6):    # 假装不知道答案有几位，想爆几位手动调
+    f(i)
+</code></pre>
+<blockquote>
+<p>flag{pediy2016cool1531223}</p>
+</blockquote>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="../../2022/11/06/BUUCTF-Crackme6%E7%A9%B6%E6%9E%81%E6%8A%98%E7%A3%A8%E5%A4%B1%E8%B4%A5%E5%AE%9E%E5%BD%95/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
+    <article id="post-关于小娜的形象" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="../../2022/10/31/%E5%85%B3%E4%BA%8E%E5%B0%8F%E5%A8%9C%E7%9A%84%E5%BD%A2%E8%B1%A1/">关于小娜的形象</a>
+    </h1>
+  
+
+        
+        <a href="../../2022/10/31/%E5%85%B3%E4%BA%8E%E5%B0%8F%E5%A8%9C%E7%9A%84%E5%BD%A2%E8%B1%A1/" class="archive-article-date">
+  	<time datetime="2022-10-31T04:54:53.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-10-31</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>想了一下，目前小娜小白裙的形象是不是太单一了</p>
+<p>但是又想了一下，我的技术力明显不支持太复杂的衣物</p>
+<p>不如就先小白裙吧，顺带加点细节。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/IMG_20221031_125045.jpg"></p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">杂谈</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="../../2022/10/31/%E5%85%B3%E4%BA%8E%E5%B0%8F%E5%A8%9C%E7%9A%84%E5%BD%A2%E8%B1%A1/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
     <article id="post-深入理解计算机系统学习笔记-第一篇" class="article article-type-post  article-index" itemscope itemprop="blogPost">
   <div class="article-inner">
     
@@ -1220,626 +1740,9 @@ print(&quot;&#125;&quot;)
 
 
   
-    <article id="post-DASCTF2022-07赋能赛复现" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="../../2022/08/02/DASCTF2022-07%E8%B5%8B%E8%83%BD%E8%B5%9B%E5%A4%8D%E7%8E%B0/">DASCTF2022.07赋能赛复现</a>
-    </h1>
-  
-
-        
-        <a href="../../2022/08/02/DASCTF2022-07%E8%B5%8B%E8%83%BD%E8%B5%9B%E5%A4%8D%E7%8E%B0/" class="archive-article-date">
-  	<time datetime="2022-08-02T14:46:00.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-08-02</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h3 id="隐秘的角落"><a href="#隐秘的角落" class="headerlink" title="隐秘的角落"></a>隐秘的角落</h3><p>打开，die，发现是go，idagolanghelper，一套行云流水的操作。</p>
-<p>找到关键函数main_main、main_Myencode和main_checkflag。在checkflag找到判定正确的字样：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/right.png"></p>
-<p>所以这玩意大概率就是检查flag正确性的。主要还得看Myencode，我们能在里面找到密钥main_enc_key_str。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/key.png"></p>
-<p>所以接下来，要么确认它是什么加密，要么直接动调弄出密文。密文猜测为被当作checkflag判断条件的qword_55EA78，我们直接下断点（跟涅普的golang题一样下在判断处），掏出kali就是一个林克死大头。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/enc_data.png"></p>
-<p>结果密文不是这玩意，反倒是下面的main_enc指向的unk_54DF80。我们直接从里头掏数据出来。Myencode里头不是用了rc4加密的函数吗，我们照解：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/ans.png"></p>
-<p>真解出来一玩意。再结合之前再checkflag里看到的东西，我们直接弄出flag：</p>
-<blockquote>
-<p>flag{9e1963bbbb1285b993c862a5a6f12604}</p>
-</blockquote>
-<h3 id="Fantastic-maze"><a href="#Fantastic-maze" class="headerlink" title="Fantastic_maze"></a>Fantastic_maze</h3><p>只能说调教了半天的bruteHASH，最后竟然治不了这区区sha256碰撞，还是直接自个写了个针对性脚本才好使。</p>
-<pre><code>import hashlib
-sha256 = &quot;d6332bef2902cd05d5f39a2ed281b8b2247bf5978544a0d5cab08d6bc8fd3ce4&quot;
-strr=&quot;ABCDEFGHIJKMLNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789&quot;
-for i in strr:
-    for j in strr:
-        for k in strr:
-            for l in strr:
-                asc = i+j+k+l
-                proof = asc + &quot;MiXq73WVMvdx3jYL&quot;
-                digest = hashlib.sha256(proof.encode(&#39;utf-8&#39;)).hexdigest()
-                if digest == sha256:
-                    finale = proof + &#39;\n&#39; + digest+ &#39;\n&#39;
-                    print(finale)
-</code></pre>
-<p>一开始会给你链接，nc一下，sha256碰撞，你会得到一串巨长无比的base64，想来就是题目的真身了。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/bigdata.png"></p>
-<p>直接蔡博厨房烤一烤，上ida，草，走，忽略ጿ ኈ ቼ ዽ ጿ</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/samestructure.png"></p>
-<p>可以看到程序里这帮子函数基本都一个样。在运行了一阵过后发现这就是一个超大号迷宫，迷宫上每一个节点都连接着十个节点，要我们找到一条路杀出去，满足路长等于1000。</p>
-<p>但是在运行的过程中发现，每次输入0都会使得过程重置，回到开始的节点（这里没截上图，各位可以自行理解）</p>
-<p>好办，遍历图，最短路，前面填充0，完事。由于图的条件太过充裕，甚至连正经最短路都不用，建议广搜（其实是点太少边太多容易出环，一般最短路反倒不好整）。</p>
-<p>另外，在运行后发现每次提供的地图都有细微差别，并且端口还会有超时关停，所以还是得实时提取实时操作，这玩意要像pwn题那样处理。（我不熟python，按官解写的，flag挂了，有人有头绪吗）</p>
-<pre><code>from pwn import *
-import hashlib
-import sys
-
-strr=&quot;ABCDEFGHIJKMLNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789&quot;
-r = remote(&quot;node4.buuoj.cn&quot;,25617)
-
-def de_sha256(): #还是之前那样的sha256
-    r.recvuntil(b&#39;[+] sha256(XXXX+&#39;)
-    salt = r.recv(16).strip().decode()
-    r.recvuntil(b&#39;) == &#39;)
-    sha256 = r.recv(64).strip().decode()
-    for i in strr:
-        for j in strr:
-            for k in strr:
-                for l in strr:
-                    asc = i+j+k+l
-                    proof = asc + salt
-                    digest = hashlib.sha256(proof.encode(&#39;utf-8&#39;)).hexdigest()
-                    if digest == sha256:
-                        print(asc)
-                        r.sendlineafter(b&#39;[+] Plz Tell Me XXXX :&#39;, asc.encode(&#39;utf-8&#39;))
-                        return
-                        
-def get_elf(): #在sha256之后提取程序
-    r.recvuntil(b&#39;map :\n&#39;)
-    data = r.recvuntil(b&#39;That\&#39;s all\n&#39;,drop=True)[:-1]
-    data = base64.b64decode(data)
-    fd = open(&#39;program&#39;,&#39;wb&#39;)
-    fd.write(data)
-    fd.close()
-    
-de_sha256()
-get_elf()
-
-fd = open(&quot;./program&quot;,&quot;rb&quot;)
-offset = 0x13C0 #所需数据的起始位置
-
-def get_Map(fd,offset):
-    #接下来经常出现0xd3，代表每个数据组之间的间距，也就是函数偏移
-    #同理，0xa，每个待取数据之间的偏移
-    Map = []
-    for i in range(1000):
-        addr = offset
-        for j in range(10):
-            fd.seek(addr)
-            fc = u64(fd.read(4).ljust(8,b&#39;\x00&#39;))
-            if fc &lt;= 0x33765: #话说明明func_999的地址都到0x34000+了，为啥这里设了这么低的上限
-                fc = fc//0xd3 + i + 1 #取出与当前点连边的点
-            else: #对于在上限外的点，应该就是对func_1000的条件进行特判吧，条件不符就属于正常点
-                fc = fc - 0x100000000
-                if fc &gt; -0xd3:
-                    fc = i
-                else:
-                    if addr+fc &lt; 0x134A:
-                        fc = 1000
-                    else:
-                        fc = fc//0xd3
-                        fc = i+1+fc
-            Map.append(fc)
-            addr += 0xa
-        offset += 0xd3
-    return Map
-
-Map = get_Map(fd,offset)
-
-def bfs(Map):
-    edge = []
-    keys = []
-    for st in range(1000):
-        for ed in range(10):
-            if ed == 0:
-                edge.append([])
-            edge[st].append(Map[ed + st * 10]) #还得麻烦的将一维数组转换成邻接表
-    for i in range(1000):
-        keys.append(i)
-    point_data = dict(zip(keys,edge)) #然后打包成点和边的集合
-    q = [(0,&#39;&#39;)] #python在变量定义上的好处，啥边一块记了
-    check_map = &#123;&#125;
-    result1 = None
-    while len(q):
-        f = q[0]
-        q = q[1:]
-        if(f[0] == 1000):
-            result1 = f[1]
-            break
-        if f[0] not in check_map:
-            check_map[f[0]] = 1 #ban掉走过的边防止回环
-            for i in range(10):
-                if point_data[f[0]][i] not in check_map:
-                    q.append((point_data[f[0]][i],f[1]+str(i)))
-    return result1
-
-result = bfs(Map)
-print(result)
-result = str(result)
-times = 999 - len(result)
-
-for i in range(times):
-    r.sendline(b&#39;0&#39;)
-
-for i in range(len(result)):
-    r.sendline(str(int(result[i])+1).encode(&#39;utf-8&#39;))
-    
-data = r.recvuntil(b&#39;&#125;&#39;,drop=True)[:-1]
-fin_fd = open(&#39;./result.txt&#39;,&#39;wb&#39;)
-fin_fd.write(data)
-fin_fd.close()
-</code></pre>
-<blockquote>
-<p>DASCTF{d46dfb6b-610a-48d5-a1d6-2035aa4af67}（未通过）</p>
-</blockquote>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="../../2022/08/02/DASCTF2022-07%E8%B5%8B%E8%83%BD%E8%B5%9B%E5%A4%8D%E7%8E%B0/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-    <article id="post-捏 浦 吸 踢 艾 釜 贰 零 贰 贰 解 题 与 复 现" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="../../2022/07/17/%E6%8D%8F%20%E6%B5%A6%20%E5%90%B8%20%E8%B8%A2%20%E8%89%BE%20%E9%87%9C%20%E8%B4%B0%20%E9%9B%B6%20%E8%B4%B0%20%E8%B4%B0%20%E8%A7%A3%20%E9%A2%98%20%E4%B8%8E%20%E5%A4%8D%20%E7%8E%B0/">捏 浦 吸 踢 艾 釜 贰 零 贰 贰 解 题 与 复 现</a>
-    </h1>
-  
-
-        
-        <a href="../../2022/07/17/%E6%8D%8F%20%E6%B5%A6%20%E5%90%B8%20%E8%B8%A2%20%E8%89%BE%20%E9%87%9C%20%E8%B4%B0%20%E9%9B%B6%20%E8%B4%B0%20%E8%B4%B0%20%E8%A7%A3%20%E9%A2%98%20%E4%B8%8E%20%E5%A4%8D%20%E7%8E%B0/" class="archive-article-date">
-  	<time datetime="2022-07-17T02:09:00.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-07-17</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h3 id="Previously"><a href="#Previously" class="headerlink" title="Previously"></a>Previously</h3><p>首次500人+的个人竞技大混战突入前百，感觉还是不错的。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/scoreboard.png"></p>
-<p>就是解出来的题还是以misc占大头，难受，一个是自己还是只会传统逆向，碰着花活就挂，一个是对go之类的其它语言还是不甚了解，回头害得研究orz。</p>
-<p>以及，有道小分密码因为睡过头没来得及研究，寄</p>
-<p>以及，只有前三十名才有可能拿fufu，寄中寄</p>
-<h2 id="Crypto"><a href="#Crypto" class="headerlink" title="Crypto"></a>Crypto</h2><p>换成温佬应该已经AK了吧（</p>
-<h3 id="signin"><a href="#signin" class="headerlink" title="signin"></a>signin</h3><p>注意看leak：</p>
-<pre><code>def leak(par, c):
-    assert len(par) == 5
-    (p,q,n,e,d) = par
-
-    print(&quot;Here&#39;s something for you.&quot;)
-    print(&quot;n =&quot;,n)
-    print(&quot;e =&quot;,e)
-    print(&quot;c_mod_p =&quot;,c % p)
-    print(&quot;c_mod_q =&quot;,c % q)
-</code></pre>
-<p>可知我们能得到的数据只有c mod p，c mod q，n和e。由于RSA的运算中明文和密文都是在模n意义下得到，这里可以直接用中国剩余定理进行攻击（毕竟题目描述都很直白了，而p*q&#x3D;n刚好满足<a target="_blank" rel="noopener" href="https://baike.baidu.com/item/%E5%AD%99%E5%AD%90%E5%AE%9A%E7%90%86/2841597?fromtitle=%E4%B8%AD%E5%9B%BD%E5%89%A9%E4%BD%99%E5%AE%9A%E7%90%86&fromid=11200132&fr=aladdin">中国剩余定理</a>的过程，就变成了求解模n意义下的同余方程组）。</p>
-<p>那么，先通过对n开方和sympy等库的函数猜测出构成n的质因子，通过中国剩余定理解出c关于p和q的同余方程得到密文：</p>
-<pre><code>from Crypto.Util.number import *
-from Crypto import *
-from gmpy2 import *
-from sympy import *
-
-n = 19955580242010925349026385826277356862322608500430230515928936214328341334162349408990409245298441768036250429913772953915537485025323789254947881868366911379717813713406996010824562645958646441589124825897348626601466594149743648589703323284919806371555688798726766034226044561171215392728880842964598154362131942585577722616354074267803330013886538511795383890371097812191816934883393255463554256887559394146851379087386846398690114807642170885445050850978579391063585254346364297374019309370189128443081285875218288166996242359495992824824109894071316525623741755423467173894812627595135675814789191820979950786791
-p = prevprime(int(sqrt(n)))  #通过n开方猜测质因子
-q = next_prime(p)
-print(p*q==n)
-
-inp = invert(q,p)  #相当于只有两个式子
-inq = invert(p,q)
-
-a1 = 32087476819370469840242617415402189007173583393431940289526096277088796498999849060235750455260897143027010566292541554247738211165214410052782944239055659645055068913404216441100218886028415095562520911677409842046139862877354601487378542714918065194110094824176055917454013488494374453496445104680546085816
-a2 = 59525076096565721328350936302014853798695106815890830036017737946936659488345231377005951566231961079087016626410792549096788255680730275579842963019533111895111371299157077454009624496993522735647049730706272867590368692485377454608513865895352910757518148630781337674813729235453169946609851250274688614922
-
-c = ( ( a1*inp*q ) + ( a2*inq*p ) )%n
-
-print(c)
-print(p)
-print(q)
-</code></pre>
-<p>然后将得到的c、p、q代入rsa求解得到明文：</p>
-<pre><code>from libnum import *
-from sympy import *
-def exgcd_(a, b):
-    if b == 0:
-        return 1, 0
-    else:
-        k = a // b
-        remainder = a % b
-        x1, y1 = exgcd_(b, remainder)
-        x, y = y1, x1 - k * y1
-    return x, y
-
-def ext_euclid(a, b):
-    if b == 0:
-        return 1, 0, a
-    else:
-        x, y, q = ext_euclid(b, a % b)
-        # q = gcd(a, b) = gcd(b, a%b)
-        x, y = y, (x - (a // b) * y)
-        return x, y, q
-
-def fastpower_(a,b,n):
-    ans = 1
-    while n &gt; 0:
-        if n % 2 ==1:
-            ans= ans * a % b
-        a = a * a % b
-        n = n // 2
-    return ans % b
-
-p = 141264221379693044160345378758459195879285464451894666001807667429134348549398732060237738374405784248735752195059908618618110595213605790125890251970818437656069617772772793421437649079362238861287098916200835889507111259332056471215428085418047179545017193159169629731673653136069647622114441162534727202891
-q = 141264221379693044160345378758459195879285464451894666001807667429134348549398732060237738374405784248735752195059908618618110595213605790125890251970818437656069617772772793421437649079362238861287098916200835889507111259332056471215428085418047179545017193159169629731673653136069647622114441162534727202901
-e = 65537
-c = 11585753035364453623378164545833713948934121662572481093551492504984285077422719062455876099192809170965528989978916297975142142402092047776685650391890015591851053625214326683661927557815767412532952834312578481775648269348260126890551800182341487341482624921905494384205411870866282984671167687789838745481283560185866063970417999748309023918055613674098243729965218609202078551918246640314724590879724609275497227193516782920583249761139685192331805838597293957173545581106446048233248746840771791319643962479707861560044363232580020690857525268858245122996322707454824806268698526881569554077998480289824923073346
-n = 19955580242010925349026385826277356862322608500430230515928936214328341334162349408990409245298441768036250429913772953915537485025323789254947881868366911379717813713406996010824562645958646441589124825897348626601466594149743648589703323284919806371555688798726766034226044561171215392728880842964598154362131942585577722616354074267803330013886538511795383890371097812191816934883393255463554256887559394146851379087386846398690114807642170885445050850978579391063585254346364297374019309370189128443081285875218288166996242359495992824824109894071316525623741755423467173894812627595135675814789191820979950786791
-phin = totient(n)
-# print(n)
-# print(phin)
-x= exgcd_(e, phin)[0]
-d = x % phin
-m = fastpower_(c, n, d)
-print(n2s(int(m)))
-</code></pre>
-<h3 id="中等数学"><a href="#中等数学" class="headerlink" title="中等数学"></a>中等数学</h3><p>RSA，但是生成了一组贵物pq：</p>
-<pre><code>p=getPrime(1024)
-q=next_prime(p+(p&gt;&gt;500))
-#Zuni: 听说密码学是小学数学来着？
-</code></pre>
-<p>很寄，所以结合题目描述，要解方程。但是这种方程组不是小学数学，所以出题人该打（</p>
-<p>电脑不顺手，直接用手算。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/IMG_20220721_222436%7E1.jpg"></p>
-<p>然后得到了一个不用暴力，只需要nxtprime的方法（虽然gmpy的next_prime本质上也是暴力），于是码出来（感谢0HB佬提醒，RSA类题目过程涉及实数运算的记得整除）：</p>
-<pre><code>from gmpy2 import *
-from sympy import *
-
-n = 13776679754786305830793674359562910178503525293501875259698297791987196248336062506951151345232816992904634767521007443634017633687862289928715870204388479258679577315915061740028494078672493226329115247979108035669870651598111762906959057540508657823948600824548819666985698501483261504641066030188603032714383272686110228221709062681957025702835354151145335986966796484545336983392388743498515384930244837403932600464428196236533563039992819408281355416477094656741439388971695931526610641826910750926961557362454734732247864647404836037293509009829775634926600458845832805085222154851310850740227722601054242115507
-q = next_prime(int(sqrt(n+(n&gt;&gt;500)))) # 既然r要尽可能小，那假设p既定，q-(sqrt(n+(n&gt;&gt;500))也要尽可能小
-p = n//q
-print(&#39;p is :&#39;, p)
-print(&#39;q is :&#39;, q)
-</code></pre>
-<p>当然你也可以用<code>sqrt(n)</code>硬梭（虽然我梭了一万年都没梭出来），总之，能求出p和q就行。然后放进你常用的rsa脚本求解就行了。</p>
-<blockquote>
-<p>NepCTF{never_ignore_basic_math}</p>
-</blockquote>
-<h2 id="misc"><a href="#misc" class="headerlink" title="misc"></a>misc</h2><h3 id="花花画画画花花"><a href="#花花画画画花花" class="headerlink" title="花花画画画花花"></a>花花画画画花花</h3><p>osz文件为osu谱面，打开进入编辑器快进看到flag</p>
-<p>注意不明显的下划线，以及，这里的flag可以有中文。</p>
-<h3 id="少见的bbbbase"><a href="#少见的bbbbase" class="headerlink" title="少见的bbbbase"></a>少见的bbbbase</h3><p>只能说，对于misc工具还是孤陋寡闻了。Nep的教程里出现了一堆使用插件，必可活用于下次.jpg</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/detected.png"></p>
-<p>使用stegdetect，输入<code>.\stegdetect.exe -tjopi -s 10.0 少见的bbbbase.jpg</code>指令，得知图片为jphide隐写，遂用Jphs打开。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Jphs.png"></p>
-<p>输出无后缀文件，保险起见winhex打开，得到一串编码<code>KkYWdvCQcLYewSUUy5TtQc9AMa</code>。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/winhex.png"></p>
-<p>联想到题目名，排除base64等常见密码的可能，转而去找base61、base58、base92等非常见base，最后使用相对常见的base58得出答案。</p>
-<blockquote>
-<p>NepCTF{Real_qiandao~}</p>
-</blockquote>
-<h3 id="签到题"><a href="#签到题" class="headerlink" title="签到题"></a>签到题</h3><p>图片大小不对劲，winhex打开，发现其内部藏有大量zip文件。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/winhex_2.png"></p>
-<p>用kali的binwalk拆解后发现入题解所言是套娃，于是直接上脚本拆解：</p>
-<pre><code>from zipfile import *
-from re import *
-zipname = &quot;G:\\Hank Another\\带学\\CTF\\比赛\\NepCTF2022\\misc\\签到题\\_xxx.jpg.extracted\\&quot;+&quot;232.zip&quot;
-while True:
-    if zipname != &quot;G:\\Hank Another\\带学\\CTF\\比赛\\NepCTF2022\\misc\\签到题\\_xxx.jpg.extracted\\1.zip&quot;:
-        ts1 = ZipFile(zipname)
-        #print ts1.namelist()[0]
-        res = search(&#39;[0-9]*&#39;,ts1.namelist()[0])
-        print (res.group())
-        passwd = str.encode(res.group())
-        ts1.extractall(&quot;G:\\Hank Another\\带学\\CTF\\比赛\\NepCTF2022\\misc\\签到题\\_xxx.jpg.extracted\\&quot;,pwd=passwd)
-        zipname = &quot;G:\\Hank Another\\带学\\CTF\\比赛\\NepCTF2022\\misc\\签到题\\_xxx.jpg.extracted\\&quot;+ts1.namelist()[0]
-    else:
-        print (&quot;find&quot;)
-</code></pre>
-<p>拆解到只剩一层时发现压缩包内含流量包，压缩包含加密。winhex再次打开发现文件头并没有加密标记，但目录区有加密标记，为伪加密，直接改掉标记拆包。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/rewinhex.png"></p>
-<p>打开流量包，发现是键盘usb流量，通过<code>.\tshark.exe -T json -r keyboard.pcap &gt; usbdata.json</code>指令处理后得到操作数据的json文件，但指令无法直接提取操作内容，故手动提取得到usbdata.txt：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/handjob.png"></p>
-<p>然后脚本开跑，得出操作。</p>
-<pre><code>from numpy import *
-mappings = &#123; 0x04:&quot;a&quot;,  0x05:&quot;b&quot;,  0x06:&quot;c&quot;, 0x07:&quot;d&quot;, 0x08:&quot;e&quot;, 0x09:&quot;f&quot;, 0x0A:&quot;g&quot;,  0x0B:&quot;h&quot;, 0x0C:&quot;i&quot;,  0x0D:&quot;j&quot;, 0x0E:&quot;k&quot;, 0x0F:&quot;l&quot;, 0x10:&quot;m&quot;, 0x11:&quot;n&quot;,0x12:&quot;o&quot;,  0x13:&quot;p&quot;, 0x14:&quot;q&quot;, 0x15:&quot;r&quot;, 0x16:&quot;s&quot;, 0x17:&quot;t&quot;, 0x18:&quot;u&quot;,0x19:&quot;v&quot;, 0x1A:&quot;w&quot;, 0x1B:&quot;x&quot;, 0x1C:&quot;y&quot;, 0x1D:&quot;z&quot;, 0x1E:&quot;1&quot;, 0x1F:&quot;2&quot;, 0x20:&quot;3&quot;, 0x21:&quot;4&quot;, 0x22:&quot;5&quot;,  0x23:&quot;6&quot;, 0x24:&quot;7&quot;, 0x25:&quot;8&quot;, 0x26:&quot;9&quot;, 0x27:&quot;0&quot;, 0x28:&quot;\n&quot;, 0x2a:&quot;[DEL]&quot;,  0X2B:&quot;    &quot;, 0x2C:&quot; &quot;,  0x2D:&quot;-&quot;, 0x2E:&quot;=&quot;, 0x2F:&quot;[&quot;,  0x30:&quot;]&quot;,  0x31:&quot;\\&quot;, 0x32:&quot;`&quot;, 0x33:&quot;;&quot;,  0x34:&quot;&#39;&quot;, 0x36:&quot;,&quot;,  0x37:&quot;.&quot; &#125;
-shiftmappings = &#123; 0x04:&quot;A&quot;,  0x05:&quot;B&quot;,  0x06:&quot;C&quot;, 0x07:&quot;D&quot;, 0x08:&quot;E&quot;, 0x09:&quot;F&quot;, 0x0A:&quot;G&quot;,  0x0B:&quot;H&quot;, 0x0C:&quot;I&quot;,  0x0D:&quot;J&quot;, 0x0E:&quot;K&quot;, 0x0F:&quot;L&quot;, 0x10:&quot;M&quot;, 0x11:&quot;N&quot;,0x12:&quot;O&quot;,  0x13:&quot;P&quot;, 0x14:&quot;Q&quot;, 0x15:&quot;R&quot;, 0x16:&quot;S&quot;, 0x17:&quot;T&quot;, 0x18:&quot;U&quot;,0x19:&quot;V&quot;, 0x1A:&quot;W&quot;, 0x1B:&quot;X&quot;, 0x1C:&quot;Y&quot;, 0x1D:&quot;Z&quot;, 0x1E:&quot;!&quot;, 0x1F:&quot;@&quot;, 0x20:&quot;#&quot;, 0x21:&quot;$&quot;, 0x22:&quot;%&quot;,  0x23:&quot;^&quot;, 0x24:&quot;&amp;&quot;, 0x25:&quot;*&quot;, 0x26:&quot;(&quot;, 0x27:&quot;)&quot;, 0x28:&quot;\n&quot;, 0x2a:&quot;[DEL]&quot;,  0X2B:&quot;    &quot;, 0x2C:&quot; &quot;,  0x2D:&quot;_&quot;, 0x2E:&quot;+&quot;, 0x2F:&quot;&#123;&quot;,  0x30:&quot;&#125;&quot;,  0x31:&quot;|&quot;, 0x32:&quot;~&quot;, 0x33:&quot;:&quot;,  0x34:&quot;[double quo]&quot;, 0x36:&quot;&lt;&quot;,  0x37:&quot;&gt;&quot; &#125;
-
-nums = []
-shiftag = []
-keys = open(&#39;usbdata.txt&#39;)
-for line in keys:
-    if line[0]!=&#39;0&#39; or (line[1]!=&#39;0&#39; and line[1]!=&#39;2&#39;) or line[3]!=&#39;0&#39; or line[4]!=&#39;0&#39; or line[9]!=&#39;0&#39; or line[10]!=&#39;0&#39; or line[12]!=&#39;0&#39; or line[13]!=&#39;0&#39; or line[15]!=&#39;0&#39; or line[16]!=&#39;0&#39; or line[18]!=&#39;0&#39; or line[19]!=&#39;0&#39; or line[21]!=&#39;0&#39; or line[22]!=&#39;0&#39;:
-         continue
-    nums.append(int(line[6:8],16))
-    shiftag.append(int(line[0:2],16))
-keys.close()
-output = &quot;&quot;
-for i in range(len(nums)):
-    if nums[i] == 0:
-        continue
-    if nums[i] in mappings:
-        if shiftag[i]:
-            output += shiftmappings[nums[i]]
-        else:
-            output += mappings[nums[i]]
-    else:
-        output += &#39;[unknown]&#39;
-print (&#39;output :\n&#39; + output)
-</code></pre>
-<h3 id="馅饼？陷阱！"><a href="#馅饼？陷阱！" class="headerlink" title="馅饼？陷阱！"></a>馅饼？陷阱！</h3><p>偏简单的社工。模拟了一个网友被骗，自己需要靠照片找银行的情况。</p>
-<p>通过照片二上“尚德源”的招牌和“琼”字头车牌，确认地区为海南，用google地图进一步确认店铺名称为“尚德源茶园酒店”，以及所在地海南省三亚市天涯区新风街。结合附近地址，如饺子城等店铺确认位置后，找到附近有对应银行为光大银行，银行官网网址即为flag。</p>
-<h2 id="Reverse"><a href="#Reverse" class="headerlink" title="Reverse"></a>Reverse</h2><h3 id="快来签到"><a href="#快来签到" class="headerlink" title="快来签到"></a>快来签到</h3><p>die发现repsych.asm，谷歌搜索，发现是一个用于将位图隐藏到ida控制流图的插件。</p>
-<p>抬高ida的流图nodes上限，再缩小主函数显示比例，答案出现。</p>
-<h3 id="We-Can-Gone"><a href="#We-Can-Gone" class="headerlink" title="We_Can_Gone"></a>We_Can_Gone</h3><p>exe文件，用32位ida打开，并未发现明显主函数。发现报错字段：“no goroutines (main called runtime.Goexit) - deadlock!”，确认是go语言，于是用IDAGolangHelper把它的汇编形式变得阳间点。</p>
-<p>但是我们怎么确认主函数的位置捏？如果你在汇编里头铁搜索，你八成只能找得到一点残渣：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/notfound_wecangone.png"></p>
-<p>这时候就得去字节码部分搜，去找数据。这一搜索还真找着了，地址4AF360附近有一个false：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/found_wecangone.png"></p>
-<p>至少找到要用的字符串了，方向多没关系，挨个试一遍，最后发现这个false与off_4D2334关联，而off_4D2334又与sub_499630关联，于是我们终于找到了个类似主函数的东西。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/main_wecangone.png"></p>
-<p>首先判定，长度是否为23，是否符合flag格式，然后是和某个数组进行比对是否一致。但是这个数组在未运行时神龙见首不见尾，我们直接进行动态调试让它现形（随便输一个总长23的flag，在循环判断的地方下断点）：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/debugger.png"></p>
-<blockquote>
-<p>NepCTF{U9et_t0_th3TRUE}</p>
-</blockquote>
-<h3 id="simple-judge"><a href="#simple-judge" class="headerlink" title="simple_judge"></a>simple_judge</h3><p>官方题解给出的源码是这样：</p>
-<pre><code>#include&lt;bits/stdc++.h&gt;
-#include&lt;unistd.h&gt;
-using namespace std;
-char passage[100000];
-int num;
-int read_n(int len)&#123;
-  int i=1;
-  while(i&lt;=len)&#123;
-    scanf(&quot;%c&quot;,passage+i);
-    i++;
-  &#125;
-  return len;
-&#125;
-int mask(int x)&#123;
-  return 1&lt;&lt;x;
-&#125;
-int get_bit(int x)&#123;
-  if(1+x/8&gt;num+1)&#123;
-    printf(&quot;too short\n&quot;);
-    exit(0);
-  &#125;
-  //printf(&quot;%c\n&quot;,(passage[1+x/8]));
-  return !!(passage[1+x/8]&amp;mask(x%8));
-&#125; 
-bool judge_xor(int x,int y)&#123;
-  if(x==y)return 0;
-  return (get_bit(x)^get_bit(y));
-&#125;
-bool judge_or(int x,int y)&#123;
-  if(x==y)return 0;
-  return get_bit(x)||get_bit(y);
-&#125;
-int main()&#123;
-  freopen(&quot;data.txt&quot;,&quot;r&quot;,stdin);
-  int len;
-  cin&gt;&gt;len;
-  getchar();
-  num=read_n(len);
-  if(num!=len)printf(&quot;wrong\n&quot;);
-  printf(&quot;I will check your input passage\nplease make sure ./data.txt exists and follow the input format\n&quot;);
-  //printf(passage+1);
-  int n;
-  scanf(&quot;%d\n&quot;,&amp;n);
-  //printf(&quot;%d\n&quot;,n);
-  for(int i=1;i&lt;=n;i++)&#123;
-    int op,x,y;
-    scanf(&quot;%d %d %d&quot;,&amp;op,&amp;x,&amp;y);
-    if(op==1)&#123;
-      if(!judge_or(x,y))&#123;
-        printf(&quot;Wrong passage on %d\n&quot;,i);
-        exit(0);
-      &#125;
-    &#125;
-    else&#123;
-      if(!judge_xor(x,y))&#123;
-        printf(&quot;Wrong passage on %d\n&quot;,i);
-        exit(0);
-      &#125;
-    &#125;
-  &#125;
-  printf(&quot;Great!,But you may check your input if it is passage!\n&quot;);
-  return 0;
-&#125;
-</code></pre>
-<p>但在ida里其实这俩长得一毛一样：</p>
-<pre><code>_BOOL8 __fastcall sub_C24(int a1)
-&#123;
-  int v1; // ebx
-
-  if ( a1 / 8 + 1 &gt; dword_24A16E0 + 1 )
-  &#123;
-    puts(&quot;too short&quot;);
-    exit(0);
-  &#125;
-  v1 = *((char *)&amp;unk_2489040 + a1 / 8 + 1);
-  return (v1 &amp; (unsigned int)sub_C0D(a1 % 8)) != 0;
-&#125;
-
-_BOOL8 __fastcall sub_CEC(unsigned int a1, unsigned int a2)
-&#123;
-  if ( a1 == a2 )
-    return 0LL;
-  return sub_C24(a1) || sub_C24(a2);
-&#125;
-
-bool __fastcall sub_CAC(int a1, int a2)
-&#123;
-  _BOOL4 v3; // ebx
-
-  if ( a1 == a2 )
-    return 0;
-  v3 = sub_C24(a1);
-  return v3 != sub_C24(a2);
-&#125;
-
-__int64 __fastcall main(__int64 a1, char **a2, char **a3)
-&#123;
-  unsigned int i; // [rsp+0h] [rbp-10h]
-  unsigned int v5; // [rsp+8h] [rbp-8h]
-  unsigned int v6; // [rsp+Ch] [rbp-4h]
-
-  sub_7AA(a1, a2, a3);
-  freopen(&quot;passage.txt&quot;, &quot;r&quot;, stdin);
-  dword_24A16E0 = read(0, &amp;unk_2489041, (size_t)&amp;off_1869F);
-  puts(&quot;I will check your input passage\nplease make sure ./passage.txt exists.&quot;);
-  freopen(&quot;data&quot;, &quot;r&quot;, stdin);
-  for ( i = 0; (int)i &lt;= (int)&amp;off_2E06BF; ++i )
-  &#123;
-    v5 = dword_3720[3 * i + 1];
-    v6 = dword_3720[3 * i + 2];
-    if ( dword_3720[3 * i] == 1 )
-    &#123;
-      if ( !sub_CEC(v5, v6) )
-      &#123;
-        printf(&quot;Wrong passage on %d\n&quot;, i);
-        exit(0);
-      &#125;
-    &#125;
-    else if ( !sub_CAC(v5, v6) )
-    &#123;
-      printf(&quot;Wrong passage on %d\n&quot;, i);
-      exit(0);
-    &#125;
-  &#125;
-  puts(&quot;Great!,But you may check your input if it is passage!&quot;);
-  return 0LL;
-&#125;
-</code></pre>
-<p>无非就是在题设中dword_3720给定了操作，基本都是用按字节操作去求某些东西，一道算法题。这里就要扯到一个我曾经打OI时没注意到的一个知识盲区——2-SAT。</p>
-<blockquote>
-<p>可以证明，当k&gt;2时，k-SAT是NP完全的。因此一般讨论的是k&#x3D;2的情况，即2-SAT问题。</p>
-<p>我们通俗的说，就是给你n个变量ai，每个变量能且只能取0&#x2F;1的值。同时给出若干条件，形式诸如(not)a[i]opt(not)a[j]&#x3D;0&#x2F;1，其中opt表示and,or,xor中的一种，而求解2-SAT的解就是求出满足所有限制的一组a。</p>
-<p>————摘自<a target="_blank" rel="noopener" href="https://www.cnblogs.com/cjjsb/p/9771868.html">hl666的文章</a></p>
-</blockquote>
-<p>这么说来，我们之前提到过的搜索算法似乎很适合求解这种贵物。题目本身就是一个2-SAT问题，看起来只需要把2-SAT问题转换为一张有向图就行了。但……怎么转换呢？</p>
-<p>于是我去翻了各种2-SAT的模板题……这simple个锤子，出题人吃了吗，没吃吃我一拳（</p>
-<p>虽然这2-SAT的结构还算简单，就只有或和异或，但这鬼屎数据量简直屎到劲，根本提不出来（从0x3720到0x1869B，IDA直呼太大了进不去）。更不要说这张奇大无比的图它还有环，还有环口牙！！！而且自己测试的时候官解都挂了……离谱。</p>
-<p>（后来发现是提数据的时候逼到ida软件本体读取上限了，看来得用其它工具）</p>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="../../2022/07/17/%E6%8D%8F%20%E6%B5%A6%20%E5%90%B8%20%E8%B8%A2%20%E8%89%BE%20%E9%87%9C%20%E8%B4%B0%20%E9%9B%B6%20%E8%B4%B0%20%E8%B4%B0%20%E8%A7%A3%20%E9%A2%98%20%E4%B8%8E%20%E5%A4%8D%20%E7%8E%B0/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
   
     <nav id="page-nav">
-      <a class="extend prev" rel="prev" href="../2/">&amp;laquo; Prev</a><a class="page-number" href="../../">1</a><a class="page-number" href="../2/">2</a><span class="page-number current">3</span>
+      <a class="extend prev" rel="prev" href="../2/">&amp;laquo; Prev</a><a class="page-number" href="../../">1</a><a class="page-number" href="../2/">2</a><span class="page-number current">3</span><a class="page-number" href="../4/">4</a><a class="extend next" rel="next" href="../4/">Next &amp;raquo;</a>
     </nav>
   
 

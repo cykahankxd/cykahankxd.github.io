@@ -254,6 +254,117 @@
 
 
   
+    <article id="post-深入理解计算机系统学习笔记-第五篇（下）" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="2023/09/16/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%BA%94%E7%AF%87%EF%BC%88%E4%B8%8B%EF%BC%89/">深入理解计算机系统学习笔记-第五篇（下）</a>
+    </h1>
+  
+
+        
+        <a href="2023/09/16/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%BA%94%E7%AF%87%EF%BC%88%E4%B8%8B%EF%BC%89/" class="archive-article-date">
+  	<time datetime="2023-09-16T07:48:43.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-09-16</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h3 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h3><p>终于，到了大三</p>
+<p>估计不久之后也要开始崩溃的考研时光了（悲</p>
+<p>那么接下来，开始我的炸弹秀——</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%BA%94%E7%AF%87%E4%B8%8B-1.png"></p>
+<p>啊对对对，是咋俩的炸弹秀。</p>
+<h3 id="讲到哪了？"><a href="#讲到哪了？" class="headerlink" title="讲到哪了？"></a>讲到哪了？</h3><p>哦，对了，上一回刚刚讲到子进程和fork，其中提到了一些：</p>
+<h3 id="信号"><a href="#信号" class="headerlink" title="信号"></a>信号</h3><p>我们之前提到的<code>SIGSTOP / SIGSTEP / SIGTTIN / SIGTTOU</code>信号，其实只是信号的一部分。信号的定义，实际上就是内核向进程系统发送的消息，提示系统进程发生了，或者计划发生某些事件。比方说一个进程可以通过内核发送向另一个进程的<code>SIGKILL</code>信号，来终止目标进程；再比如内核发出<code>SIGXCPU</code>信号的时候，是一个进程TLE（Time Limit Exceed，运行超时，准确来讲是在CPU中执行指令的时候并没有抛出异常却卡住了）了。</p>
+<p>至于这些信号的确切作用，你可以在《深入理解》的原书中找到，本文不再赘述。</p>
+<h4 id="信号的运作"><a href="#信号的运作" class="headerlink" title="信号的运作"></a>信号的运作</h4><p>既然提到信号，那么就不得不提信号的收发。概念很简单，<strong>发送信号</strong>就是内核将信号发送到进程，<strong>接收信号</strong>就是进程对内核发出的信号做出反应（并且因为内核的层级高于进程，实际上在通常情况下，这个接受过程是<strong>受迫</strong>的）。</p>
+<p>是否发送取决于内核是否对检测到的系统事件进行反应，或者说系统有没有收到来自进程的kill请求。最直观的就是当你的程序卡住不动，尝试操作又导致超时的时候，windows任务管理器会发来一个提示，让你决定是否中断程序，当你选择中断，那么内核才会对这个异常信号反应，或者接受kill的调用请求，选择继续等待时则会绕过这一次的决策。</p>
+<p>同样的，有无法发送的情况，就有无法接收的情况。有被动的情况，一个发出但没有被接收的信号叫<strong>待处理信号</strong>，一旦一个进程有一条对应的待处理信号，那么与这条信号同类的所有信号都会在传入的时候被拦截，而这也就意味着，待处理信号有对于当前进程的<strong>唯一性</strong>，即一个进程的同一类待处理信号只能有一个。</p>
+<p>也有主动的情况，就是一个进程可以选择<strong>阻塞</strong>某类信号，这些被阻塞的信号会处于一种“如收”的状态，即收了但没执行，直到进程取消阻塞行为。实际上，对于待处理信号的处理过程就是一种<strong>隐式</strong>的阻塞，相对而言，使用**<code>sigporcmask</code><strong>函数之类的手段进行调用的阻塞则是</strong>显式**阻塞，具体而言可以翻阅《深入理解》原书522到533页，本文不再赘述。</p>
+<p>内核在每个进程中维护两个分别叫”<strong>pending</strong>“和”<strong>blocked</strong>“的位向量，一个维护当前进程的待处理信号，一个维护被阻塞的信号类别.当内核发送一个信号给进程时，它将会修改进程的pending位向量，譬如说，当内核发送一个<code>SIGINT</code>信号给进程，那么它会将进程的<code>pending[SIGINT]</code>的值设置成1。同样地，当进程屏蔽掉一个信号时，那么它会修改blocked位向量。实际上，比起将其当作向量理解，学OI学多的人更可能会将其当作bool数组来理解，不过这都是后话了。</p>
+<h4 id="发信与收信的方式"><a href="#发信与收信的方式" class="headerlink" title="发信与收信的方式"></a>发信与收信的方式</h4><p>虽然我很想先把发信方式讲了，但是，我突然意识到，我在介绍进程的时候漏了个概念：</p>
+<h4 id="进程和进程组"><a href="#进程和进程组" class="headerlink" title="进程和进程组"></a>进程和进程组</h4><p>众所周知，每个进程有唯一对应的编号，但是，打过OI或者学过数据结构的人应该明白，对于大批量且具有明确上下级关系的结构，用并查集维护（简单来讲就是对于在同一个连通块的数据，全部归为一组进行管理，方便对组数据的批处理操作）往往比直接用数组更为高效。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%BA%94%E7%AF%87%E4%B8%8B-2.png"></p>
+<p>行行行，考虑到大家都是学CTF的，不谈OI了，谈数据结构吧。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%BA%94%E7%AF%87%E4%B8%8B-3.png"></p>
+<p>就单纯为了方便管理，在进程之上，还有<strong>进程组</strong>的概念，即父进程以及所有与之直接或间接关联的子进程。众所周知，是个并查集都需要一个单射序列，来确定所有的集合。同样地，进程组也需要一个唯一对应的标识，也就是**进程组ID(PGID)**。当一个新的进程组产生，其进程组ID往往是其根进程，也就是第一个加入该进程组的进程的PID。</p>
+<p>一个进程对自身所在的进程组，可以用**<code>getpgrp</code><strong>进行查询，也可以用</strong><code>set-pgid</code>**函数来更改自身或其它进程的进程组，set-pgid若设定pgid为0，则以目标进程为根进程，新创建一个进程组。</p>
+<h4 id="回到正题"><a href="#回到正题" class="headerlink" title="回到正题"></a>回到正题</h4><p>发信的方式有很多，**<code>/bin/kill</code><strong>程序或者编程语言中系统库的kill函数，可以向任意进程发送<code>SIGKILL</code>，也就是所谓“杀程序”的信号；系统快捷键也可以向正在运行中的进程发送信号，比方说在运行时</strong>Ctrl+C**就是发送强制终止的信号；进程也可以通过调用alarm函数给自己发送<code>SIGALRM</code>信号，etc。</p>
+<p>信号的收发，论其根源实际上都是内核到进程的单线控制。当内核完成上下文切换或者从系统调用中返回进程时，控制权由内核移交给进程，此时，若我们之前提到的，内核维护的待处理信号集合&#x2F;序列为非空状态，内核会根据序列中信号在系统中编号的大小，从小到大发送信号。进程在接收信号，完成行为之后就继续执行下一条指令——如果它没有被信号影响而产生一些无法逆转的后果的话。</p>
+<p>进程在接收信号的时候可以通过**<code>signal</code><strong>函数来改变某类信号相关联的行为。简单来讲，如之前所说，每一个信号种类其实对应着序列上的一个元素，而这个元素又与一条编码序列，也就是</strong>信号编码**形成单射，signal就是将编码对应的信号调用转移到其它函数，或者将它已经变更过的调用转移到原信号上。</p>
+<p>举个并不很实际，但却很直观的例子，假设今天小娜想特别给自己插张全新N卡，她的<code>SIGUSR1(允许用户自定义的信号)</code>被设定为自己的导航程序的启动函数：</p>
+<pre><code>signal(10, *loc_tar_start);
+</code></pre>
+<p>这时候，她的思考进程捕获到了<code>SIGUSR1</code>信号，启动了导航程序，让她能够一路畅通无阻的杀向电子城。但是，她盘算了自己的钱包，显然连这个月给自己充电用的电费都快付不起了。她只好想着法子克制自己的欲望，于是她灵机一动，把代码改成了这个样子：</p>
+<pre><code>sighandler_t signal(10, SIG_IGN);
+</code></pre>
+<p>当第二个参数为<code>SIG_IGN</code>时，<code>SIGUSR1</code>会被忽略，这样她就找不到地，也就用一个非常简单的方式保住了自己的钱包。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%BA%94%E7%AF%87%E4%B8%8B-4.png"></p>
+<p>好吧，下回给你多发点……</p>
+<p>不过，如果想要达到忽略信号的效果，阻塞其实也不失为一种办法，这就要利用**<code>sigporcmask</code>**函数了。</p>
+<h3 id="非本地跳转"><a href="#非本地跳转" class="headerlink" title="非本地跳转"></a>非本地跳转</h3><p>当然，并不是只有内核才能处理异常，异常也不是只提供给内核的操作手段。<strong>非本地跳转</strong>通过**<code>setjump</code><strong>和</strong><code>longjump</code>**函数，提供了令用户层不需要通过内核，便能在进程间转移的手段。</p>
+<p><code>setjump</code>通过在栈上的<strong>env缓冲区</strong>保存当前<strong>调用环境</strong>，也就是在栈上某个可用区域存储你目前用到的运行环境相关的变量，包括程序的计数器、栈指针和通用目的寄存器。而<code>longjump</code>负责从env缓冲区中恢复这些状态。具体实例还是得翻阅原书，毕竟这里只是个笔记，抛砖引玉用的。</p>
+<hr>
+<p>综上所述，我们终于大概弄明白了整一个进程操作和控制流传递的过程，也大致明白了你的计算机究竟是怎样在多个问题中思考，寻求解决方案的。不出意外，下一期，我们就要去干内存了。所以……</p>
+<p><em><strong>–ARE YOU READY???–</strong></em></p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">学习</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="2023/09/16/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%BA%94%E7%AF%87%EF%BC%88%E4%B8%8B%EF%BC%89/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
     <article id="post-深入理解计算机系统学习笔记-第四篇（下）" class="article article-type-post  article-index" itemscope itemprop="blogPost">
   <div class="article-inner">
     
@@ -1610,6 +1721,323 @@ print(&quot;3861&#125;&quot;)
 
 
   
+    <article id="post-深入理解计算机系统学习笔记-第五篇（中）" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="2023/06/11/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%BA%94%E7%AF%87%EF%BC%88%E4%B8%AD%EF%BC%89/">深入理解计算机系统学习笔记-第五篇（中）</a>
+    </h1>
+  
+
+        
+        <a href="2023/06/11/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%BA%94%E7%AF%87%EF%BC%88%E4%B8%AD%EF%BC%89/" class="archive-article-date">
+  	<time datetime="2023-06-11T07:45:19.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-06-11</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h3 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h3><p>经历了ISCC和二十余篇报告的终极折磨，我终于……还是没解放</p>
+<p>课程设计、期末考试、武术表演、CISCN……甚至还是AWD</p>
+<p>我™真想给那屎忽的来一发超解口牙！我要把那可恶排班，可恶出题人，锁在地上吃我登龙口牙！！！杀！杀！杀！！！</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%BA%94%E7%AF%87%E4%B8%AD-1.png"></p>
+<p>害，算了，让我们收拾收拾心情，看看接下来的内容：</p>
+<h3 id="进程控制"><a href="#进程控制" class="headerlink" title="进程控制"></a>进程控制</h3><p>这把的CISCN初赛，有一道pwn用上了一个恶心玩意，那就是<strong>fork</strong>。简单来讲，这玩意用来克隆一个与父进程在代码和堆栈等层面完全一致，也就是上回提到的0-3G的用户层部分完全一致，甚至连哪个变量的值是什么都一样，但在pid（每个进程的运行时唯一编号）、内核映射等方面不大一样的子进程（具体可以看<a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/53527981">享受生活 的文章</a>）。那道题目中，程序在while时通过fork创建子进程回传，再配合PIE地址随机化把没有做过多少pwn的我整的晕头转向。</p>
+<p>当然，fork可不单单是出题人用来恶心人的道具，在错误处理、进程控制等方面，fork都有重要应用。实际上，你的linux shell也在用fork。当你打算打开一个程序，shell通过fork创建一个新的子进程。而这些就是我们接下来要讲的内容：</p>
+<h4 id="fork的作用机理"><a href="#fork的作用机理" class="headerlink" title="fork的作用机理"></a>fork的作用机理</h4><p>以程序员角度，一个进程有三种状态，运行（Running，即在自己的逻辑控制流上，正在或等待执行的状态）、暂停（Stopped，进程被挂起，暂时不会被调度或执行）和终止（Terminated，进程不再被执行）。其中，暂停在进程收到 SIGSTOP &#x2F; SIGSTEP &#x2F; SIGTTIN &#x2F; SIGTTOU 信号时发生，而终止则在收到对应信号、主程序返回或者调用exit函数时发生。</p>
+<p>fork的定义如下：</p>
+<pre><code>#include &lt;sys/types.h&gt;
+#include &lt;unistd.h&gt;
+
+pid_t fork(void);
+</code></pre>
+<p>返回值在linux中定义为int，当子进程成功创建，fork在子进程中返回0，在父进程中返回子进程的PID。若子进程创建不成功返回-1。故正常运转的fork调用一次时会返回两次，一次子进程，一次父进程。比如如下代码：</p>
+<pre><code>pid = fork();
+
+if (pid == 0)&#123;
+    printf(&quot;child detected\n&quot;);
+    exit();
+&#125;
+printf(&quot;pid: %d\n&quot;, pid);
+exit();
+</code></pre>
+<p>在子进程中，fork的返回值为0，故会输出<code>child detected</code>；在父进程中，fork的返回值为子进程的pid，故会输出<code>pid: 2</code>之类的东西。两个进程独立并发运行，且先后顺序不定，取决于你的操作系统。</p>
+<p>如上，子进程相对于父进程，除了用户层分配的三个G是相同的之外，地址空间在构成上也是完全相同的，但两个空间相互独立。并且，它们调用的文件都是相同的。</p>
+<p>以及，多次调用fork而不清理进程的话，会使得进程指数级增长，2fork出4进程，3fork出8进程，etc。为了你的电脑，请不要偷懒一次性多开fork，而没写回收的函数，要不然……</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%BA%94%E7%AF%87%E4%B8%AD-2.png"></p>
+<h4 id="为什么，以及如何回收进程呢"><a href="#为什么，以及如何回收进程呢" class="headerlink" title="为什么，以及如何回收进程呢"></a>为什么，以及如何回收进程呢</h4><blockquote>
+<p>在Linux中正常情况下，子进程是通过父进程创建的，子进程再创建新的进程。子进程的结束和父进程的运行是一个异步过程，也就是说，父进程永远无法预知到子进程会在什么时候结束。当一个进程完成工作终止后，它的父进程需要调用<code>wait()</code>或<code>waitpid()</code>系统调用来获取子进程的终止状态。</p>
+<p>——摘自<a target="_blank" rel="noopener" href="https://www.jianshu.com/p/943f6cfff191">JunChow520的文章</a></p>
+</blockquote>
+<p>子进程的结束时间相对于父进程是不定的，正常来讲，子进程在父进程结束之前结束，并获得子进程状态，而倘若父进程先于子进程结束，那么这个子进程就成为了没父亲的<strong>孤儿进程</strong>，系统会安排init进程称为它的<strong>养父进程</strong>，其pid为1，是所有进程的祖先，亦是所有孤儿进程的“托儿所”。由于计算机系统并不像某些dfzf一样拖泥带水，这些孤儿进程一般都会得到妥善回收，所以这种情况是不需要我们处理的。</p>
+<p>但<strong>僵死进程</strong>就不那么好办了。通常来讲，我们在父进程中会使用wait或者waitpid来回收，或者在父进程因为某些问题挂掉的时候让init领养，可一旦你在父进程中忘记回收，而你的子进程恰好在父进程运行的逻辑控制流中终止了，那它就成为了停止，但依旧在内核空间存在的僵死进程，即子进程残留资源PCB存放于内核中。</p>
+<p>这些残留资源会一直存在于内核，并且占用相应的内存号，要是没有其它进程用wait或者waitpid发现它们，可能它们就一直呆在那里，直到你内存爆炸或者系统再也无法生成新的进程号，然后你的电脑就在寄掉的边缘徘徊。你也不能kill它们，因为它们已经是终止的进程了，就整一个处于死了也没死的状态，故又名<strong>僵尸进程</strong>，让计算机避之不及。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%BA%94%E7%AF%87%E4%B8%AD-3.png"></p>
+<p>但好就好在，我们还有wait和waitpid可以利用。</p>
+<p>wait函数可以阻塞当前进程，等待子进程退出，之后进行子进程的回收并获取子进程终止状态及原因。子进程的终止状态由<code>wait.h</code>库的几个宏定义：</p>
+<blockquote>
+<p>WIFEXITED(status) ：全称wait if exited，表示判断是否是正常退出的，若非0则表示进程正常退出<br>WEXITSTATUS(status) ：全称wait exit status，表示退出状态，当子进程正常退出，即WIFEXITED(status)为真则获取进程退出的状态，即exit的参数。<br>WIFSIGNALED(status) ：全称wait if signaled，若非0则表示进程异常终止<br>WTERMSIG(status)：全称wait term signal，若WIFSIGNALED为真则获得使进程终止的那个信号的编号。<br>WIFSTOPPED(status)：全称wait if stopped进程处于暂停状态，若非0则表示进程处于暂停状态<br>WSTOPSIG(status)：为真则使用宏WSTOPSIG(status)以获取使进程暂停的那个信号的编号。<br>WIFCONTINUED(status)：为真则表示进程暂停后已经继续运行  </p>
+</blockquote>
+<p>waitpid则更加灵活且具有指向性，可以指定pid进程清理且不带有进程阻塞。若pid小于-1表示回收指定进程组中的任意子进程；若pid等于0表示回收和当前调用waitpid一个组的所有子进程；若pid等于-1表示回收任意子进程，作用相当于wait函数；若pid大于0表示回收指定进程ID的子进程。</p>
+<p>Linux中系统调用的错误都存储于 errno中，errno由操作系统维护，存储就近发生的错误，即下一次的错误码会覆盖掉上一次的错误。当调用进程没有子进程，则waitpid返回-1，并且设置errno为ECHILD。若waitpid被一个信号中断，则返回-1，并设置errno为EINTR。详细的errno状态列表可以参考<a target="_blank" rel="noopener" href="https://www.cnblogs.com/Jimmy1988/p/7485133.html">Jimmy_Nie的文章</a>，这里不再赘述。</p>
+<h4 id="加载并运行程序"><a href="#加载并运行程序" class="headerlink" title="加载并运行程序"></a>加载并运行程序</h4><p>fork可以克隆一个进程，但我们怎么在进程运行的过程中在打开一个新的程序呢？这就要用到<strong>execve</strong>了。execve函数在当前进程的上下文中加载并运行一个新程序，但是莫得返回值。execve的定义如下：</p>
+<pre><code>#include &lt;unistd.h&gt;
+
+int execve(const char *filename, const char *argv[], const char *envp[]);
+</code></pre>
+<p><strong>filename</strong>就是你要运行的程序名，<strong>argv</strong>表示执行这个程序需要的参数列表，<strong>envp</strong>表示环境变量列表。</p>
+<p>关于argv，最直观的，你使用linux或者windows的shell执行某些程序或指令的时候，你在后面加上的一系列诸如<code>-o xxx</code>或者<code>--update</code>之类的东西就是这个程序运行需要的参数。<code>argv[0]</code>按照惯例是你的可执行文件或程序的名字，比方说我们需要在kali上修复并更新系统上的软件，那么我们一般会用（假设你已经是root权限了）：</p>
+<pre><code>apt-get update --fix-missing
+</code></pre>
+<p>此时，argv内容如下，argc表参数个数（严格意义来讲是argv中非空指针的数量），argv以NULL结尾：</p>
+<pre><code>argv[0] = &quot;apt-get&quot;
+argv[1] = &quot;update&quot;
+argv[argc-1] = &quot;--fix-missing&quot;
+argv[argc] = NULL
+</code></pre>
+<p>envp和argv一样都是尾部为NULL的指针数组，但从0开始包含当前的环境变量信息，如文件路径pwd，用户名，系统版本等。环境变量及其打印可以参考<a target="_blank" rel="noopener" href="https://blog.csdn.net/deniece1/article/details/102766346">deniece1的文章</a>。</p>
+<h5 id="加载"><a href="#加载" class="headerlink" title="加载"></a>加载</h5><p>当我们使用shell运行程序的时候，以linux shell为例，我们在输入执行命令后，execve首先会调用一个驻留在存储器中的<strong>加载器</strong>(loader)，这个加载器会先读取可执行文件的头，校验它的正确性，接着将其中的代码和数据从磁盘复制到内存中，接着通过跳转到程序的第一条指令或者入口点来运行该程序（也就是把PC定位到第一条指令的地址），这个过程叫做<strong>加载</strong>。</p>
+<p>从细节上，上一节其实对地址空间的描述还不够细致，事实上，地址空间从代码段开始的0x400000，还有读&#x2F;写段、运行时堆、共享库的内存映射区域和用户栈（并且数据与代码间为了.data段的前后对齐而留有空隙）。用户栈从最大合法用户地址，也就是上一回提到的那个第三个G的尾巴开始，向较小地址反向拓展。</p>
+<p>接下来可以参考第一回的内容，在程序header的引导下，加载器调用mmap进行映射，具体而言是一种“按需分页”的方法，不会一下子将所有的代码段以及数据段的数据加载到内存，而是通过<strong>缺页中断</strong>（当软件试图访问已映射在虚拟地址空间中，但是目前并未被加载在物理内存中的一个分页时，由中央处理器的内存管理单元所发出的中断）来实现懒加载，而这些被分页的程序段就叫做<strong>chunk</strong>。</p>
+<p>加载器接下来会让PC指向程序的<code>start</code>，<code>start</code>又指向系统启动函数<code>__libc_start_main</code>，该函数定义在系统库<code>libc.so</code>中，以初始化执行环境并调用main函数进行处理，一定情况下需要返回信息给内核。<code>__libc_start_main</code>的严格定义如下：</p>
+<pre><code>int __libc_start_main(int *(main) (int, char * *, char * *), int argc, char * * ubp_av, void (*init) (void), void (*fini) (void), void (*rtld_fini) (void), void (* stack_end));
+</code></pre>
+<h5 id="运行"><a href="#运行" class="headerlink" title="运行"></a>运行</h5><p>接下来，启动代码设置栈，并将控制权和变量传递给用户层的，也就是程序的主函数main。堆栈的结构自栈底到栈顶依次是：环境变量、命令行、envp、argv、libc_start_main的栈帧、main未来的栈帧。</p>
+<p>main的定义比较简单：</p>
+<pre><code>int main(int argc,char **argv, char **envp);
+</code></pre>
+<p>接下来，程序按照既定顺序执行代码。当程序的主函数结束，<code>__libc_start_main</code>将控制传递给exit，结束进程。</p>
+<p>不过从理论上，加载器本身作为一个程序，也需要被shell通过execve调用，按这么说，execve调用加载器，加载器需要execve启动，然后要加载器加载加载器，接下来就是加载器加载加载加载器的加载器……</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%BA%94%E7%AF%87%E4%B8%AD-4.png"></p>
+<p>好了，不开玩笑了。事实上，因为是execve调用的加载器，所以你单独使用execve还是不会发生上述的套娃，就算在进程中使用execve调用加载器，也只会发生加载器加载加载器的情况，点到为止。</p>
+<h5 id="fork-execve"><a href="#fork-execve" class="headerlink" title="fork + execve"></a>fork + execve</h5><p>然而，光使用execve还不够，因为execve是在当前进程的上下文中打开相应的程序，而非新创建一个进程：</p>
+<blockquote>
+<p>system是在单独的进程中执行命令，完了还会回到你的程序中。而exec函数是直接在你的进程中执行新的程序，新的程序会把你的程序覆盖，除非调用出错，否则你再也回不到exec后面的代码，就是说你的程序就变成了exec调用的那个程序了。</p>
+<p>——摘自<a target="_blank" rel="noopener" href="https://blog.csdn.net/i792439187/article/details/8826745">挨踢的小胖的文章</a></p>
+</blockquote>
+<p>因此，我们往往需要利用fork+execve的形式来创建一个全新的进程。一个简单的自定义进程创建大概长这样：</p>
+<pre><code>pid = fork();
+if (pid &lt; 0) exit(-1);
+else if (pid == 0)execve([your progress], [argv], NULL);
+else&#123;
+    wait();
+    exit(0);
+&#125;
+</code></pre>
+<hr>
+<p>到此为止，我们终于把程序的运行机理，进程的创建机理给深入分析了一番。至于接下来的内容嘛……还是那句话：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%BA%94%E7%AF%87%E4%B8%AD-5.png"></p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">学习</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="2023/06/11/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%BA%94%E7%AF%87%EF%BC%88%E4%B8%AD%EF%BC%89/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
+    <article id="post-深入理解计算机系统学习笔记-第五篇（上）" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="2023/06/04/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%BA%94%E7%AF%87%EF%BC%88%E4%B8%8A%EF%BC%89/">深入理解计算机系统学习笔记-第五篇（上）</a>
+    </h1>
+  
+
+        
+        <a href="2023/06/04/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%BA%94%E7%AF%87%EF%BC%88%E4%B8%8A%EF%BC%89/" class="archive-article-date">
+  	<time datetime="2023-06-04T07:36:56.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-06-04</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h3 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h3><p>关于我上一篇完篇之后就开始疯狂ISCC，然后休息的时候打野炊和王泪，结果在各种不同电子yw之间反复摩擦这件事情.pdf</p>
+<p>关于小娜，别提了，她最近跑程序跑得很过载，估计连游戏都懒得打了。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%BA%94%E7%AF%87%E4%B8%8A-1.png"></p>
+<p>也罢，到时候给她做个全面检查。</p>
+<p>至于在程序的汇编表示之后，我们该探究些什么，想一想，直接扯硬件对于软工和逆向有点不大实际，谈网络又不可避免要请鲍师傅来扯Web Assembly，那只能是继续程序方面的内容了。</p>
+<p>所以这一期，前有巨量文本，敬请留意——</p>
+<h2 id="来谈谈异常控制流"><a href="#来谈谈异常控制流" class="headerlink" title="来谈谈异常控制流"></a>来谈谈异常控制流</h2><p>什么是异常控制流？从程序逆向来说，你可以试试对一个加了<strong>反调试</strong>的程序的main函数，或者是程序的起始点下断，然后单步步过，正常来讲，它并不会像我们在上一篇文章中提到的那样正常进入运行阶段，而是一头创进进程检查，然后让你的程序exit或者让你的ida崩溃，这就是一种异常控制流。</p>
+<p>用专业一点的术语来讲，异常控制流是应对系统状态出现特殊情况而产生的控制流突变，这种特殊情况可能是一个附带多线程的程序的其中一个线程终止，也有可能是因为堆栈溢出导致整个程序崩溃，etc。</p>
+<h3 id="但是慢着，什么是控制流"><a href="#但是慢着，什么是控制流" class="headerlink" title="但是慢着，什么是控制流"></a>但是慢着，什么是控制流</h3><p>从处理器开始上电到断电的时间里，有一个叫做“<strong>程序计数器</strong>”的寄存器（<strong>PC</strong>，又名指令指针IP、指令地址寄存器IAR等），一直在处理你下一个要处理的汇编指令的地址。汇编指令的地址在同一进程上是一段连续的序列（在堆栈上被抽象为数组），而就算是不同进程，在执行时也是一串以连续序列为元素的链表，串联着父进程的调用点与子进程的首尾。</p>
+<p>假设整个地址序列为a，当前执行的指令的地址为a<sub>k</sub>，那么，每次从a<sub>k</sub>到a<sub>k+1</sub>的地址转移就被称为<strong>控制转移</strong>，而由一系列控制转移串联的如上序列则被称为控制流。</p>
+<p>但是，我们之前也学过jmp和各种逻辑跳转，控制转移在内存中，不可能每次都是从上一个地址到下一个地址的平顺变化，由跳转、调用等导致的这些跨内存地址的控制转移，被称为<strong>突变</strong>，很多突变是必要且通常的，比方说正常的jnz call等逻辑指令组合，但如果部分突变导致了系统状态变化，比方说你程序运行的半路，又想将外源的数据写入当前进程的内存，那么这种突变就成为了<strong>“异常控制流”</strong>。</p>
+<p>通常来讲，异常控制流包括如下部分：</p>
+<h3 id="异常"><a href="#异常" class="headerlink" title="异常"></a>异常</h3><p>和“异常控制流”的定义一样，顾名不思义。异常在严格定义上来讲，只是控制流中的“突变”，用于响应处理器状态的某些变化，而并没有严格意义上界定它对于程序运行影响的正负。</p>
+<p>系统中每种可能的异常都被分配了一个唯一的非负整数编号，即<strong>异常号</strong>，其中一部分由处理器设计者分配，另外一部分由操作系统内核设计者分配。这些编号组成一张<strong>异常表</strong>，这个表的起始地址存储在CPU的<strong>异常表基址寄存器</strong>中，在系统启动时由操作系统分配和初始化，异常号为异常表元素的索引，每个元素为每个异常的跳转地址，这就形成了异常号到异常的单射</p>
+<p>这样，当系统欲抛出异常时，系统会先通过函数去抛出异常号，再对照异常表转到对应的<strong>异常处理程序</strong>，可以理解为一个间接的函数调用，只是函数调用时入栈的返回地址取决于你调用指令的位置，而异常抛出则以<strong>当前指令</strong>（事件发生时正在执行的指令）或<strong>下一条指令</strong>（事件不发生，将会在当前指令执行之后执行的指令）为返回值，视异常类型而定。且额外还会将处理器的一些状态入栈，在处理程序返回时，重新开始被中断的程序会需要这些状态。</p>
+<p>上面这段话可能说的有点暧昧，别急，慢慢来。</p>
+<p>比方说我们想要写一个阳间一点的高精度加法，但是我们分别将调用程序和高精度加法程序封装在了不同的文件里，按照我们之前提到过的，我们调用高精度加法时会产生一个call，此时除了传入的参数，压入栈中的也只剩下被调用函数的返回地址，其对应着我们call指令的下一条指令，而非下一条要执行的指令的地址。这是一般的过程调用。</p>
+<p>可是，总有些CTF出题人想给你挖个坑，他们在你阳间的程序上加入了阴间的反调试，使得你在call的时候会进行一次进程检查，一旦发现你在用反编译程序进行进程调试就像上面说的那样，给你直接抛出异常中止运行，这时候，进程检查的返回值就是你进程栈上的下一条指令，而非你调用函数的返回值，倘若你真的没有用反编译器调试，这个返回指令就会和预先存储的处理器状态一同作用，使系统回到工作状态继续运行你的程序。这是一个异常作用的过程。</p>
+<p>简而言之，异常是系统在给自己干活，调用是系统给你干活。</p>
+<p>而关于内核和用户的交互部分，这里先不急着讲，下文再说，只需要知道我们平时执行程序用的都是用户层，而异常处理程序在内核层，因此<strong>拥有所有系统资源的访问权限</strong>就行了。</p>
+<h3 id="异常的类别"><a href="#异常的类别" class="headerlink" title="异常的类别"></a>异常的类别</h3><h4 id="中断（interrupt）"><a href="#中断（interrupt）" class="headerlink" title="中断（interrupt）"></a>中断（interrupt）</h4><p>中断是<strong>异步</strong>的，即动作的执行和异常的处理不同步，因为这里的系统动作来源于处理器外部的I&#x2F;O设备，而非CPU自身的指令。</p>
+<p>比方说你敲键盘就会产生一次中断，I&#x2F;O设备向CPU的<strong>中断引脚</strong>传输一次电信号，提高引脚电压，产生电压差，从而在这一次的输入指令执行完成后触发一次对系统总线上异常的读取，进而调用相对应的<strong>中断处理程序</strong>执行中断。中断完成后，就跳转到<strong>下一条指令</strong>继续运行，中断过程并没有影响这个程序的运行。</p>
+<p>而现在处理器的速度已经足够快，中断的处理也就在一瞬间，这就使得你在输入一长串文本，比方说写你那 * 中原粗口 * 的工程学老师留下的一堆报告时，并不会感觉到老式电脑，乃至于电子打字机（谁还用这玩意啊）那样的，中断带来的卡顿。</p>
+<h4 id="陷阱（trap）"><a href="#陷阱（trap）" class="headerlink" title="陷阱（trap）"></a>陷阱（trap）</h4><p>如果说中断是一种程序设定好的，随时发生异常，那“<strong>陷阱</strong>”就是受控发生的异常。陷阱最重要的用途是用户程序和内核之间提供一个像过程一样的接口，叫做<strong>系统调用</strong>。什么意思呢？</p>
+<blockquote>
+<p>内核态与用户态是操作系统的两种运行级别，当程序运行在3级特权级上时，就可以称之为运行在用户态。因为这是最低特权级，是普通的用户进程运行的特权级，大部分用户直接面对的程序都是运行在用户态；</p>
+<p>当程序运行在0级特权级上时，就可以称之为运行在内核态。</p>
+<p>运行在用户态下的程序不能直接访问操作系统内核数据结构和程序。当我们在系统中执行一个程序时，大部分时间是运行在用户态下的，在其需要操作系统帮助完成某些它没有权力和能力完成的工作时就会切换到内核态（比如操作硬件）。</p>
+<p>这两种状态的主要差别是：</p>
+<p>处于用户态执行时，进程所能访问的内存空间和对象受到限制，其所处于占有的处理器是可被抢占的<br>处于内核态执行时，则能访问所有的内存空间和对象，且所占有的处理器是不允许被抢占的。</p>
+<p>——摘自<a target="_blank" rel="noopener" href="https://blog.csdn.net/guorui_java/article/details/113827888">哪 吒 的文章</a></p>
+</blockquote>
+<p>系统从0到3划分了三个特权级，3级为最低，0级为最高。要实现从低到高的调用，系统只提供了异常和一些特殊的中断作为窗口，令用户态主动切换到内核态，进而干一些只有系统内核能干的事情，比方说超管权限。但是，内核态到用户态的变化则是系统控制的，通过设置设置程序状态字PSW来控制。</p>
+<p>当你在用户程序中向内核请求服务，处理器提供了一个叫 <strong>syscall</strong> 的指令，用于让你向系统内核请求服务，你使用某些形式使用了syscall，比方说C的 <strong>system</strong> 指令，以向系统内核请求去进行某些事项，比方说<code>/bin/sh</code>进行系统文件查找，那么，syscall指令就会将控制权转移到到对应的异常处理程序，即对应的<strong>陷阱处理程序</strong>，以调用适当的内核程序。调用完毕后，系统会交回控制权，处理程序返回到syscall之后的命令。这就完成了一次“陷阱”的处理。</p>
+<p>值得注意的是：</p>
+<blockquote>
+<p>系统调用的机制其核心还是使用了操作系统为用户特别开放的一个中断来实现，例如Linux的int 80h中断。</p>
+</blockquote>
+<p>这也就意味着，以系统调用为代表的陷阱异常，通常来说，其本质都是中断。但是，这对于程序逆向基本没什么影响，暂且按下不表。</p>
+<h4 id="故障（错误，fault）"><a href="#故障（错误，fault）" class="headerlink" title="故障（错误，fault）"></a>故障（错误，fault）</h4><p>上述的两个异常都是可以预测和控制的，但是<strong>故障</strong>和<strong>中止</strong>并不能被预测，两者都是发生<strong>错误</strong>而非中断，区别在于这个错误是否可修复。如果一条指令导致了故障的发生，那它会相应地将控制权移交给内核的故障处理程序，处理程序要么成功修复错误，返回当前用户层指令地址继续运行，要么修复不能，直接abort中止程序运行。</p>
+<p>比方说你在ida里单步步过动态调试的时候，因为你不小心把返回地址改大了，导致返回到了一些不该返回的语句，甚至是直接创到了符号表，那么就会发生一次故障，导致你的程序停转，这时候你还可以通过手动修改返回地址来补救，以再次继续运行，要是你不想修了，你也可以直接中止调试进程。这个时候，导致错误的是你动调patch过的返回指令，而故障处理程序是你自己。</p>
+<h4 id="中止（终止，abort）"><a href="#中止（终止，abort）" class="headerlink" title="中止（终止，abort）"></a>中止（终止，abort）</h4><p>通常是一些硬件问题导致的不可逆性错误，比方说你的RAM被日穿了，电容漏电，导致你写入的数据当场爆炸。详细的DRAM故障可以参考<a target="_blank" rel="noopener" href="https://blog.csdn.net/weixin_42238387/article/details/118446634">weixin_42238387的文章</a>，本文不做赘述。</p>
+<p>细心的逆向手可能会发现，这不就跟导致你ida当场爆炸的某些反调试函数一个功用吗？反调试有很多种，而且实际上，部分反调试就是利用调试器对异常的处理来进行对调试进程的破坏的。具体可以参考<a target="_blank" rel="noopener" href="https://nnnewb.github.io/blog/p/learning-packer-06/">weakptr大佬的文章</a>。</p>
+<h3 id="进程"><a href="#进程" class="headerlink" title="进程"></a>进程</h3><p>从概念上讲，进程最普适的概念就是把进程对应一个程序的正在运行的实例，文件和实例的关系可以抽象地理解为放在存储空间上的原本和跑在内存上的副本的关系。</p>
+<p>至于进程具体的实现细节，可以参考<a target="_blank" rel="noopener" href="https://cloud.tencent.com/developer/article/1434830">这篇文章</a>。</p>
+<p>进程带来的程序运行层面的两个抽象，也就是逻辑控制流和私有地址空间。这两个抽象导致了两个假象，即你的程序看似在独占地使用处理器和内存系统。关于独立使用内存这一点，在第一篇的虚拟内存那块也提到过。</p>
+<h4 id="逻辑控制流"><a href="#逻辑控制流" class="headerlink" title="逻辑控制流"></a>逻辑控制流</h4><p>众所周知，程序中下一条指令的值只会在执行到当前指令之后才会复制到PC中，需要的时候总是被算出来的。你在ida或者ghidra之类的反汇编软件中能直观地看到指令的PC值（前提是出题人没有丧心病狂地开PIE），这些PC值唯一对应于包含在程序的可执行目标文件中的指令。而这一连串的PC值构成的序列，就是<strong>逻辑控制流</strong>。在处理器的单个核心内，一个既定的物理控制流——你可以抽象地把它看作一个时间轴，这个物理控制流被多个进程分成了对应的多个逻辑控制流，也就是在一条既定的时间轴上安排进程的运行与否。</p>
+<p>这也意味着每个进程占用处理器的时间轴区间是互不相交的，比方说你在使用word打字的时候，你想要用QQ回复一句消息，然后再回来打字，那么在处理器内核上，word的进程开始运行到你使用QQ，然后QQ的进程运行到你回完消息，接着，word的进程又占领控制权直到你把字码完。不难发现，整个过程中，不同进程在自己所排布的时间轴上，<strong>轮流</strong>使用处理器内核。</p>
+<p>一个逻辑流的执行在时间上与另一个流重叠，称为<strong>并发流</strong>。进程在处理器内核的使用上互不影响，在逻辑控制流上是互不相交的，但这不影响它们的整个流程，包括轮换时的中断，在时间轴上重叠，即逻辑控制流的重叠。还是上面的例子，你可以理解为逻辑控制流是割裂的，因为它确实导致了程序轮流占用处理器；但你也可以理解为它们是交叠的，因为QQ进程在占用与否上，其时间轴是被包含在word进程的时间轴内的。</p>
+<p>这种多个流存在同时执行的时间区间的情况也就是所谓<strong>并发</strong>。区别于<strong>“并行”</strong>的概念，并发是排列于同一物理控制流上的进程的交替运行，在空间上统一；而并行是多个进程同时进行，在时间上同步。</p>
+<p>对于并发的解释，还有<strong>多任务</strong>，也就是<strong>时间分片</strong>的概念，多任务简单来讲就是一堆进程轮流运行，每个进程执行它的控制流的一部分的每一时间段叫做 <strong>时间片</strong>。这与我们之前提到过的时间轴的思想不谋而合。</p>
+<p>所以，在整个控制流上，每个进程轮流占用处理器内核，营造出一种整个处理器上只有你当前运行的进程，或者说你眼前的程序在好好运行的假象。</p>
+<h4 id="私有地址空间"><a href="#私有地址空间" class="headerlink" title="私有地址空间"></a>私有地址空间</h4><p>顾名思义，进程在内存空间上是独立存在，且在一般情况下，某一进程无法被除自身外的其它进程读和写（也总有些例外情况，比方说windows的getThreadId）。具体而言，进程不但独占内存空间，将其与其它并行的进程隔离开来，每一个进程还有其独立的<strong>地址空间</strong>。</p>
+<p>在同一系统架构的同一语言下，这个地址空间的构造几乎完全一致，所以出现相同的地址也很正常，比方说你linux的elf就是默认以0x400000作为代码段的起始地址，再往上，从上到下就是第一篇提到过的各种头啊表啊之类的，然后就是你的堆栈。</p>
+<p>具体而言：</p>
+<blockquote>
+<p>Linux的虚拟地址空间范围为0～4G，Linux内核将这4G字节的空间分为两部分，将最高的1G字节（从虚拟地址0xC0000000到0xFFFFFFFF）供内核使用，称为“内核空间”。而将较低的3G字节（从虚拟地址0x00000000到0xBFFFFFFF）供各个进程使用，称为“用户空间。因为每个进程可以通过系统调用进入内核，因此，Linux内核由系统内的所有进程共享。于是，从具体进程的角度来看，每个进程可以拥有4G字节的虚拟空间。</p>
+<p>Linux使用两级保护机制：0级供内核使用，3级供用户程序使用，每个进程有各自的私有用户空间（0～3G），这个空间对系统中的其他进程是不可见的，最高的1GB字节虚拟内核空间则为所有进程以及内核所共享。</p>
+<p>通常32位Linux内核地址空间划分0<del>3G为用户空间，3</del>4G为内核空间</p>
+<p>——摘自<a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/26857760">张胜飞的文章</a></p>
+</blockquote>
+<p>所以，在linux系统中，内核虚拟内存和用户区域分离的架构，使得进程在表面上是相互独立，在表现上是独占内存空间的，但实际上，所有的进程都由内核直辖，也就更方便内核与进程的交互和对进程的控制。</p>
+<p>这种空间上的分离是通过<strong>模式位</strong>来实现的。通常情况下，模式位不设置，进程用户模式下，无法进行内核操作，比如停止处理器等，只能通过异常或系统接口的方式来间接调用内核指令和信息。但设置了模式位（最直观的就是kali的sudo等超管权限）的进程运行在内核模式，这时进程才能任意执行指令。</p>
+<p>但也不一定，在linux的系统里有个叫<code>/proc</code>的文件夹，里头存放着内核相关的数据结构，其中的信息能被用户层直接读取，也就意味着，进程可以反过来读取你的内核甚至硬件相关信息。</p>
+<h4 id="上下文"><a href="#上下文" class="headerlink" title="上下文"></a>上下文</h4><p>由上述内容可知，进程之间难以相互读取和操作，也就只能由内核层面的某种机制，控制它们对内核的占用状态，以方便逻辑控制流的实现和进程状态的恢复。这种时候，就需要上下文出手了。</p>
+<blockquote>
+<p>系统的两种不同运行状态，才有了上下文的概念。用户空间的应用程序，如果想请求系统服务，比如操作某个物理设备，映射设备的地址到用户空间，必须通过系统调用来实现。（系统调用是操作系统提供给用户空间的接口函数）。</p>
+<p>通过系统调用，用户空间的应用程序就会进入内核空间，由内核代表该进程运行于内核空间，这就涉及到上下文的切换，用户空间和内核空间具有不同的 地址映射，通用或专用的寄存器组，而用户空间的进程要传递很多变量、参数给内核，内核也要保存用户进程的一些寄存器、变量等，以便系统调用结束后回到用户空间继续执行。</p>
+<p>——摘自<a target="_blank" rel="noopener" href="https://bbs.huaweicloud.com/blogs/342455">嵌入式与Linux那些事 的文章</a></p>
+</blockquote>
+<p>内核为每一个进程维持一个<strong>上下文</strong>，即重启一个被抢占进程所需的状态。具体而言，上下文包括一个进程的通用目的寄存器、浮点寄存器、程序计数器、用户栈、状态寄存器、内核栈和各种内核数据结构（描述地址空间的页表、包含当前进程信息的进程表、包含进程已打开文件的信息表）等。</p>
+<p>在进程执行的时候，内核可以决定让某个之前进行到一半被抢占的进程横插一刀，重新启动，这就叫<strong>调度</strong>，调度的过程由内核中叫<strong>调度器</strong>的代码处理。每当进行调度时，都会触发一次<strong>上下文切换</strong>，即：</p>
+<p>1、保存当前进程的上下文<br>2、恢复某个先前被抢占的进程被保存的上下文<br>3、将控制传递给这个新恢复的进程</p>
+<p>相当于你打游戏打到一半，你的导师突然让你改论文去，然后你无奈给游戏存了档，这是第一步；接着无奈地打开了你的word，把你之前那篇看上去还不错的论文给拿出来，这是第二步；然后被导师的要求摁着手去把论文改了，这是第三步。两个进程分别是游戏和写论文，导师是调度器，你是负责调度和处理的内核（悲）</p>
+<p>上下文分为进程上下文和中断上下文等，进程上下文如前文所述，以及，没错，中断也可以是一种上下文，因为在中断的过程中，确实因为被中断的进程需要保存一些环境，而产生了一些用户向内核，以及内核向用户的数据传递。也就是说，内核对进程的控制，以及中断机制都会产生上下文切换。具体案例在原书中有提及，本文不多细说了。</p>
+<hr>
+<p>综上所述，咱已经把一些基础的概念给理清楚了，接下来就是一些正式的进程操作了。</p>
+<p>所以，还是那句话，前面的区域，以后再来……？！</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%BA%94%E7%AF%87%E4%B8%8A-2.png"></p>
+<p>这是什么绿皮散热法……算了，能活过来就行。下一期还指望你接着营业呢</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%BA%94%E7%AF%87%E4%B8%8A-3.png"></p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">学习</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="2023/06/04/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%BA%94%E7%AF%87%EF%BC%88%E4%B8%8A%EF%BC%89/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
     <article id="post-痛苦逆向人ISCC实录" class="article article-type-post  article-index" itemscope itemprop="blogPost">
   <div class="article-inner">
     
@@ -2071,462 +2499,9 @@ plt.show()
 
 
   
-    <article id="post-DASCTF X SU 2023 四月赛 可能不会更新的复现" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="2023/04/23/DASCTF%20X%20SU%202023%20%E5%9B%9B%E6%9C%88%E8%B5%9B%20%E5%8F%AF%E8%83%BD%E4%B8%8D%E4%BC%9A%E6%9B%B4%E6%96%B0%E7%9A%84%E5%A4%8D%E7%8E%B0/">DASCTF X SU 2023 四月赛 可能不会更新的复现</a>
-    </h1>
-  
-
-        
-        <a href="2023/04/23/DASCTF%20X%20SU%202023%20%E5%9B%9B%E6%9C%88%E8%B5%9B%20%E5%8F%AF%E8%83%BD%E4%B8%8D%E4%BC%9A%E6%9B%B4%E6%96%B0%E7%9A%84%E5%A4%8D%E7%8E%B0/" class="archive-article-date">
-  	<time datetime="2023-04-23T07:56:18.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-04-23</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h2 id="RE"><a href="#RE" class="headerlink" title="RE"></a>RE</h2><h3 id="easyRE"><a href="#easyRE" class="headerlink" title="easyRE"></a>easyRE</h3><p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/DASCTF2023Apr_easyRE_pic1.png"></p>
-<p>一头雾水，只根据<a target="_blank" rel="noopener" href="https://www.cnblogs.com/DirWang/p/12128900.html">DirWangK的文章</a>了解到出题人可能在初始化函数<code>__scrt_common_main()</code>用一些奇怪的玩意做了点手脚，并且开了非常严的反调试（一气之下搬来ghidra还是不得劲）：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/DASCTF2023Apr_easyRE_pic2.png"></p>
-<p>搜字符串也没有查找到程序显示的语句，也没有看到Thread相关函数，不排除是做了高度混淆和反调试的高明子进程，又或者是什么新东西。无奈只能查找程序是否含有奇怪字串。在<code>sub_140002760</code>找到<code>_MEIPASS2</code>字串，经查是python系统环境里的东西，基本确认这个玩意是个python exe，遂尝试用pyinstxtractor把这个exe反编译成pyc来逆。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/DASCTF2023Apr_easyRE_pic3.png"></p>
-<p>还真是.jpg，但是接下来使用各种工具反编译pyc的时候都因为魔数问题挂了，一查可能是python版本不对，但是py2和py3一直到3.10都挂了，怀疑用的3.11编译的（实际上确实如此，python3.11的编译魔数是3495）。遂直接用python的dis库进行反编译然后强行读汇编：</p>
-<pre><code>import dis
-import marshal
-
-with open(&#39;easyRE.pyc&#39;, &#39;rb&#39;) as f:
-    f.seek(16)
-    dis.disassemble(marshal.load(f))
-</code></pre>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/DASCTF2023Apr_easyRE_pic4.png"></p>
-<p>字符长度46，伪随机根322376503，先进行输入并编码，然后另开一个数组，存放<code>input[i]^randint(0,255)</code>的结果。</p>
-<p>道理都懂，实践开始。</p>
-<pre><code>import random
-
-r = random.seed(322376503)
-encans = b&#39;\x8b\xcck\xd3\xed\x96\xffFb\x06r\x085\x82\xbc \xb2\xde)p\x88Q`\x1bf\x18\xb6QUSw\x10\xcd\xd9\x13A$\x86\xe5\xcd\xd9\xff&#39;
-
-for i in encans:
-    print(chr(i ^ random.randint(0, 255)), end = &#39;&#39;)
-</code></pre>
-<blockquote>
-<p>flag{69858b56-4987-438f-a02c-5ab5c09e5138}</p>
-</blockquote>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="2023/04/23/DASCTF%20X%20SU%202023%20%E5%9B%9B%E6%9C%88%E8%B5%9B%20%E5%8F%AF%E8%83%BD%E4%B8%8D%E4%BC%9A%E6%9B%B4%E6%96%B0%E7%9A%84%E5%A4%8D%E7%8E%B0/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-    <article id="post-从零开始的逆向人modding之路-E02" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="2023/03/24/%E4%BB%8E%E9%9B%B6%E5%BC%80%E5%A7%8B%E7%9A%84%E9%80%86%E5%90%91%E4%BA%BAmodding%E4%B9%8B%E8%B7%AF-E02/">从零开始的逆向人modding之路[E02]</a>
-    </h1>
-  
-
-        
-        <a href="2023/03/24/%E4%BB%8E%E9%9B%B6%E5%BC%80%E5%A7%8B%E7%9A%84%E9%80%86%E5%90%91%E4%BA%BAmodding%E4%B9%8B%E8%B7%AF-E02/" class="archive-article-date">
-  	<time datetime="2023-03-24T09:49:32.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-03-24</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h3 id="上回书说到"><a href="#上回书说到" class="headerlink" title="上回书说到"></a>上回书说到</h3><p>彼时的璃月，海中有大魔侵扰，山间有恶魑盘踞……等下，我拿错稿子了？</p>
-<p>回到正题，之前我们成功让模组跑起来了，今天咱们来点物品相关的东西。</p>
-<h3 id="你的第一个物品"><a href="#你的第一个物品" class="headerlink" title="你的第一个物品"></a>你的第一个物品</h3><h4 id="代码实现部分"><a href="#代码实现部分" class="headerlink" title="代码实现部分"></a>代码实现部分</h4><p>我们先在模组本体文件的package下新建一个item package，然后新建一个名为ModItems的java类：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E02_1.png"></p>
-<p>我们需要定义一个Register变量来注册这个类的所有物品：</p>
-<pre><code>public static final DeferredRegister&lt;Item&gt; ITEMS =
-        DeferredRegister.create(ForgeRegistries.ITEMS, TutorialMod.MOD_ID);
-</code></pre>
-<p>我们浅浅地分析以下为什么要使用如上格式。首先，我们需要了解Java中各种变量类型及修饰符的作用。</p>
-<h4 id="借着这个机会学java"><a href="#借着这个机会学java" class="headerlink" title="借着这个机会学java"></a>借着这个机会学java</h4><p>常规变量如int，bool等都和C系语言特别类似，最大的差别就是适用于面向对象的，不论函数还是变量，又或者说类和对象都能使用的修饰符。访问修饰符如下：</p>
-<blockquote>
-<p><strong>default</strong> (即默认，什么也不写）: 在同一包内可见，不使用任何修饰符。使用对象：类、接口、变量、方法。<br><strong>private</strong> : 仅在其所属类内可见与访问。使用对象：变量、方法。 注意：不能修饰类（外部类）<br><strong>public</strong> : 对所有类可见，能够被任何其它类访问，其所在方法也必须是共有类型。使用对象：类、接口、变量、方法<br><strong>protected</strong> : 对同一包内的类和所有子类可见，但其它类对其的调用权限由其子类的调用方式决定，正常来讲，protected变量只有该类本身及其子类允许正常访问。使用对象：变量、方法。 注意：不能修饰外部类，接口及接口的成员变量和成员方法不能声明为 protected。  </p>
-</blockquote>
-<p>非访问修饰符如下：</p>
-<blockquote>
-<p><strong>static</strong> : 使对象独立于其它对象成为<strong>静态对象</strong>，它在同一类当中独一无二，且无法主动互动非静态对象，但能被非静态对象调用。<br><strong>final</strong> : 使对象成为可以被引用，但无法被二次赋值的<strong>“常变量”</strong>，此变量必须被赋初值。<br><strong>abstract</strong> : 不能用于定义对象，但可以用于定义类和方法，使之在代码层面上“可拓展”<br><strong>synchronized</strong> : 使被定义的方法只能同时被一个线程访问<br><strong>transient</strong> ： 序列化的对象包含被 transient 修饰的实例变量时，java 虚拟机(JVM)跳过该特定的变量。<br><strong>volatile</strong> ： 修饰的成员变量在每次被线程访问时，都强制从共享内存中重新读取该成员变量的值。而且，当成员变量发生变化时，会强制线程将变化值回写到共享内存。</p>
-</blockquote>
-<p>java由于<strong>面向对象</strong>，所以对于<strong>“面向过程”</strong>语言的<strong>“函数”</strong>和<strong>“变量”</strong>概念的重新解读会比较抽象。举个简单的例子，在你的书架上，你往往会把<strong>文具、学习用书和休闲书</strong><br>分置，则这三堆物件为所谓的<strong>“类”</strong>，而具体到铅笔、橡皮之类的文具则是<strong>“文具类”</strong>下的<br><strong>“对象”</strong>，同时也是对“类”所定义的概念具现化的一种<strong>“实例”</strong>。</p>
-<p>也正因如此，一般情况下，类与类之间并不互通，所以你书架上的物品都是<strong>private</strong>变量。直到有一天，你搞到了一本电子书，你非常纳闷该把它放哪，因为它既符合文具类“物件”的用途，又有作为学习用书、休闲书使用的需要。那么，电子书就是一个<strong>public</strong><br>变量。但是你习惯用电子书了，学着学着，又意识到在上大课的时候看武侠小说会卷不过同学，于是就把电子书里的各种小说扬了，只用来存取电子课本，这时它又变成了一个<strong>protect</strong>变量。但其实，电子书一开始什么都没做，它纯粹根据你的需要被定义成了各种样式，所以，它一开始也只是一个<strong>default</strong>变量。</p>
-<p>如果一本书上的内容不需要你进行增删，甚至是校方严格规定的，比方说你的学生手册，那么它就是一个<strong>final</strong>变量，再比如，你为了完成你的毕业设计，不知从哪找来了一篇没有复本的冷门论文，你的毕设随时都要用到它，但你不可能用它的内容去修改你书架上其它已经发布的论文，它就是一个<strong>static</strong>变量。</p>
-<p>总之，java对各种量和函数的定义非常复杂，结合现实实际抽象理解，可能会帮到你不少。</p>
-<h4 id="回到正题"><a href="#回到正题" class="headerlink" title="回到正题"></a>回到正题</h4><p>由是，我们在设计的时候往往会想到，一个注册端口必须是稳定，启动后不可变动，并且可被其它类随意调用的（想想看你坐飞机，你也不希望起飞前半个小时突然告诉你登机口变更，其他人要是赶时间，肯定更不想），所以它就很适合被定义为一个<strong>public static final</strong>型的变量。同样的，对于我们注册进列表中的每一个物品也是如此。</p>
-<p>至于DeferredRegister，它则是forge提供的注册你的minecraft对象的方式。它在RegisterEvent期间维护你提供的各类物品的列表，并将其注册为游戏内物品。详细参数可以参考forge官网的教程以及网络上各路dalao的教程。</p>
-<p>DeferredRegister.create需要提供两个参数，一个是你需要调用的注册表的类型，物品用ITEMS，方块用BLOCKS，以此类推。另一个则是你的MODID，这个变量之前就提到过，贯穿你的整个modding过程，所以，如果想修改，现在还来得及。</p>
-<p>之前提到过，forge mod是基于对游戏本体的订阅和消息处理来完成与本体的交互的，所以我们在此基础上再加上对订阅消息的接口：</p>
-<pre><code>public static void register(IEventBus eventBus)&#123;
-    ITEMS.register(eventBus);
-&#125;
-</code></pre>
-<p>IEventBus是OpenMod API提供的对接方式之一，用于事件的订阅和管理。</p>
-<p>既然物品类都加上了物品对象的订阅接口，本体自然也是要加的，我们在负责订阅、进程监听与交互的TutorialMod方法中加上：</p>
-<pre><code>ModItems.register(modEventBus);
-</code></pre>
-<p>接下来，回到ModItems类，我们将我们的第一个物品塞进注册表（doge只是我起的名字，各位可以换成其他的名称）：</p>
-<pre><code>public static final RegistryObject&lt;Item&gt; DOGE = ITEMS.register(&quot;doge&quot;,
-        () -&gt; new Item(new Item.Properties()));
-</code></pre>
-<p>至于Item类下的对象及方法，可以在Intellij中使用Ctrl+Shift+A查找对应类查看：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E02_2.png"></p>
-<p>Item下的Properties子类应该算是其中最基础的方法了，用于定义一个物品最为基础的状态。当然，如果你想设计一个定义上占据小容量的轻小物件，比方说某种细小的螺丝钉，你可以设计一个子类，将maxStackSize参数调到256，这里就不细说了。</p>
-<pre><code>public static class Properties &#123;
-      int maxStackSize = 64;
-      int maxDamage;
-      @Nullable
-      Item craftingRemainingItem;
-      Rarity rarity = Rarity.COMMON;
-      @Nullable
-      FoodProperties foodProperties;
-      boolean isFireResistant;
-      FeatureFlagSet requiredFeatures = FeatureFlags.VANILLA_SET;
-      private boolean canRepair = true;
-
-      public Item.Properties food(FoodProperties p_41490_) &#123;
-         this.foodProperties = p_41490_;
-         return this;
-      &#125;
-</code></pre>
-<p>在做完定义之后，我们还需要让它在创造模式下可视以及可存取，于是我们在Mod本体类下的addCreative加上如下代码：</p>
-<pre><code>if(event.getTab() == CreativeModeTabs.INGREDIENTS)&#123;
-    event.accept(ModItems.DOGE);
-&#125;
-</code></pre>
-<p>这样，我们就可以在原版的创造模式物品列表里（INGREDIENTS特指材料列表，1.19.3以后的创造列表和之前有较大出入，调用时还请留意）看到它的身影了。</p>
-<p>完全代码如下（package取决于你自己定义的模组名称）：</p>
-<pre><code>package net.drivenhank.tutorialmod.item;
-
-import net.drivenhank.tutorialmod.TutorialMod;
-import net.minecraft.world.item.Item;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.registries.DeferredRegister;
-import net.minecraftforge.registries.ForgeRegistries;
-import net.minecraftforge.registries.RegistryObject;
-
-public class ModItems &#123;
-    public static final DeferredRegister&lt;Item&gt; ITEMS =
-            DeferredRegister.create(ForgeRegistries.ITEMS, TutorialMod.MOD_ID);
-
-    public static final RegistryObject&lt;Item&gt; DOGE = ITEMS.register(&quot;doge&quot;,
-            () -&gt; new Item(new Item.Properties()));
-
-    public static void register(IEventBus eventBus)&#123;
-        ITEMS.register(eventBus);
-    &#125;
-&#125;
-</code></pre>
-<p><em>ps：一定要确保引用的class或者库是正确的，否则就会出现一些不必要的接口调用混乱等情况，并不是作者亲身经历过，但防患于未然</em></p>
-<p><em>ps：Intellij的代码补全真是好用的一批</em></p>
-<hr>
-<h4 id="资源部分"><a href="#资源部分" class="headerlink" title="资源部分"></a>资源部分</h4><p>且慢，是不是少了什么？没错，是模型。更准确来讲，是物品显示的资源文件。</p>
-<p>莫得模型的物品没有灵魂，在mc里的显示也只会是undefine默认的紫黑块。我们来看看官方是怎么配置模型相关的资源文件的。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E02_3.png"></p>
-<p>如下，我们需要仿照官方的格式去列出调用的资源包：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E02_4.png"></p>
-<p>如图，blockstates代表方块类物品放置后呈现的不同状态下的样式，lang代表不同语言下的物品名称显示，models即模型，textures即材质。</p>
-<p>先从简单的物品名开始，中国人不放洋屁，但洋老爷看不懂中文，所以我们需要两个json语言包，分别命名为en_us和zh_cn。</p>
-<p>设定好的语言文件格式如下：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E02_5.png"></p>
-<p>然后，我们需要设定一下物品的模型调用，格式如下：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E02_6.png"></p>
-<p>“parent”代表我们调用的模型父类，这里使用了一个通用的模板item&#x2F;generate。“layer”则代表模型层数，这里只定义了“layer0”，是一个比较简单的模型。</p>
-<p>当然，如果你不怕设计复杂模型，你甚至可以定义一个多layer的物品，当然，你背后的美工，或者你自己的工作量可能就大了起来。</p>
-<p>顺带一提，你在翻阅客户端文件以作参考的时候，可能会发现一些特殊物品的模型没有对应的layer调用，比方说美西螈刷怪蛋：</p>
-<pre><code>&#123;
-  &quot;parent&quot;: &quot;minecraft:item/template_spawn_egg&quot;
-&#125;
-</code></pre>
-<p>这应该是程序员为了节省工作量，而对刷怪蛋的模型作了统一定义，于是只需要调用统一模型的公用模板，代码方面会自动生成其变体。至于方块类物品，甚至是门、船之类模型特殊的物品的定义，就留到之后再说吧。</p>
-<p>再者，我们需要制作一个模型。这里你可以使用各种在线插件，但如果你美工能力够自信，你可以直接使用PS（反正我是这么干的），做好的模型按设定的物品id命名，存入textures文件夹。顺带，minecraft支持偶数倍数大小的方形模型文件，但你最好不要设计一个超过32*32的模型（除非像拔刀剑那样有比较高效的自定义统一模板）</p>
-<p>将模型图片放到texture下，我们就可以打开游戏（gradle runClient），看到我们可爱的doge了：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E02_7.png"></p>
-<h4 id="额外的创造模式列表"><a href="#额外的创造模式列表" class="headerlink" title="额外的创造模式列表"></a>额外的创造模式列表</h4><p>但是，有一个小问题，我们平常所熟知的mod，除非是用于多mod在原版物品上的合成兼容，否则基本都有自己的创造模式物品栏。</p>
-<p>对此，我们需要额外创建一个类来构建自己的物品栏。在item目录下创建ModCreativeModeTabs类，然后输入如下代码：</p>
-<pre><code>package net.drivenhank.tutorialmod.item;
-
-import net.drivenhank.tutorialmod.TutorialMod;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.CreativeModeTab;
-import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.event.CreativeModeTabEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
-@Mod.EventBusSubscriber(modid = TutorialMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD)
-public class ModCreativeModeTabs &#123;
-    public static CreativeModeTab TUTORIAL_TAB;
-
-    @SubscribeEvent
-    public static void registerCreativeModeTabs(CreativeModeTabEvent.Register event)&#123;
-        TUTORIAL_TAB = event.registerCreativeModeTab(new ResourceLocation(TutorialMod.MOD_ID, &quot;tutorial_tab&quot;),
-                builder -&gt; builder.icon(() -&gt; new ItemStack(ModItems.DOGE.get()))
-                        .title(Component.translatable(&quot;creativemodetab.tutorial_tab&quot;)));
-    &#125;
-&#125;
-</code></pre>
-<p>如上，我们设定了一个订阅接口，用于模组文件的交互，又设定了一个全新的事件，用于创建一个新的创造模式物品栏分类，调用的部分包括模组id，模组标签图片，以及语言栏里的标题。具体格式及源文件，各位可以在自有库中查阅，本文不再赘述。</p>
-<p>同时，我们需要把模组本体文件中addCreative的event get改成：</p>
-<pre><code>if(event.getTab() == ModCreativeModeTabs.TUTORIAL_TAB)&#123;
-        event.accept(ModItems.DOGE);
-    &#125;
-</code></pre>
-<p>语言栏里也要加上ItemStack.title调用的标题：</p>
-<pre><code>&quot;creativemodetab.tutorial_tab&quot;: &quot;Doge Doge&quot;
-</code></pre>
-<p>最终效果如下：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E02_8.png"></p>
-<hr>
-<p>如是，我们终于得到了我们的第一个物品。</p>
-<p>这一期的内容似乎有点复杂，但别急，更复杂的还在后头。</p>
-<p>mc除了物品，还有方块，方块有更复杂的物理、模型和功能需要我们处理，这些留到接下来再说。</p>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color2">mc模组开发</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="2023/03/24/%E4%BB%8E%E9%9B%B6%E5%BC%80%E5%A7%8B%E7%9A%84%E9%80%86%E5%90%91%E4%BA%BAmodding%E4%B9%8B%E8%B7%AF-E02/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-    <article id="post-从零开始的逆向人modding之路-E01" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="2023/03/24/%E4%BB%8E%E9%9B%B6%E5%BC%80%E5%A7%8B%E7%9A%84%E9%80%86%E5%90%91%E4%BA%BAmodding%E4%B9%8B%E8%B7%AF-E01/">从零开始的逆向人modding之路[E01]</a>
-    </h1>
-  
-
-        
-        <a href="2023/03/24/%E4%BB%8E%E9%9B%B6%E5%BC%80%E5%A7%8B%E7%9A%84%E9%80%86%E5%90%91%E4%BA%BAmodding%E4%B9%8B%E8%B7%AF-E01/" class="archive-article-date">
-  	<time datetime="2023-03-24T09:49:29.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-03-24</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>接下来，我们可以开始制作我们的第一个mod了。如果你还需要一个合适的java开发环境，你可以参考<a target="_blank" rel="noopener" href="https://www.youtube.com/watch?v=p-mp91zrlqo">Kaupenjoe的视频</a>以及网上其他博主和视频主的资料。这里还是建议使用intelij作为你的开发软件，一方面作为pycharm的同厂商软件，使用手感也与pycharm相近，另一方面，代码自动补全确实省事不少。</p>
-<h3 id="先从手头有的东西开始"><a href="#先从手头有的东西开始" class="headerlink" title="先从手头有的东西开始"></a>先从手头有的东西开始</h3><h4 id="API的开发模板"><a href="#API的开发模板" class="headerlink" title="API的开发模板"></a>API的开发模板</h4><p>我们既然需要通过一些插件作为跳板来开发模组，那么，相关工程的代码模板也必不可少。</p>
-<p>这里以forge mod开发举例，你可以很轻而易举地从github上pull一个forge的开发模板到本地环境。我这里使用的是1.19.3的mdk，实际开发中可能还需要针对你modding的目标版本使用不同的模板和编写方式，但大同小异。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_1.png"></p>
-<p>如图，src就是日后我们存储大部分相关源代码的地方，gradle相关的文件则用于自动构建项目，git相关则是用作之后在本地与git之间交互的。</p>
-<p>除此之外，那些README啥的txt你可以全扬了。</p>
-<p>关于模板内部的各类参数，我们等打开开发环境之后再说：</p>
-<h4 id="你的开发环境"><a href="#你的开发环境" class="headerlink" title="你的开发环境"></a>你的开发环境</h4><p>接下来，我们打开编辑软件，这里以intelij为例：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_2.png"></p>
-<p>我们需要做的就是等待gradle自行完成项目的建构，紧接着，你的forge模板上就会有一个完整的minecraft运行环境，里面包括了很多你会用到的东西。</p>
-<p>顺带，记得把你的gradle的默认java改成项目自带的Java环境，像这样：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_3.png"></p>
-<h4 id="minecraft本体的各类参数和函数"><a href="#minecraft本体的各类参数和函数" class="headerlink" title="minecraft本体的各类参数和函数"></a>minecraft本体的各类参数和函数</h4><p>如果你要尝试开发一个包含功能性方块、功能性物件、一套完整合成系统，甚至生物模型、AI、生态的大型mod，其工作量不亚于让你重新开发一个minecraft，但好消息是，minecraft本体当中为你提供了大量原生的代码，减轻了你自行编写函数的工作量。</p>
-<p>在gradle建构完成后，你可以在你的External Libaries文件夹看到客户端及其文件，在正式开发mod之前，建议细细翻阅，以免自己在编写（实为复现）的时候出现莫名的格式问题（毕竟不同版本之间可能会有大重构，就像1.19.2到1.19.3直接把物品分类大改了一样）：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_4.png"></p>
-<h4 id="让我们回到模板"><a href="#让我们回到模板" class="headerlink" title="让我们回到模板"></a>让我们回到模板</h4><p>src文件夹下包含两个关键的大类，一个是项目本体（java），存放实现功能的主要代码；一个是模组资源（resources），存放模组的各类模型等。</p>
-<p>在开始编程之前，我们需要认识我们的模板。</p>
-<h5 id="java类"><a href="#java类" class="headerlink" title="java类"></a>java类</h5><p>java类下有一个ExampleMod文件，那是一切的开始之一，我们点进去看看各项组件：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_5.png"></p>
-<p><strong>MODID</strong>：你的模组的ID，日后很多调用都需要以ID为关键参数。我们需要把它的内容替换为为全小写格式的，我们自己的模组名。这里就以tutorialmod为例。<em>Kaupenjoe习惯将此变量名改为MOD_ID，可能是后期编写的时候会与客户端源文件冲突？</em></p>
-<p><strong>LOGGER</strong>：一个简单日志门面的接口，关于slf4j的详细内容可以参考<a target="_blank" rel="noopener" href="https://56data.cc/1563.html">https://56data.cc/1563.html</a>，本文不作赘述。</p>
-<p><strong>BLOCKS、ITEMS、EXAMPLE_BLOCK、EXAMPLE_BLOCK_ITEM</strong>：forge提供的各类物件的注册模板，方便你快速在类中注册物品，但自己写的话多半用不上。</p>
-<p>以及下方的各类函数，其上都有一定的注释，这里不多赘述。但是需要注意一下EventBusSubscriber，这个组件涉及到forge、mod和minecraft本体之间的交互，因为mod本身也是一个项目，它需要通过订阅和消息处理来进行驱动。</p>
-<blockquote>
-<p>forge在加载了mod之后forge就会根据mod的订阅消息情况适时的发送消息。也就是说mod也是消息驱动的程序。当然开始一个mod的编程就要从消息处理开始。</p>
-<p>forge提供了一个特殊的Annotation来订阅消息。这个Annotation 就是@EventHandler</p>
-<p>————<a target="_blank" rel="noopener" href="https://www.261day.com/minecraft-mod%E6%95%99%E7%A8%8B-forge%E5%8E%9F%E7%90%86%E4%B8%8Eeventhandler/">摘自ManaGeryzy的博客</a></p>
-</blockquote>
-<p>EventBusScriber也有<a target="_blank" rel="noopener" href="https://developer.salesforce.com/docs/atlas.en-us.platform_events.meta/platform_events/sforce_api_objects_eventbussubscriber.htm">相应的教程</a>，需要的话可以查阅。</p>
-<p>还有一个关键组件是addCreative，这个比较好懂，与我们在创造模式的面板上能否看到我们写出来的物品相关联。</p>
-<p>所以，我们开发的第一件事情就是——把东西扬个干净。</p>
-<p>可能你会问，为什么呢？明明有这么多重要的内容和好用的模板。但我想说，一是这些东西可能不合你的代码风格，二是目前在离线开发阶段，我们并没有操作这些东西的必要，三是留太多反倒看得头疼，并且会让代码成为工友不友好型。</p>
-<p>回到正题，我们首先把主函数名称和文件名、以及所有次级调用改为自己的模组名（这里我用TutorialMod），然后把所有的MOD_ID改成自己想要的，接下来，官方模板应删尽删，留下MODID和LOGGER，注释应删尽删，函数内容应删尽删（但public TutorialMod()需要把modEventBus相关留下），由于我们目前离线开发，所以OnSeverStarting整个扬了，最后你会看到如下结果：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_6.png"></p>
-<p>清爽多了。</p>
-<h5 id="resources类"><a href="#resources类" class="headerlink" title="resources类"></a>resources类</h5><p>接下来是resources类，我们点开其中的mods.toml，这是我们模组的配置文件之一，其中包含如下要修改的内容：</p>
-<p><strong>license</strong>：模组工程的协议类型。由于我们只是在别人的基础上开发，所以用偏专利型的All Rights Reserved还是不稳妥，建议用MIT。</p>
-<p><strong>modId</strong>：不用多说</p>
-<p><strong>displayName</strong>：你的模组最后显示在mc里的名称，需要改成你自己的mod名称。</p>
-<p>authors、credits、description：作者、赞助、描述。这些看你心情。</p>
-<p><strong>dependencies.XXX</strong>：环境依赖，点后面记得改成你自己的模组id。</p>
-<h5 id="build-gradle"><a href="#build-gradle" class="headerlink" title="build.gradle"></a>build.gradle</h5><p>在主文件夹下还有一个build.gradle需要变动，这玩意涉及到你的项目build时候的一些参数：</p>
-<p><strong>version</strong>：模组版本</p>
-<p><strong>group</strong>：你的模组所处的类，这里建议配合你的java类起名进行修改，比方说你的模组程序文件在<code>net/drivenhank/tutorialmod</code>下，那么这里要同步为<code>net.drivenhank.tutorialmod</code>。</p>
-<p><strong>archivesBaseName</strong>：需要同步为你的模组id。</p>
-<p>除此之外，文件中所有examplemod都要同步为你的模组id。</p>
-<p>做完这些更改，你只需要点开右侧边栏的gradle项，重新加载所有的gradle项目，然后点击Tasks-&gt;forgegradle runs-&gt;run client，然后就可以看到在mc里头，我们的mod能够正常显示了：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_7.png"></p>
-<h4 id="各种精巧的小工具"><a href="#各种精巧的小工具" class="headerlink" title="各种精巧的小工具"></a>各种精巧的小工具</h4><p>首先是intelij自带的git工具，非常方便你在开发时存档。你只需要把你的mod给share on github或者直接push上去：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_8.png"></p>
-<p>在github上自动存档力</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_9.png"></p>
-<p>然后是<a target="_blank" rel="noopener" href="https://misode.github.io/loot-table/">misode的各种generator</a>，方便开发时构建各类物品的json：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_10.png"></p>
-<p>至于模型制作，如果局限于原版构型，我比较建议用ps硬画，但是如果要实现复杂模型，Blockbench也许是一个不错的选择。</p>
-<hr>
-<p>先讲到这里。下一回，我们将实现mod的部分功能：做出一些普通的方块和物品。</p>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color2">mc模组开发</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="2023/03/24/%E4%BB%8E%E9%9B%B6%E5%BC%80%E5%A7%8B%E7%9A%84%E9%80%86%E5%90%91%E4%BA%BAmodding%E4%B9%8B%E8%B7%AF-E01/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
   
     <nav id="page-nav">
-      <span class="page-number current">1</span><a class="page-number" href="page/2/">2</a><a class="page-number" href="page/3/">3</a><a class="extend next" rel="next" href="page/2/">Next &amp;raquo;</a>
+      <span class="page-number current">1</span><a class="page-number" href="page/2/">2</a><a class="page-number" href="page/3/">3</a><a class="page-number" href="page/4/">4</a><a class="extend next" rel="next" href="page/2/">Next &amp;raquo;</a>
     </nav>
   
 

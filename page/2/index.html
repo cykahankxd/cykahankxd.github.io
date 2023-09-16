@@ -166,6 +166,459 @@
           <div id="js-content" class="content-ll">
             
   
+    <article id="post-DASCTF X SU 2023 四月赛 可能不会更新的复现" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="../../2023/04/23/DASCTF%20X%20SU%202023%20%E5%9B%9B%E6%9C%88%E8%B5%9B%20%E5%8F%AF%E8%83%BD%E4%B8%8D%E4%BC%9A%E6%9B%B4%E6%96%B0%E7%9A%84%E5%A4%8D%E7%8E%B0/">DASCTF X SU 2023 四月赛 可能不会更新的复现</a>
+    </h1>
+  
+
+        
+        <a href="../../2023/04/23/DASCTF%20X%20SU%202023%20%E5%9B%9B%E6%9C%88%E8%B5%9B%20%E5%8F%AF%E8%83%BD%E4%B8%8D%E4%BC%9A%E6%9B%B4%E6%96%B0%E7%9A%84%E5%A4%8D%E7%8E%B0/" class="archive-article-date">
+  	<time datetime="2023-04-23T07:56:18.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-04-23</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="RE"><a href="#RE" class="headerlink" title="RE"></a>RE</h2><h3 id="easyRE"><a href="#easyRE" class="headerlink" title="easyRE"></a>easyRE</h3><p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/DASCTF2023Apr_easyRE_pic1.png"></p>
+<p>一头雾水，只根据<a target="_blank" rel="noopener" href="https://www.cnblogs.com/DirWang/p/12128900.html">DirWangK的文章</a>了解到出题人可能在初始化函数<code>__scrt_common_main()</code>用一些奇怪的玩意做了点手脚，并且开了非常严的反调试（一气之下搬来ghidra还是不得劲）：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/DASCTF2023Apr_easyRE_pic2.png"></p>
+<p>搜字符串也没有查找到程序显示的语句，也没有看到Thread相关函数，不排除是做了高度混淆和反调试的高明子进程，又或者是什么新东西。无奈只能查找程序是否含有奇怪字串。在<code>sub_140002760</code>找到<code>_MEIPASS2</code>字串，经查是python系统环境里的东西，基本确认这个玩意是个python exe，遂尝试用pyinstxtractor把这个exe反编译成pyc来逆。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/DASCTF2023Apr_easyRE_pic3.png"></p>
+<p>还真是.jpg，但是接下来使用各种工具反编译pyc的时候都因为魔数问题挂了，一查可能是python版本不对，但是py2和py3一直到3.10都挂了，怀疑用的3.11编译的（实际上确实如此，python3.11的编译魔数是3495）。遂直接用python的dis库进行反编译然后强行读汇编：</p>
+<pre><code>import dis
+import marshal
+
+with open(&#39;easyRE.pyc&#39;, &#39;rb&#39;) as f:
+    f.seek(16)
+    dis.disassemble(marshal.load(f))
+</code></pre>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/DASCTF2023Apr_easyRE_pic4.png"></p>
+<p>字符长度46，伪随机根322376503，先进行输入并编码，然后另开一个数组，存放<code>input[i]^randint(0,255)</code>的结果。</p>
+<p>道理都懂，实践开始。</p>
+<pre><code>import random
+
+r = random.seed(322376503)
+encans = b&#39;\x8b\xcck\xd3\xed\x96\xffFb\x06r\x085\x82\xbc \xb2\xde)p\x88Q`\x1bf\x18\xb6QUSw\x10\xcd\xd9\x13A$\x86\xe5\xcd\xd9\xff&#39;
+
+for i in encans:
+    print(chr(i ^ random.randint(0, 255)), end = &#39;&#39;)
+</code></pre>
+<blockquote>
+<p>flag{69858b56-4987-438f-a02c-5ab5c09e5138}</p>
+</blockquote>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="../../2023/04/23/DASCTF%20X%20SU%202023%20%E5%9B%9B%E6%9C%88%E8%B5%9B%20%E5%8F%AF%E8%83%BD%E4%B8%8D%E4%BC%9A%E6%9B%B4%E6%96%B0%E7%9A%84%E5%A4%8D%E7%8E%B0/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
+    <article id="post-从零开始的逆向人modding之路-E02" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="../../2023/03/24/%E4%BB%8E%E9%9B%B6%E5%BC%80%E5%A7%8B%E7%9A%84%E9%80%86%E5%90%91%E4%BA%BAmodding%E4%B9%8B%E8%B7%AF-E02/">从零开始的逆向人modding之路[E02]</a>
+    </h1>
+  
+
+        
+        <a href="../../2023/03/24/%E4%BB%8E%E9%9B%B6%E5%BC%80%E5%A7%8B%E7%9A%84%E9%80%86%E5%90%91%E4%BA%BAmodding%E4%B9%8B%E8%B7%AF-E02/" class="archive-article-date">
+  	<time datetime="2023-03-24T09:49:32.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-03-24</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h3 id="上回书说到"><a href="#上回书说到" class="headerlink" title="上回书说到"></a>上回书说到</h3><p>彼时的璃月，海中有大魔侵扰，山间有恶魑盘踞……等下，我拿错稿子了？</p>
+<p>回到正题，之前我们成功让模组跑起来了，今天咱们来点物品相关的东西。</p>
+<h3 id="你的第一个物品"><a href="#你的第一个物品" class="headerlink" title="你的第一个物品"></a>你的第一个物品</h3><h4 id="代码实现部分"><a href="#代码实现部分" class="headerlink" title="代码实现部分"></a>代码实现部分</h4><p>我们先在模组本体文件的package下新建一个item package，然后新建一个名为ModItems的java类：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E02_1.png"></p>
+<p>我们需要定义一个Register变量来注册这个类的所有物品：</p>
+<pre><code>public static final DeferredRegister&lt;Item&gt; ITEMS =
+        DeferredRegister.create(ForgeRegistries.ITEMS, TutorialMod.MOD_ID);
+</code></pre>
+<p>我们浅浅地分析以下为什么要使用如上格式。首先，我们需要了解Java中各种变量类型及修饰符的作用。</p>
+<h4 id="借着这个机会学java"><a href="#借着这个机会学java" class="headerlink" title="借着这个机会学java"></a>借着这个机会学java</h4><p>常规变量如int，bool等都和C系语言特别类似，最大的差别就是适用于面向对象的，不论函数还是变量，又或者说类和对象都能使用的修饰符。访问修饰符如下：</p>
+<blockquote>
+<p><strong>default</strong> (即默认，什么也不写）: 在同一包内可见，不使用任何修饰符。使用对象：类、接口、变量、方法。<br><strong>private</strong> : 仅在其所属类内可见与访问。使用对象：变量、方法。 注意：不能修饰类（外部类）<br><strong>public</strong> : 对所有类可见，能够被任何其它类访问，其所在方法也必须是共有类型。使用对象：类、接口、变量、方法<br><strong>protected</strong> : 对同一包内的类和所有子类可见，但其它类对其的调用权限由其子类的调用方式决定，正常来讲，protected变量只有该类本身及其子类允许正常访问。使用对象：变量、方法。 注意：不能修饰外部类，接口及接口的成员变量和成员方法不能声明为 protected。  </p>
+</blockquote>
+<p>非访问修饰符如下：</p>
+<blockquote>
+<p><strong>static</strong> : 使对象独立于其它对象成为<strong>静态对象</strong>，它在同一类当中独一无二，且无法主动互动非静态对象，但能被非静态对象调用。<br><strong>final</strong> : 使对象成为可以被引用，但无法被二次赋值的<strong>“常变量”</strong>，此变量必须被赋初值。<br><strong>abstract</strong> : 不能用于定义对象，但可以用于定义类和方法，使之在代码层面上“可拓展”<br><strong>synchronized</strong> : 使被定义的方法只能同时被一个线程访问<br><strong>transient</strong> ： 序列化的对象包含被 transient 修饰的实例变量时，java 虚拟机(JVM)跳过该特定的变量。<br><strong>volatile</strong> ： 修饰的成员变量在每次被线程访问时，都强制从共享内存中重新读取该成员变量的值。而且，当成员变量发生变化时，会强制线程将变化值回写到共享内存。</p>
+</blockquote>
+<p>java由于<strong>面向对象</strong>，所以对于<strong>“面向过程”</strong>语言的<strong>“函数”</strong>和<strong>“变量”</strong>概念的重新解读会比较抽象。举个简单的例子，在你的书架上，你往往会把<strong>文具、学习用书和休闲书</strong><br>分置，则这三堆物件为所谓的<strong>“类”</strong>，而具体到铅笔、橡皮之类的文具则是<strong>“文具类”</strong>下的<br><strong>“对象”</strong>，同时也是对“类”所定义的概念具现化的一种<strong>“实例”</strong>。</p>
+<p>也正因如此，一般情况下，类与类之间并不互通，所以你书架上的物品都是<strong>private</strong>变量。直到有一天，你搞到了一本电子书，你非常纳闷该把它放哪，因为它既符合文具类“物件”的用途，又有作为学习用书、休闲书使用的需要。那么，电子书就是一个<strong>public</strong><br>变量。但是你习惯用电子书了，学着学着，又意识到在上大课的时候看武侠小说会卷不过同学，于是就把电子书里的各种小说扬了，只用来存取电子课本，这时它又变成了一个<strong>protect</strong>变量。但其实，电子书一开始什么都没做，它纯粹根据你的需要被定义成了各种样式，所以，它一开始也只是一个<strong>default</strong>变量。</p>
+<p>如果一本书上的内容不需要你进行增删，甚至是校方严格规定的，比方说你的学生手册，那么它就是一个<strong>final</strong>变量，再比如，你为了完成你的毕业设计，不知从哪找来了一篇没有复本的冷门论文，你的毕设随时都要用到它，但你不可能用它的内容去修改你书架上其它已经发布的论文，它就是一个<strong>static</strong>变量。</p>
+<p>总之，java对各种量和函数的定义非常复杂，结合现实实际抽象理解，可能会帮到你不少。</p>
+<h4 id="回到正题"><a href="#回到正题" class="headerlink" title="回到正题"></a>回到正题</h4><p>由是，我们在设计的时候往往会想到，一个注册端口必须是稳定，启动后不可变动，并且可被其它类随意调用的（想想看你坐飞机，你也不希望起飞前半个小时突然告诉你登机口变更，其他人要是赶时间，肯定更不想），所以它就很适合被定义为一个<strong>public static final</strong>型的变量。同样的，对于我们注册进列表中的每一个物品也是如此。</p>
+<p>至于DeferredRegister，它则是forge提供的注册你的minecraft对象的方式。它在RegisterEvent期间维护你提供的各类物品的列表，并将其注册为游戏内物品。详细参数可以参考forge官网的教程以及网络上各路dalao的教程。</p>
+<p>DeferredRegister.create需要提供两个参数，一个是你需要调用的注册表的类型，物品用ITEMS，方块用BLOCKS，以此类推。另一个则是你的MODID，这个变量之前就提到过，贯穿你的整个modding过程，所以，如果想修改，现在还来得及。</p>
+<p>之前提到过，forge mod是基于对游戏本体的订阅和消息处理来完成与本体的交互的，所以我们在此基础上再加上对订阅消息的接口：</p>
+<pre><code>public static void register(IEventBus eventBus)&#123;
+    ITEMS.register(eventBus);
+&#125;
+</code></pre>
+<p>IEventBus是OpenMod API提供的对接方式之一，用于事件的订阅和管理。</p>
+<p>既然物品类都加上了物品对象的订阅接口，本体自然也是要加的，我们在负责订阅、进程监听与交互的TutorialMod方法中加上：</p>
+<pre><code>ModItems.register(modEventBus);
+</code></pre>
+<p>接下来，回到ModItems类，我们将我们的第一个物品塞进注册表（doge只是我起的名字，各位可以换成其他的名称）：</p>
+<pre><code>public static final RegistryObject&lt;Item&gt; DOGE = ITEMS.register(&quot;doge&quot;,
+        () -&gt; new Item(new Item.Properties()));
+</code></pre>
+<p>至于Item类下的对象及方法，可以在Intellij中使用Ctrl+Shift+A查找对应类查看：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E02_2.png"></p>
+<p>Item下的Properties子类应该算是其中最基础的方法了，用于定义一个物品最为基础的状态。当然，如果你想设计一个定义上占据小容量的轻小物件，比方说某种细小的螺丝钉，你可以设计一个子类，将maxStackSize参数调到256，这里就不细说了。</p>
+<pre><code>public static class Properties &#123;
+      int maxStackSize = 64;
+      int maxDamage;
+      @Nullable
+      Item craftingRemainingItem;
+      Rarity rarity = Rarity.COMMON;
+      @Nullable
+      FoodProperties foodProperties;
+      boolean isFireResistant;
+      FeatureFlagSet requiredFeatures = FeatureFlags.VANILLA_SET;
+      private boolean canRepair = true;
+
+      public Item.Properties food(FoodProperties p_41490_) &#123;
+         this.foodProperties = p_41490_;
+         return this;
+      &#125;
+</code></pre>
+<p>在做完定义之后，我们还需要让它在创造模式下可视以及可存取，于是我们在Mod本体类下的addCreative加上如下代码：</p>
+<pre><code>if(event.getTab() == CreativeModeTabs.INGREDIENTS)&#123;
+    event.accept(ModItems.DOGE);
+&#125;
+</code></pre>
+<p>这样，我们就可以在原版的创造模式物品列表里（INGREDIENTS特指材料列表，1.19.3以后的创造列表和之前有较大出入，调用时还请留意）看到它的身影了。</p>
+<p>完全代码如下（package取决于你自己定义的模组名称）：</p>
+<pre><code>package net.drivenhank.tutorialmod.item;
+
+import net.drivenhank.tutorialmod.TutorialMod;
+import net.minecraft.world.item.Item;
+import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.registries.DeferredRegister;
+import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraftforge.registries.RegistryObject;
+
+public class ModItems &#123;
+    public static final DeferredRegister&lt;Item&gt; ITEMS =
+            DeferredRegister.create(ForgeRegistries.ITEMS, TutorialMod.MOD_ID);
+
+    public static final RegistryObject&lt;Item&gt; DOGE = ITEMS.register(&quot;doge&quot;,
+            () -&gt; new Item(new Item.Properties()));
+
+    public static void register(IEventBus eventBus)&#123;
+        ITEMS.register(eventBus);
+    &#125;
+&#125;
+</code></pre>
+<p><em>ps：一定要确保引用的class或者库是正确的，否则就会出现一些不必要的接口调用混乱等情况，并不是作者亲身经历过，但防患于未然</em></p>
+<p><em>ps：Intellij的代码补全真是好用的一批</em></p>
+<hr>
+<h4 id="资源部分"><a href="#资源部分" class="headerlink" title="资源部分"></a>资源部分</h4><p>且慢，是不是少了什么？没错，是模型。更准确来讲，是物品显示的资源文件。</p>
+<p>莫得模型的物品没有灵魂，在mc里的显示也只会是undefine默认的紫黑块。我们来看看官方是怎么配置模型相关的资源文件的。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E02_3.png"></p>
+<p>如下，我们需要仿照官方的格式去列出调用的资源包：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E02_4.png"></p>
+<p>如图，blockstates代表方块类物品放置后呈现的不同状态下的样式，lang代表不同语言下的物品名称显示，models即模型，textures即材质。</p>
+<p>先从简单的物品名开始，中国人不放洋屁，但洋老爷看不懂中文，所以我们需要两个json语言包，分别命名为en_us和zh_cn。</p>
+<p>设定好的语言文件格式如下：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E02_5.png"></p>
+<p>然后，我们需要设定一下物品的模型调用，格式如下：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E02_6.png"></p>
+<p>“parent”代表我们调用的模型父类，这里使用了一个通用的模板item&#x2F;generate。“layer”则代表模型层数，这里只定义了“layer0”，是一个比较简单的模型。</p>
+<p>当然，如果你不怕设计复杂模型，你甚至可以定义一个多layer的物品，当然，你背后的美工，或者你自己的工作量可能就大了起来。</p>
+<p>顺带一提，你在翻阅客户端文件以作参考的时候，可能会发现一些特殊物品的模型没有对应的layer调用，比方说美西螈刷怪蛋：</p>
+<pre><code>&#123;
+  &quot;parent&quot;: &quot;minecraft:item/template_spawn_egg&quot;
+&#125;
+</code></pre>
+<p>这应该是程序员为了节省工作量，而对刷怪蛋的模型作了统一定义，于是只需要调用统一模型的公用模板，代码方面会自动生成其变体。至于方块类物品，甚至是门、船之类模型特殊的物品的定义，就留到之后再说吧。</p>
+<p>再者，我们需要制作一个模型。这里你可以使用各种在线插件，但如果你美工能力够自信，你可以直接使用PS（反正我是这么干的），做好的模型按设定的物品id命名，存入textures文件夹。顺带，minecraft支持偶数倍数大小的方形模型文件，但你最好不要设计一个超过32*32的模型（除非像拔刀剑那样有比较高效的自定义统一模板）</p>
+<p>将模型图片放到texture下，我们就可以打开游戏（gradle runClient），看到我们可爱的doge了：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E02_7.png"></p>
+<h4 id="额外的创造模式列表"><a href="#额外的创造模式列表" class="headerlink" title="额外的创造模式列表"></a>额外的创造模式列表</h4><p>但是，有一个小问题，我们平常所熟知的mod，除非是用于多mod在原版物品上的合成兼容，否则基本都有自己的创造模式物品栏。</p>
+<p>对此，我们需要额外创建一个类来构建自己的物品栏。在item目录下创建ModCreativeModeTabs类，然后输入如下代码：</p>
+<pre><code>package net.drivenhank.tutorialmod.item;
+
+import net.drivenhank.tutorialmod.TutorialMod;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.CreativeModeTab;
+import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.event.CreativeModeTabEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
+
+@Mod.EventBusSubscriber(modid = TutorialMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD)
+public class ModCreativeModeTabs &#123;
+    public static CreativeModeTab TUTORIAL_TAB;
+
+    @SubscribeEvent
+    public static void registerCreativeModeTabs(CreativeModeTabEvent.Register event)&#123;
+        TUTORIAL_TAB = event.registerCreativeModeTab(new ResourceLocation(TutorialMod.MOD_ID, &quot;tutorial_tab&quot;),
+                builder -&gt; builder.icon(() -&gt; new ItemStack(ModItems.DOGE.get()))
+                        .title(Component.translatable(&quot;creativemodetab.tutorial_tab&quot;)));
+    &#125;
+&#125;
+</code></pre>
+<p>如上，我们设定了一个订阅接口，用于模组文件的交互，又设定了一个全新的事件，用于创建一个新的创造模式物品栏分类，调用的部分包括模组id，模组标签图片，以及语言栏里的标题。具体格式及源文件，各位可以在自有库中查阅，本文不再赘述。</p>
+<p>同时，我们需要把模组本体文件中addCreative的event get改成：</p>
+<pre><code>if(event.getTab() == ModCreativeModeTabs.TUTORIAL_TAB)&#123;
+        event.accept(ModItems.DOGE);
+    &#125;
+</code></pre>
+<p>语言栏里也要加上ItemStack.title调用的标题：</p>
+<pre><code>&quot;creativemodetab.tutorial_tab&quot;: &quot;Doge Doge&quot;
+</code></pre>
+<p>最终效果如下：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E02_8.png"></p>
+<hr>
+<p>如是，我们终于得到了我们的第一个物品。</p>
+<p>这一期的内容似乎有点复杂，但别急，更复杂的还在后头。</p>
+<p>mc除了物品，还有方块，方块有更复杂的物理、模型和功能需要我们处理，这些留到接下来再说。</p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color2">mc模组开发</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="../../2023/03/24/%E4%BB%8E%E9%9B%B6%E5%BC%80%E5%A7%8B%E7%9A%84%E9%80%86%E5%90%91%E4%BA%BAmodding%E4%B9%8B%E8%B7%AF-E02/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
+    <article id="post-从零开始的逆向人modding之路-E01" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="../../2023/03/24/%E4%BB%8E%E9%9B%B6%E5%BC%80%E5%A7%8B%E7%9A%84%E9%80%86%E5%90%91%E4%BA%BAmodding%E4%B9%8B%E8%B7%AF-E01/">从零开始的逆向人modding之路[E01]</a>
+    </h1>
+  
+
+        
+        <a href="../../2023/03/24/%E4%BB%8E%E9%9B%B6%E5%BC%80%E5%A7%8B%E7%9A%84%E9%80%86%E5%90%91%E4%BA%BAmodding%E4%B9%8B%E8%B7%AF-E01/" class="archive-article-date">
+  	<time datetime="2023-03-24T09:49:29.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-03-24</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>接下来，我们可以开始制作我们的第一个mod了。如果你还需要一个合适的java开发环境，你可以参考<a target="_blank" rel="noopener" href="https://www.youtube.com/watch?v=p-mp91zrlqo">Kaupenjoe的视频</a>以及网上其他博主和视频主的资料。这里还是建议使用intelij作为你的开发软件，一方面作为pycharm的同厂商软件，使用手感也与pycharm相近，另一方面，代码自动补全确实省事不少。</p>
+<h3 id="先从手头有的东西开始"><a href="#先从手头有的东西开始" class="headerlink" title="先从手头有的东西开始"></a>先从手头有的东西开始</h3><h4 id="API的开发模板"><a href="#API的开发模板" class="headerlink" title="API的开发模板"></a>API的开发模板</h4><p>我们既然需要通过一些插件作为跳板来开发模组，那么，相关工程的代码模板也必不可少。</p>
+<p>这里以forge mod开发举例，你可以很轻而易举地从github上pull一个forge的开发模板到本地环境。我这里使用的是1.19.3的mdk，实际开发中可能还需要针对你modding的目标版本使用不同的模板和编写方式，但大同小异。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_1.png"></p>
+<p>如图，src就是日后我们存储大部分相关源代码的地方，gradle相关的文件则用于自动构建项目，git相关则是用作之后在本地与git之间交互的。</p>
+<p>除此之外，那些README啥的txt你可以全扬了。</p>
+<p>关于模板内部的各类参数，我们等打开开发环境之后再说：</p>
+<h4 id="你的开发环境"><a href="#你的开发环境" class="headerlink" title="你的开发环境"></a>你的开发环境</h4><p>接下来，我们打开编辑软件，这里以intelij为例：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_2.png"></p>
+<p>我们需要做的就是等待gradle自行完成项目的建构，紧接着，你的forge模板上就会有一个完整的minecraft运行环境，里面包括了很多你会用到的东西。</p>
+<p>顺带，记得把你的gradle的默认java改成项目自带的Java环境，像这样：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_3.png"></p>
+<h4 id="minecraft本体的各类参数和函数"><a href="#minecraft本体的各类参数和函数" class="headerlink" title="minecraft本体的各类参数和函数"></a>minecraft本体的各类参数和函数</h4><p>如果你要尝试开发一个包含功能性方块、功能性物件、一套完整合成系统，甚至生物模型、AI、生态的大型mod，其工作量不亚于让你重新开发一个minecraft，但好消息是，minecraft本体当中为你提供了大量原生的代码，减轻了你自行编写函数的工作量。</p>
+<p>在gradle建构完成后，你可以在你的External Libaries文件夹看到客户端及其文件，在正式开发mod之前，建议细细翻阅，以免自己在编写（实为复现）的时候出现莫名的格式问题（毕竟不同版本之间可能会有大重构，就像1.19.2到1.19.3直接把物品分类大改了一样）：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_4.png"></p>
+<h4 id="让我们回到模板"><a href="#让我们回到模板" class="headerlink" title="让我们回到模板"></a>让我们回到模板</h4><p>src文件夹下包含两个关键的大类，一个是项目本体（java），存放实现功能的主要代码；一个是模组资源（resources），存放模组的各类模型等。</p>
+<p>在开始编程之前，我们需要认识我们的模板。</p>
+<h5 id="java类"><a href="#java类" class="headerlink" title="java类"></a>java类</h5><p>java类下有一个ExampleMod文件，那是一切的开始之一，我们点进去看看各项组件：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_5.png"></p>
+<p><strong>MODID</strong>：你的模组的ID，日后很多调用都需要以ID为关键参数。我们需要把它的内容替换为为全小写格式的，我们自己的模组名。这里就以tutorialmod为例。<em>Kaupenjoe习惯将此变量名改为MOD_ID，可能是后期编写的时候会与客户端源文件冲突？</em></p>
+<p><strong>LOGGER</strong>：一个简单日志门面的接口，关于slf4j的详细内容可以参考<a target="_blank" rel="noopener" href="https://56data.cc/1563.html">https://56data.cc/1563.html</a>，本文不作赘述。</p>
+<p><strong>BLOCKS、ITEMS、EXAMPLE_BLOCK、EXAMPLE_BLOCK_ITEM</strong>：forge提供的各类物件的注册模板，方便你快速在类中注册物品，但自己写的话多半用不上。</p>
+<p>以及下方的各类函数，其上都有一定的注释，这里不多赘述。但是需要注意一下EventBusSubscriber，这个组件涉及到forge、mod和minecraft本体之间的交互，因为mod本身也是一个项目，它需要通过订阅和消息处理来进行驱动。</p>
+<blockquote>
+<p>forge在加载了mod之后forge就会根据mod的订阅消息情况适时的发送消息。也就是说mod也是消息驱动的程序。当然开始一个mod的编程就要从消息处理开始。</p>
+<p>forge提供了一个特殊的Annotation来订阅消息。这个Annotation 就是@EventHandler</p>
+<p>————<a target="_blank" rel="noopener" href="https://www.261day.com/minecraft-mod%E6%95%99%E7%A8%8B-forge%E5%8E%9F%E7%90%86%E4%B8%8Eeventhandler/">摘自ManaGeryzy的博客</a></p>
+</blockquote>
+<p>EventBusScriber也有<a target="_blank" rel="noopener" href="https://developer.salesforce.com/docs/atlas.en-us.platform_events.meta/platform_events/sforce_api_objects_eventbussubscriber.htm">相应的教程</a>，需要的话可以查阅。</p>
+<p>还有一个关键组件是addCreative，这个比较好懂，与我们在创造模式的面板上能否看到我们写出来的物品相关联。</p>
+<p>所以，我们开发的第一件事情就是——把东西扬个干净。</p>
+<p>可能你会问，为什么呢？明明有这么多重要的内容和好用的模板。但我想说，一是这些东西可能不合你的代码风格，二是目前在离线开发阶段，我们并没有操作这些东西的必要，三是留太多反倒看得头疼，并且会让代码成为工友不友好型。</p>
+<p>回到正题，我们首先把主函数名称和文件名、以及所有次级调用改为自己的模组名（这里我用TutorialMod），然后把所有的MOD_ID改成自己想要的，接下来，官方模板应删尽删，留下MODID和LOGGER，注释应删尽删，函数内容应删尽删（但public TutorialMod()需要把modEventBus相关留下），由于我们目前离线开发，所以OnSeverStarting整个扬了，最后你会看到如下结果：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_6.png"></p>
+<p>清爽多了。</p>
+<h5 id="resources类"><a href="#resources类" class="headerlink" title="resources类"></a>resources类</h5><p>接下来是resources类，我们点开其中的mods.toml，这是我们模组的配置文件之一，其中包含如下要修改的内容：</p>
+<p><strong>license</strong>：模组工程的协议类型。由于我们只是在别人的基础上开发，所以用偏专利型的All Rights Reserved还是不稳妥，建议用MIT。</p>
+<p><strong>modId</strong>：不用多说</p>
+<p><strong>displayName</strong>：你的模组最后显示在mc里的名称，需要改成你自己的mod名称。</p>
+<p>authors、credits、description：作者、赞助、描述。这些看你心情。</p>
+<p><strong>dependencies.XXX</strong>：环境依赖，点后面记得改成你自己的模组id。</p>
+<h5 id="build-gradle"><a href="#build-gradle" class="headerlink" title="build.gradle"></a>build.gradle</h5><p>在主文件夹下还有一个build.gradle需要变动，这玩意涉及到你的项目build时候的一些参数：</p>
+<p><strong>version</strong>：模组版本</p>
+<p><strong>group</strong>：你的模组所处的类，这里建议配合你的java类起名进行修改，比方说你的模组程序文件在<code>net/drivenhank/tutorialmod</code>下，那么这里要同步为<code>net.drivenhank.tutorialmod</code>。</p>
+<p><strong>archivesBaseName</strong>：需要同步为你的模组id。</p>
+<p>除此之外，文件中所有examplemod都要同步为你的模组id。</p>
+<p>做完这些更改，你只需要点开右侧边栏的gradle项，重新加载所有的gradle项目，然后点击Tasks-&gt;forgegradle runs-&gt;run client，然后就可以看到在mc里头，我们的mod能够正常显示了：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_7.png"></p>
+<h4 id="各种精巧的小工具"><a href="#各种精巧的小工具" class="headerlink" title="各种精巧的小工具"></a>各种精巧的小工具</h4><p>首先是intelij自带的git工具，非常方便你在开发时存档。你只需要把你的mod给share on github或者直接push上去：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_8.png"></p>
+<p>在github上自动存档力</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_9.png"></p>
+<p>然后是<a target="_blank" rel="noopener" href="https://misode.github.io/loot-table/">misode的各种generator</a>，方便开发时构建各类物品的json：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_10.png"></p>
+<p>至于模型制作，如果局限于原版构型，我比较建议用ps硬画，但是如果要实现复杂模型，Blockbench也许是一个不错的选择。</p>
+<hr>
+<p>先讲到这里。下一回，我们将实现mod的部分功能：做出一些普通的方块和物品。</p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color2">mc模组开发</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="../../2023/03/24/%E4%BB%8E%E9%9B%B6%E5%BC%80%E5%A7%8B%E7%9A%84%E9%80%86%E5%90%91%E4%BA%BAmodding%E4%B9%8B%E8%B7%AF-E01/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
     <article id="post-从零开始的逆向人modding之路-E00" class="article article-type-post  article-index" itemscope itemprop="blogPost">
   <div class="article-inner">
     
@@ -1082,529 +1535,9 @@ while 1:
 
 
   
-    <article id="post-NSILAB一月赛——逆向部分题解" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="../../2023/01/09/NSILAB%E4%B8%80%E6%9C%88%E8%B5%9B%E2%80%94%E2%80%94%E9%80%86%E5%90%91%E9%83%A8%E5%88%86%E9%A2%98%E8%A7%A3/">NSILAB一月赛——逆向部分题解</a>
-    </h1>
-  
-
-        
-        <a href="../../2023/01/09/NSILAB%E4%B8%80%E6%9C%88%E8%B5%9B%E2%80%94%E2%80%94%E9%80%86%E5%90%91%E9%83%A8%E5%88%86%E9%A2%98%E8%A7%A3/" class="archive-article-date">
-  	<time datetime="2023-01-09T12:42:38.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-01-09</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h4 id="minidump"><a href="#minidump" class="headerlink" title="minidump"></a>minidump</h4><p>这道题其实是实验室的会长安排的，我一开始也没反应过来。</p>
-<p>dmp文件其实是dbg或者系统错误时产生的内存转储，但是，我们不一定需要专业的软件来打开它，就比如这题，出题人摆明这是c++程序的内存转储，而整个程序的源代码其实在运行时写入了内存，以便后续处理，所以我们直接winhex或者010editor打开，搜索相关字样，比方说“#include”即可，就可以快速跳转到对应代码：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/minidump_1.png"></p>
-<p>我们把代码扒出来，稍微小修小补一阵，看一看，就是个很简单的输出，运行，结束。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/minidump_2.png"></p>
-<h4 id="好像有点不对"><a href="#好像有点不对" class="headerlink" title="好像有点不对"></a>好像有点不对</h4><p>其实，前半截加密就是base64，只不过我把密码表改成了各位没见过的样子（</p>
-<p>后半段嘛……其实跟随机数的生成本身也没太大关系，既然不知道它生成的随机数值到底是什么，那么就粗暴一点，直接爆破。</p>
-<p>那么，思路很清楚了，对结果串从0~89暴力爆破，产生的产物，能看的直接塞到cyberchef里，换个base64的表挨个试一遍（下面的代码用c++实现）：</p>
-<pre><code>#include &lt;bits/stdc++.h&gt;
-using namespace std;
-const char data_0[] = &#123;37,29,51,58,33,123,57,35,30,78,93,95,91,117,99,74,123,13,6,85,127,125,115,65,80,11,89,87,44,120,51,50,15,22,47,119&#125;;
-int main()
-&#123;
-    freopen(&quot;output.txt&quot;,&quot;w&quot;,stdout);
-    for(int i=0;i&lt;=114-24;i++)&#123;
-        bool jud = true;
-        char data_1[114];
-        strcpy(data_1,data_0);
-        for(int j=0;j&lt;strlen(data_0);j++)&#123;
-            data_1[(j+i)%strlen(data_0)] ^= i+j;
-        &#125;
-            puts(data_1);
-    &#125;
-    return 0;
-&#125;
-</code></pre>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E5%A5%BD%E5%83%8F%E6%9C%89%E7%82%B9%E4%B8%8D%E5%AF%B9_1.png"></p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E5%A5%BD%E5%83%8F%E6%9C%89%E7%82%B9%E4%B8%8D%E5%AF%B9_2.png"></p>
-<h4 id="山外青山楼外楼"><a href="#山外青山楼外楼" class="headerlink" title="山外青山楼外楼"></a>山外青山楼外楼</h4><p>顾题思义，这题的flag藏在你的视野之外。</p>
-<p>实现这题的技术来自于<a target="_blank" rel="noopener" href="https://www.youtube.com/watch?v=HlUe0TUHOIc">DEF CON 23</a>，名叫REpsych，可以实现将位图贴到你的程序的控制流图，也就是所谓的ast语法树在ida中的表现上。我在Nepctf2022做到了相关的题目，相关<a target="_blank" rel="noopener" href="https://github.com/xoreaxeaxeax/REpsych">github链接</a>我也放在这，方便各位查阅。</p>
-<p>那么知道这是位图了，我们怎么在ida里看呢？很简单，你需要进入ida的设置，调节一下流图显示的上限。打开options-&gt;general-&gt;graph，将Max number of nodes 调到一定大小即可，比方说114514（。</p>
-<p>至于要看的更清楚的话，可以options-&gt;color-&gt;graph，把背景全部涂黑，这样，一张图片就显示出来了：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E5%B1%B1%E5%A4%96%E9%9D%92%E5%B1%B1%E6%A5%BC%E5%A4%96%E6%A5%BC_1.png"></p>
-<p>顺带，可能低版本ida的流图显示和高版本有一定差距，还请注意</p>
-<h4 id="看不见-走位-走位"><a href="#看不见-走位-走位" class="headerlink" title="看不见 ~ 走位 ~ 走位 ~"></a>看不见 ~ 走位 ~ 走位 ~</h4><p>我摊牌了，这本来是一个经典的迷宫，但是我塞进去了一些隐形墙。</p>
-<p>宋师傅几次与正解失之交臂，估计也是因为没能理解隐形墙的实现方式。</p>
-<p>我们来对比一下隐形墙函数在ida中和在源代码中的表现：</p>
-<pre><code>_BYTE *func_0()
-&#123;
-  _BYTE *result; // rax
-  int i; // [rsp+Ch] [rbp-4h]
-
-  for ( i = 0; i &lt;= 13; i += 2 )
-  &#123;
-    result = &amp;data_1[12 * data_4[i] + data_4[i + 1]];
-    *result = 42;
-  &#125;
-  return result;
-&#125;
-------------------------------------------------
-int data_4[14] = &#123;1,1,1,8,9,2,4,9,3,10,7,4,3,5&#125;;
-
-int func_0()
-&#123;
-    for(int i=0;i&lt;14;i+=2)
-        data_1[data_4[i]][data_4[i+1]]=&#39;*&#39;;
-&#125;
-</code></pre>
-<p>我故意将坐标数组合二为一，但如果能理解经典地图题的实现，就能发现，每一个i和i+1对应的就是地图上的纵横坐标。</p>
-<p>此外，我还在func_2对输入数据做了一些预处理，使上下左右四个方向能直接对应上数组的下标：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%9C%8B%E4%B8%8D%E8%A7%81%7E%E8%B5%B0%E4%BD%8D%7E%E8%B5%B0%E4%BD%8D_1.png"></p>
-<p>那么，接下来就轮到解题了。老规矩，你可以把地图拷下来，再把隐形墙贴上去，然后，要么手动走一遍，要么用算法脚本：</p>
-<pre><code>#include &lt;bits/stdc++.h&gt;
-using namespace std;
-char mp[12][12] = &#123;
-&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,
-&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;_&#39;,&#39;_&#39;,&#39;_&#39;,&#39;_&#39;,&#39;_&#39;,&#39;*&#39;,&#39;_&#39;,&#39;_&#39;,&#39;_&#39;,
-&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;_&#39;,&#39;_&#39;,&#39;*&#39;,
-&#39;*&#39;,&#39;_&#39;,&#39;_&#39;,&#39;_&#39;,&#39;_&#39;,&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;T&#39;,&#39;*&#39;,&#39;*&#39;,
-&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;_&#39;,&#39;_&#39;,&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,
-&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;_&#39;,&#39;T&#39;,&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;_&#39;,&#39;_&#39;,&#39;_&#39;,&#39;*&#39;,
-&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,
-&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;_&#39;,&#39;*&#39;,&#39;_&#39;,&#39;_&#39;,&#39;_&#39;,&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,
-&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;_&#39;,&#39;_&#39;,&#39;*&#39;,
-&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;*&#39;,
-&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;_&#39;,&#39;*&#39;,&#39;*&#39;,
-&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;*&#39;,&#39;S&#39;,&#39;_&#39;,&#39;_&#39;,&#39;*&#39;,&#39;*&#39;
-&#125;;
-int walked[12][12];
-int mvy[4] = &#123;-1,1,0,0&#125;;
-int mvx[4] = &#123;0,0,-1,1&#125;;
-int path[114];
-int shortest[114];
-int total=0xff;
-void dfs(int stp,int y,int x)&#123;
-    if(mp[y][x]==&#39;T&#39;)&#123;
-        if(stp&lt;total)&#123;
-            total = stp;
-            for(int i=0;i&lt;stp;i++)shortest[i]=path[i];
-        &#125;
-        return;
-    &#125;
-    for(int i=0;i&lt;4;i++)&#123;
-        path[stp]=i;
-        if(y+mvy[i]&lt;12&amp;&amp;x+mvx[i]&lt;12&amp;&amp;y+mvy[i]&gt;=0&amp;&amp;x+mvx[i]&gt;=0&amp;&amp;mp[y+mvy[i]][x+mvx[i]]!=&#39;*&#39;&amp;&amp;!walked[y+mvy[i]][x+mvx[i]])&#123;
-            walked[y+mvy[i]][x+mvx[i]]=1;
-            dfs(stp+1,y+mvy[i],x+mvx[i]);
-            walked[y+mvy[i]][x+mvx[i]]=0;
-        &#125;
-        path[stp]=0xff;
-    &#125;
-    return;
-&#125;
-int main()
-&#123;
-    memset(path,0xff,sizeof(path));
-    walked[11][7]=1;
-    dfs(0,11,7);
-    for(int i=0;i&lt;total;i++)&#123;
-        if(shortest[i]==0)printf(&quot;u&quot;);
-        if(shortest[i]==1)printf(&quot;d&quot;);
-        if(shortest[i]==2)printf(&quot;l&quot;);
-        if(shortest[i]==3)printf(&quot;r&quot;);
-    &#125;
-    printf(&quot;\n&quot;);
-    return 0;
-&#125;
-</code></pre>
-<p>各位如果有时间，掌握一些简单算法是必要的，在比赛时绝对有效。比如同样是曾经的nepctf就考了一道广度优先搜索，那是另一种类型的迷宫，各位有兴趣可以看看<a target="_blank" rel="noopener" href="https://ctf.webvpn.nefu.edu.cn/bbs/d/345">我以前的复现</a>或者其他dalao的题解，在此不多赘述。</p>
-<h4 id="分块式处理"><a href="#分块式处理" class="headerlink" title="分块式处理"></a>分块式处理</h4><p>从10分的hint可以看出来，这是一道原题。</p>
-<p>感兴趣的各位可以查看<a target="_blank" rel="noopener" href="https://ctf.webvpn.nefu.edu.cn/bbs/d/207-re-to-2022123">我曾经写过的文章</a>，这道题是BMZCTF的逆向_RE2，各位研究出来了也可以去BMZCTF蹭点分，这里不再赘述。</p>
-<h4 id="彻底疯狂"><a href="#彻底疯狂" class="headerlink" title="彻底疯狂"></a>彻底疯狂</h4><p>如果你点进func_0或者是其它同系列函数稍微观察一下，你就会发现，它们的结构都非常相似：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E5%BD%BB%E5%BA%95%E7%96%AF%E7%8B%82_1.png"></p>
-<p>都是对全局变量value进行异或，只是异或的值有点不同，函数的运行顺序从编号0到99。</p>
-<p>为了方便把这些值提取出来，你需要在汇编代码里列出所有的异或语句：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E5%BD%BB%E5%BA%95%E7%96%AF%E7%8B%82_2.png"></p>
-<p>这时候你就不用一个函数一个函数的点了，直接从这里手动把东西全扒下来。当然，如果要操作优雅一点，你可以按字节码和地址去用脚本拔下来这些东西，这里就不演示了。</p>
-<p>如果将数据以十进制的方式提取出来，那它大概长这样：</p>
-<pre><code>920682
-1261524
-338231
-563319
-1167774
-……
-</code></pre>
-<p>异或具有自反性，所以接下来只要让结果值对其中的数据按顺序异或就行了：</p>
-<pre><code>f = open(&quot;randata.txt&quot;, &quot;r&quot;)
-data_0 = f.read().splitlines()
-data_1 = []
-for line in data_0:
-    data_1.append(int(line))
-print(data_1)
-
-finale = 0xF8B3E
-
-l = len(data_1)
-for i in range(l):
-    finale ^= data_1[l - (i + 1)]
-print(&quot;flag&#123;&quot;+str(finale)+&quot;&#125;&quot;)
-</code></pre>
-<p>顺带，这里是我用来出题的脚本，各位可以研究一下（一些库函数和main的内容我就懒得在这里fwrite了）：</p>
-<pre><code>import random
-
-f0 = open(&quot;randata.txt&quot;, &quot;w&quot;)
-for i in range(100):
-    f0.write(str(random.randint(114514, 1919810))+&quot;\n&quot;)
-f0.close()
-
-fa = open(&quot;randata.txt&quot;, &quot;r&quot;)
-data_0 = fa.read().splitlines()
-data_1 = []
-for line in data_0:
-    data_1.append(int(line))
-
-f1 = open(&quot;craaaaazy_encode.c&quot;, &#39;w&#39;)
-
-for i in range(100):
-    f1.write(&quot;void func_&quot; + str(100-(i+1)) + &quot;()&#123;\n&quot;)
-    f1.write(&quot;  value ^= &quot; + str(data_1[i]) + &quot;;\n&quot;)
-    f1.write(&quot;  func_&quot; + str(100-i) + &quot;();\n&quot;)
-    f1.write(&quot;&#125;\n&quot;)
-
-f2 = open(&quot;creaaaazy.c&quot;, &quot;w&quot;)
-
-for i in range(100):
-    f2.write(&quot;void func_&quot; + str(100 - (i+1)) + &quot;()&#123;\n&quot;)
-    f2.write(&quot;  value ^= &quot; + str(data_1[100-(i+1)]) + &quot;;\n&quot;)
-    f2.write(&quot;  func_&quot; + str(100 - i) + &quot;();\n&quot;)
-    f2.write(&quot;&#125;\n&quot;)
-</code></pre>
-<hr>
-<h3 id="后记"><a href="#后记" class="headerlink" title="后记"></a>后记</h3><p>老实说，虽然我在大一因为有着信息学竞赛的基础，所以对程序和代码的理解会稍微轻松一些，可能对于很多非常常规的题也没有太放在心上</p>
-<p>但当我真的成为了出题人，才发现自己因此缺少了一个很重要的能力：对难度的把控</p>
-<p>更难受的是，一些更高深的内容，碍于自己实践经验太少，无法完全掌握，故也无法加入题目中，作为经验传授给自己的学弟。</p>
-<p>总而言之，自己太菜，缺乏做题与实践，但环境不断在变。我现在需要担心的，不光是战力下滑的自己，更有一群嗷嗷待哺的学弟们。</p>
-<p>共勉。</p>
-<p><em><strong>fin.</strong></em></p>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="../../2023/01/09/NSILAB%E4%B8%80%E6%9C%88%E8%B5%9B%E2%80%94%E2%80%94%E9%80%86%E5%90%91%E9%83%A8%E5%88%86%E9%A2%98%E8%A7%A3/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-    <article id="post-BUUCTF-Crackme6究极折磨失败实录" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="../../2022/11/06/BUUCTF-Crackme6%E7%A9%B6%E6%9E%81%E6%8A%98%E7%A3%A8%E5%A4%B1%E8%B4%A5%E5%AE%9E%E5%BD%95/">BUUCTF-Crackme6究极折磨失败实录</a>
-    </h1>
-  
-
-        
-        <a href="../../2022/11/06/BUUCTF-Crackme6%E7%A9%B6%E6%9E%81%E6%8A%98%E7%A3%A8%E5%A4%B1%E8%B4%A5%E5%AE%9E%E5%BD%95/" class="archive-article-date">
-  	<time datetime="2022-11-06T12:33:31.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-11-06</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>f5无门，遂动调，硬看汇编。</p>
-<p>在主逻辑之前加载数据时有一段call strlen：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Crackme6_strlen.png"></p>
-<p>反复提到0D，应当是判断输入长度的位置，长度存储于ebp寄存器偏移-0x50的位置，多次动调输入后确认输入总长度至少大于13，同时确认大量临时数据位于ebp栈。</p>
-<p>第一段主逻辑在此：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Crackme6_decrypt1st_fir.png"></p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Crackme6_decrypt1st_sec.png"></p>
-<p>1、如图，第一段逻辑一开始又检查了一遍输入长度，长度达标则跳到第二段逻辑，ecx存储输入数据；循环次数为9，每次对于数据的某一位位先异或一个地址为ebp-64h的序列的对应位，再进行一个41（字符A）的减，结果对应的ascii码存储在ebp-48h中，每次跳四字节存储。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Crackme6_decrypt1st_thi.png"></p>
-<p>2、之后如上，进行从小到大的顺序判断，若发现逆序对跳出。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Crackme6_decrypt1st_for.png"></p>
-<p>3、还有一段如上，计算所得到ebp-48h中所有内容的乘积。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Crackme6_decrypt1st_fif.png"></p>
-<p>4、接下来如上，得出的结果会被减0xd4c2086，作为分母除0x64。之后进入一段未知领域。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Crackme6_decrypt1st_sixth.png"></p>
-<p>线索到这里就因为整除0的报错而夹断了。不过，我们确实可以知道flag的前9个字母是什么了。根据其为顺序数列，并且前9位乘积为0xd4c2086，我们完全可以做质因数分解：</p>
-<pre><code>from sympy import nextprime
-
-p = 2
-a = 0xd4c2086
-ans = []
-while a != 1:
-    while a % p:
-        p = nextprime(p)
-    a /= p
-    ans.append(p)
-
-print(ans)
-</code></pre>
-<p>得到的刚好是从2开始九个顺序的质数，对上了。我们直接进行一个解密：</p>
-<pre><code>#include &lt;bits/stdc++.h&gt;
-using namespace std;
-int a[9]=&#123;2,3,5,7,11,13,17,19,23&#125;;
-int b[9]=&#123;0x33,0x21,0x22,0x21,0x35,0x7C,0x62,0x65,0x6e&#125;;
-int main()
-&#123;
-    for(int i=0;i&lt;9;i++)&#123;
-        a[i]+=&#39;A&#39;;
-        a[i]^=b[i];
-        printf(&quot;%c&quot;,a[i]);
-    &#125;
-    printf(&quot;\n&quot;);
-    return 0;
-&#125;
-</code></pre>
-<p>得到前9位为pediy2016……猜都猜得出来。</p>
-<p>那么后四位呢？回到刚才被夹断的部分，在动调的时候，寄存器的值是可以修改的，我们把ecx的值修改为任意非0值就可以无伤跳过了。</p>
-<p>但是，继续动态调试的时候，我们发现一件非常可怕的事情——程序自动往结束的地方走了。</p>
-<p>考虑到代码一般是顺序执行的，我们看看这之后的函数究竟干了些啥：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Crackme6_hellprint.png"></p>
-<p>我超，地狱绘图！</p>
-<p>这种情况的代码一般已经不可读了。后续看题解才知道这是<strong>虚拟机保护</strong>产生的大量中间数据，也就是说，一串代码被改编成了这种没人能看懂的样子。</p>
-<p>一般在这种情况下，我们有几个选择：</p>
-<p>1、从第九位开始爆破，这种方法慢的一批，但可能可以出flag</p>
-<p>2、尝试逐个解读指令，同样慢的一批，而且极其考验技术</p>
-<p>3、尝试绕过报错指令，trace一波</p>
-<p>不过嘛，之后就会明白，我们需要的不是13位密码，而是20位密码……至于为什么，因为实在是卡思路了，所以去dasctf群和NEPCTF群问了dalao，dasctf方面使用动调手动爆破出了第10到13位，又用ida trace硬调分析逻辑，将爆破位数压到了四位。而NEPCTF群的dalao直接表示血压高了，血压高就会生气，生气就会angry，angry了就会想着angr硬搓，但是angr我不会。</p>
-<p>得，从这里爆破不现实了，解读指令又慢的离谱，我们干脆尝试绕过报错。</p>
-<p>从刚才的idiv开始，正常来讲在跳过报错继续执行的过程中会跳转到loc_401373，但是，loc_401373只有通到sub_404284的入口，那里可是程序的出口啊QAQ。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Crackme6_falseloaction.png"></p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Crackme6_falseway.png"></p>
-<p>不过嘛，loc_401373上面还有一段没有被正确识别到函数sub_401120内的东西：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Crackme6_trueway.png"></p>
-<p>似乎在idiv报错被跳过之后，退出了函数就会跑到这里来。那么直接修改报错语句，让程序直接跳到这里不是一个样吗？于是我们动调的时候就做一些手脚：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Crackme6_littlechange.png"></p>
-<p>总算可以trace了。于是我们可以得到一串又臭又长的逻辑：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Crackme6_helltrace.png"></p>
-<p>但是这一串逻辑太不可读了，本人的读汇编能力并不像写出这题的题解的dalao一样nb，只能放了。不过手法还是可以活用于下一次的。</p>
-<p>所以，就算假设我们手动过了后4位，那么后面连接的串长度未知，也只能尝试爆破剩下的n位了。下面是在下和do1phin一起搞出来的搞毛玩意：</p>
-<pre><code>import time
-from pymouse import PyMouse
-from pykeyboard import PyKeyboard
-
-k = PyKeyboard()
-m = PyMouse()
-
-m.click(139, 68)
-s1 = &quot;pediy2016cool15&quot;
-global s2
-s2=&quot;&quot;
-k.type_string(s1+s2)
-k.tap_key(k.enter_key)
-
-# while 1:    # 确定你的鼠标位置
-#     print(m.position())
-#     time.sleep(1)
-
-
-def f(len, stp=1):    # 浅浅做一波回溯
-    global s1, s2
-    for i in range(0, 10):    # 每一位从0到9直接硬爆
-        s2 += str(i)
-        if stp+1&lt;len:
-            f(len, stp+1)
-        else:
-            k.type_string(s1+s2)
-            k.tap_key(k.enter_key)
-            time.sleep(0.02)
-            for j in range(20):
-                k.tap_key(k.backspace_key)
-            # print(s1 + s2+&quot;\n&quot;)
-        s2=s2[:-1]
-
-
-for i in range(5, 6):    # 假装不知道答案有几位，想爆几位手动调
-    f(i)
-</code></pre>
-<blockquote>
-<p>flag{pediy2016cool1531223}</p>
-</blockquote>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="../../2022/11/06/BUUCTF-Crackme6%E7%A9%B6%E6%9E%81%E6%8A%98%E7%A3%A8%E5%A4%B1%E8%B4%A5%E5%AE%9E%E5%BD%95/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-    <article id="post-关于小娜的形象" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="../../2022/10/31/%E5%85%B3%E4%BA%8E%E5%B0%8F%E5%A8%9C%E7%9A%84%E5%BD%A2%E8%B1%A1/">关于小娜的形象</a>
-    </h1>
-  
-
-        
-        <a href="../../2022/10/31/%E5%85%B3%E4%BA%8E%E5%B0%8F%E5%A8%9C%E7%9A%84%E5%BD%A2%E8%B1%A1/" class="archive-article-date">
-  	<time datetime="2022-10-31T04:54:53.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-10-31</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>想了一下，目前小娜小白裙的形象是不是太单一了</p>
-<p>但是又想了一下，我的技术力明显不支持太复杂的衣物</p>
-<p>不如就先小白裙吧，顺带加点细节。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/IMG_20221031_125045.jpg"></p>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">杂谈</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="../../2022/10/31/%E5%85%B3%E4%BA%8E%E5%B0%8F%E5%A8%9C%E7%9A%84%E5%BD%A2%E8%B1%A1/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
   
     <nav id="page-nav">
-      <a class="extend prev" rel="prev" href="../../">&amp;laquo; Prev</a><a class="page-number" href="../../">1</a><span class="page-number current">2</span><a class="page-number" href="../3/">3</a><a class="extend next" rel="next" href="../3/">Next &amp;raquo;</a>
+      <a class="extend prev" rel="prev" href="../../">&amp;laquo; Prev</a><a class="page-number" href="../../">1</a><span class="page-number current">2</span><a class="page-number" href="../3/">3</a><a class="page-number" href="../4/">4</a><a class="extend next" rel="next" href="../3/">Next &amp;raquo;</a>
     </nav>
   
 
