@@ -294,9 +294,9 @@
 <p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%BA%94%E7%AF%87%E4%B8%8B-3.png"></p>
 <p>就单纯为了方便管理，在进程之上，还有<strong>进程组</strong>的概念，即父进程以及所有与之直接或间接关联的子进程。众所周知，是个并查集都需要一个单射序列，来确定所有的集合。同样地，进程组也需要一个唯一对应的标识，也就是**进程组ID(PGID)**。当一个新的进程组产生，其进程组ID往往是其根进程，也就是第一个加入该进程组的进程的PID。</p>
 <p>一个进程对自身所在的进程组，可以用**<code>getpgrp</code><strong>进行查询，也可以用</strong><code>set-pgid</code>**函数来更改自身或其它进程的进程组，set-pgid若设定pgid为0，则以目标进程为根进程，新创建一个进程组。</p>
-<h4 id="回到正题"><a href="#回到正题" class="headerlink" title="回到正题"></a>回到正题</h4><p>发信的方式有很多，**<code>/bin/kill</code><strong>程序或者编程语言中系统库的kill函数，可以向任意进程发送<code>SIGKILL</code>，也就是所谓“杀程序”的信号；系统快捷键也可以向正在运行中的进程发送信号，比方说在运行时</strong>Ctrl+C**就是发送强制终止的信号；进程也可以通过调用alarm函数给自己发送<code>SIGALRM</code>信号，etc。</p>
+<h4 id="回到正题"><a href="#回到正题" class="headerlink" title="回到正题"></a>回到正题</h4><p>发信的方式有很多，**<code>/bin/kill</code>** 程序或者编程语言中系统库的kill函数，可以向任意进程发送<code>SIGKILL</code>，也就是所谓“杀程序”的信号；系统快捷键也可以向正在运行中的进程发送信号，比方说在运行时 <strong>Ctrl+C</strong> 就是发送强制终止的信号；进程也可以通过调用alarm函数给自己发送<code>SIGALRM</code>信号，etc。</p>
 <p>信号的收发，论其根源实际上都是内核到进程的单线控制。当内核完成上下文切换或者从系统调用中返回进程时，控制权由内核移交给进程，此时，若我们之前提到的，内核维护的待处理信号集合&#x2F;序列为非空状态，内核会根据序列中信号在系统中编号的大小，从小到大发送信号。进程在接收信号，完成行为之后就继续执行下一条指令——如果它没有被信号影响而产生一些无法逆转的后果的话。</p>
-<p>进程在接收信号的时候可以通过**<code>signal</code><strong>函数来改变某类信号相关联的行为。简单来讲，如之前所说，每一个信号种类其实对应着序列上的一个元素，而这个元素又与一条编码序列，也就是</strong>信号编码**形成单射，signal就是将编码对应的信号调用转移到其它函数，或者将它已经变更过的调用转移到原信号上。</p>
+<p>进程在接收信号的时候可以通过 <strong><code>signal</code></strong> 函数来改变某类信号相关联的行为。简单来讲，如之前所说，每一个信号种类其实对应着序列上的一个元素，而这个元素又与一条编码序列，也就是 <strong>信号编码</strong> 形成单射，signal就是将编码对应的信号调用转移到其它函数，或者将它已经变更过的调用转移到原信号上。</p>
 <p>举个并不很实际，但却很直观的例子，假设今天小娜想特别给自己插张全新N卡，她的<code>SIGUSR1(允许用户自定义的信号)</code>被设定为自己的导航程序的启动函数：</p>
 <pre><code>signal(10, *loc_tar_start);
 </code></pre>
@@ -306,7 +306,7 @@
 <p>当第二个参数为<code>SIG_IGN</code>时，<code>SIGUSR1</code>会被忽略，这样她就找不到地，也就用一个非常简单的方式保住了自己的钱包。</p>
 <p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%BA%94%E7%AF%87%E4%B8%8B-4.png"></p>
 <p>好吧，下回给你多发点……</p>
-<p>不过，如果想要达到忽略信号的效果，阻塞其实也不失为一种办法，这就要利用**<code>sigporcmask</code>**函数了。</p>
+<p>不过，如果想要达到忽略信号的效果，阻塞其实也不失为一种办法，这就要利用 <strong><code>sigporcmask</code></strong> 函数了。</p>
 <h3 id="非本地跳转"><a href="#非本地跳转" class="headerlink" title="非本地跳转"></a>非本地跳转</h3><p>当然，并不是只有内核才能处理异常，异常也不是只提供给内核的操作手段。<strong>非本地跳转</strong>通过**<code>setjump</code><strong>和</strong><code>longjump</code>**函数，提供了令用户层不需要通过内核，便能在进程间转移的手段。</p>
 <p><code>setjump</code>通过在栈上的<strong>env缓冲区</strong>保存当前<strong>调用环境</strong>，也就是在栈上某个可用区域存储你目前用到的运行环境相关的变量，包括程序的计数器、栈指针和通用目的寄存器。而<code>longjump</code>负责从env缓冲区中恢复这些状态。具体实例还是得翻阅原书，毕竟这里只是个笔记，抛砖引玉用的。</p>
 <hr>
