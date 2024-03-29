@@ -6,17 +6,28 @@
   <meta name="renderer" content="webkit">
   <meta http-equiv="X-UA-Compatible" content="IE=edge" >
   <link rel="dns-prefetch" href="http://cykahankxd.github.io">
-  <title>Tag: 开发日志 | DrivenHank的Cyka小博客</title>
+  <title>从2023 XCTF finals的一道逆向题目来看pythonC程序的拆包 | DrivenHank的Cyka小博客</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta name="description" content="一个不论OI还是CTF都很菜，三批聚顶成分复杂的铁菜逼">
-<meta property="og:type" content="website">
-<meta property="og:title" content="DrivenHank的Cyka小博客">
-<meta property="og:url" content="http://cykahankxd.github.io/tags/%E5%BC%80%E5%8F%91%E6%97%A5%E5%BF%97/index.html">
+  <meta name="description" content="题目为XCTF2023的“我不是病毒2.0”  die查看，发现是个拟态C++，实际上是个python3.10程序，万幸它没用3.11，遂直接用pyinstxtractor和pycdc跟它爆了。  具体怎么爆可以看fortinet上的教程、一篇有关解码加密pyc的文章，以及Redamancy的博客。第一步肯定还是尝试使用pyinstxtractor拆解exe文件，但当你拆解完成之后，你会发现主函">
+<meta property="og:type" content="article">
+<meta property="og:title" content="从2023 XCTF finals的一道逆向题目来看pythonC程序的拆包">
+<meta property="og:url" content="http://cykahankxd.github.io/2024/03/29/%E4%BB%8E2023-XCTF-finals%E7%9A%84%E4%B8%80%E9%81%93%E9%80%86%E5%90%91%E9%A2%98%E7%9B%AE%E6%9D%A5%E7%9C%8BpythonC%E7%A8%8B%E5%BA%8F%E7%9A%84%E6%8B%86%E5%8C%85/index.html">
 <meta property="og:site_name" content="DrivenHank的Cyka小博客">
-<meta property="og:description" content="一个不论OI还是CTF都很菜，三批聚顶成分复杂的铁菜逼">
+<meta property="og:description" content="题目为XCTF2023的“我不是病毒2.0”  die查看，发现是个拟态C++，实际上是个python3.10程序，万幸它没用3.11，遂直接用pyinstxtractor和pycdc跟它爆了。  具体怎么爆可以看fortinet上的教程、一篇有关解码加密pyc的文章，以及Redamancy的博客。第一步肯定还是尝试使用pyinstxtractor拆解exe文件，但当你拆解完成之后，你会发现主函">
 <meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BXctf%5DIm_not_virus_pic1.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BXctf%5DIm_not_virus_pic2.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BXctf%5DIm_not_virus_pic3.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BXctf%5DIm_not_virus_pic4.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BXctf%5DIm_not_virus_pic5.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BXctf%5DIm_not_virus_pic6.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BXctf%5DIm_not_virus_pic7.png">
+<meta property="article:published_time" content="2024-03-29T12:30:10.000Z">
+<meta property="article:modified_time" content="2024-03-29T12:35:54.832Z">
 <meta property="article:author" content="Driven·Cyka·Hank">
+<meta property="article:tag" content="CTF">
 <meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BXctf%5DIm_not_virus_pic1.png">
   
     <link rel="alternative" href="/atom.xml" title="DrivenHank的Cyka小博客" type="application/atom+xml">
   
@@ -55,13 +66,13 @@
 		<nav class="header-menu">
 			<ul>
 			
-				<li><a href="../../index.html">主页</a></li>
+				<li><a href="../../../../index.html">主页</a></li>
 	        
-				<li><a href="../../tags/%E6%9D%82%E8%B0%88/">杂谈</a></li>
+				<li><a href="../../../../tags/%E6%9D%82%E8%B0%88/">杂谈</a></li>
 	        
-				<li><a href="../../tags/CTF/">CTF</a></li>
+				<li><a href="../../../../tags/CTF/">CTF</a></li>
 	        
-				<li><a href="../../tags/%E5%AD%A6%E4%B9%A0">学习</a></li>
+				<li><a href="../../../../tags/%E5%AD%A6%E4%B9%A0">学习</a></li>
 	        
 			</ul>
 		</nav>
@@ -89,7 +100,7 @@
 		        
 					<a class="bilibili" target="_blank" href="https://space.bilibili.com/110049824?spm_id_from=333.1007.0.0" title="bilibili"><i class="icon-bilibili"></i></a>
 		        
-					<a class="mail" target="_blank" href="../../mailto:1670497988@qq.com" title="mail"><i class="icon-mail"></i></a>
+					<a class="mail" target="_blank" href="../../../../mailto:1670497988@qq.com" title="mail"><i class="icon-mail"></i></a>
 		        
 			</div>
 		</nav>
@@ -134,7 +145,7 @@
 			        
 						<a class="bilibili" target="_blank" href="https://space.bilibili.com/110049824?spm_id_from=333.1007.0.0" title="bilibili"><i class="icon-bilibili"></i></a>
 			        
-						<a class="mail" target="_blank" href="../../mailto:1670497988@qq.com" title="mail"><i class="icon-mail"></i></a>
+						<a class="mail" target="_blank" href="../../../../mailto:1670497988@qq.com" title="mail"><i class="icon-mail"></i></a>
 			        
 				</div>
 			</nav>
@@ -143,13 +154,13 @@
 				<ul style="width: 70%">
 				
 				
-					<li style="width: 25%"><a href="../../index.html">主页</a></li>
+					<li style="width: 25%"><a href="../../../../index.html">主页</a></li>
 		        
-					<li style="width: 25%"><a href="../../tags/%E6%9D%82%E8%B0%88/">杂谈</a></li>
+					<li style="width: 25%"><a href="../../../../tags/%E6%9D%82%E8%B0%88/">杂谈</a></li>
 		        
-					<li style="width: 25%"><a href="../../tags/CTF/">CTF</a></li>
+					<li style="width: 25%"><a href="../../../../tags/CTF/">CTF</a></li>
 		        
-					<li style="width: 25%"><a href="../../tags/%E5%AD%A6%E4%B9%A0">学习</a></li>
+					<li style="width: 25%"><a href="../../../../tags/%E5%AD%A6%E4%B9%A0">学习</a></li>
 		        
 				</ul>
 			</nav>
@@ -164,64 +175,350 @@
             <canvas data-colors="#eaeaea" data-sectionHeight="100" data-contentId="js-content" id="myCanvas1" class="anm-canvas"></canvas>
           </div>
           <div id="js-content" class="content-ll">
-            
-  
-  
+            <article id="post-从2023-XCTF-finals的一道逆向题目来看pythonC程序的拆包" class="article article-type-post " itemscope itemprop="blogPost">
+  <div class="article-inner">
     
-    
-      
-      
-      <section class="archives-wrap">
-        <div class="archive-year-wrap">
-          <a href="../../archives/2023" class="archive-year">2023</a>
-        </div>
-        <div class="archives">
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="../../2023/09/09/%E6%9C%BA%E6%A2%B0%E8%AE%BE%E8%AE%A1%E8%AF%BE%E7%A8%8B%E8%AE%BE%E8%AE%A1%E8%87%AA%E5%8A%A8%E6%9C%BA%EF%BC%88%E4%B8%9C%E6%9E%97%E7%89%B9%E4%BE%9B%E7%89%88%EF%BC%89%E5%BC%80%E5%8F%91%E8%BF%9B%E5%BA%A6%E6%B1%87%E6%80%BB%E6%9D%BF/" class="archive-article-date">
-  	<time datetime="2023-09-09T08:10:41.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-09-09</time>
-</a>
-        </div>
-    	 
+      <header class="article-header">
+        
   
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="../../2023/09/09/%E6%9C%BA%E6%A2%B0%E8%AE%BE%E8%AE%A1%E8%AF%BE%E7%A8%8B%E8%AE%BE%E8%AE%A1%E8%87%AA%E5%8A%A8%E6%9C%BA%EF%BC%88%E4%B8%9C%E6%9E%97%E7%89%B9%E4%BE%9B%E7%89%88%EF%BC%89%E5%BC%80%E5%8F%91%E8%BF%9B%E5%BA%A6%E6%B1%87%E6%80%BB%E6%9D%BF/">机械设计课程设计自动机（东林特供版）开发进度汇总板</a>
+    <h1 class="article-title" itemprop="name">
+      从2023 XCTF finals的一道逆向题目来看pythonC程序的拆包
     </h1>
   
 
-        <div class="article-info info-on-right">
-          
+        
+        <a href="" class="archive-article-date">
+  	<time datetime="2024-03-29T12:30:10.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-03-29</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <blockquote>
+<p>题目为XCTF2023的“我不是病毒2.0”</p>
+</blockquote>
+<p>die查看，发现是个拟态C++，实际上是个python3.10程序，万幸它没用3.11，遂直接用pyinstxtractor和pycdc跟它爆了。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BXctf%5DIm_not_virus_pic1.png"></p>
+<p>具体怎么爆可以看<a target="_blank" rel="noopener" href="https://www.fortinet.com/blog/threat-research/unpacking-python-executables-windows-linux">fortinet上的教程</a>、一篇<a target="_blank" rel="noopener" href="https://0xec.blogspot.com/2017/02/extracting-encrypted-pyinstaller.html">有关解码加密pyc的文章</a>，以及<a target="_blank" rel="noopener" href="https://sakura520.life/post/8be8.html">Redamancy的博客</a>。第一步肯定还是尝试使用pyinstxtractor拆解exe文件，但当你拆解完成之后，你会发现主函数对一个 意⭐义⭐不⭐明 的pyc进行调用：</p>
+<pre><code>import sign
+sign.main()
+</code></pre>
+<p>这意味着源代码其实是在解压出的pyc包中的这个自定义pyc模块：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BXctf%5DIm_not_virus_pic2.png"></p>
+<p>但是怎么解码呢？我们得先明白，这个python程序是如何打包的，以及为什么会出现这样的加密数据：</p>
+<h3 id="python程序的打包"><a href="#python程序的打包" class="headerlink" title="python程序的打包"></a>python程序的打包</h3><p>（资料参考<a target="_blank" rel="noopener" href="https://blog.csdn.net/qq_33934427/article/details/129152909">王小希ww 的博客</a>和<a target="_blank" rel="noopener" href="https://www.cnblogs.com/weilaiqinkong/p/17240065.html">琴声悠悠-悠悠琴声 的博客</a>）</p>
+<p>目前python程序的打包方式主要是通过PyInstaller或setupTools来实现的。前者是将python文件及其调用模块打包成一个可执行文件（exe&#x2F;elf），后者则是将其作为python用的软件包打包，并发布到PyPI或者其它软件包管理器中，作为其它python程序的调用库被下载和使用。当然，你也可以选择直接拷贝一份你的运行环境并写一个启动程序，不过，这种方法的稳定性、高效性和安全性就取决于你的代码能力和肝度了（笑</p>
+<p>关于pyinstaller打包命令参数如下：</p>
+<blockquote>
+<p>-w 表示希望在生成的.exe程序运行过程中，不要出现cmd黑框，一般用于打包GUI界面</p>
+<p>-F：表示希望将所有的程序全部打包在一起，生成的只有一个.exe文件，这样的文件集成度高，但是运行速度慢<br>（如果不写-F，生成的还有一堆.dll文件，这样的程序里文件很多，但是运行速度比较快）</p>
+<p>-D：生成一个文件目录包含可执行文件和相关动态链接库和资源文件等<br>（对于打包结果较大的项目，选用-d生成目录相比单可执行文件的打包方式，执行速度更快，但包含更加多的文件）</p>
+<p>-p：自定义需要加载的类的路径</p>
+<p>-i：自己做的软件可以放上自己的图标，分享一个网站，可以把其他格式图片转成ico格式</p>
+</blockquote>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BXctf%5DIm_not_virus_pic3.png"></p>
+<p>需要注意的是，被打包的python文件在import某个包内的其它模块的时候，需要添加调用包的根目录名，或者将被调用模块的根目录打包成一个新包，否则会因为找不到调用模块而报错。</p>
+<p>而我们看到的这一个程序，明显是-F指令生成的集成程序。至于为什么使用pyinstxtractor解包后看到的调用包是一堆encrypted的包，是因为pyinstaller还可以使用特定的key参数对代码进行AES加密，比方说：</p>
+<pre><code>pyinstaller --key 123 demo.py
+</code></pre>
+<p>但实际上，这个加密有个致命的弱点，那就是存放key的<code>pyimod00_crypto_key</code>，以及入口函数<code>main.py</code>并没有加密。这样，我们的目标库和加密key简直就是开盖即食。于是先用pycdc反编译一下key，然后用代码解pyc加密的同时加上一下文件头，最后用pycdc处理一手：</p>
+<pre><code>import tinyaes
+import zlib
+CRYPT_BLOCK_SIZE = 16
+# 从pyimod00_crypto_key里把key拽出来
+key = bytes(&#39;HelloHiHowAreYou&#39;, &#39;utf-8&#39;)
+inf = open(&#39;./PYZ-00.pyz_extracted/sign.pyc.encrypted&#39;, &#39;rb&#39;) # encrypted file input
+outf = open(&#39;sign.pyc&#39;, &#39;wb&#39;) # output file
+# 代码块就这么长，能AES的不多，先初始化一手
+iv = inf.read(CRYPT_BLOCK_SIZE)
+cipher = tinyaes.AES(key, iv)
+# 解码并解压
+plaintext = zlib.decompress(cipher.CTR_xcrypt_buffer(inf.read()))
+# 写入pyc文件头
+outf.write(b&#39;\x6f\x0d\x0d\x0a\0\0\0\0\0\0\0\0\0\0\0\0&#39;)
+# 写入解码过的pyc
+outf.write(plaintext)
+
+inf.close()
+outf.close()
+</code></pre>
+<p>最后爆出来这一坨：</p>
+<pre><code>import hashlib as 沈阳
+import base64 as 杭州
+import ctypes as 蚌埠
+
+def main():
+    蚌埠.windll.kernel32.VirtualAlloc.restype = 蚌埠.c_void_p
+    福建 = input(&#39;您的输入：&#39;)
+    天津 = &#39;9K98jTmDKCXlg9E2kepX4nAi8H0DB57IU57ybV37xjrw2zutw+KnxkoYur3IZzi2ep5tDC6jimCJ7fDpgQ5F3fJu4wHA0LVq9FALbjXN6nMy57KrU8DEloh+Cji3ED3eEl5YWAyb8ktBoyoOkL1c9ASWUPBniHmD7RSqWcNkykt/USjhft9+aV930Jl5VjD6qcXyZTfjnY5MH3u22O9NBEXLj3Y9N5VjEgF2cFJ+Tq7jj92iIlEkNvx8Jl+eH5/hipsonKLTnoLGXs4a0tTQX/uXQOTMBbtd70x04w1Pa0fp+vA9tCw+DXvXj0xmX8c5HMybhpPrwQYDonx7xtS+vRIj/OmU7GxkHOOqYdsGmGdTjTAUEBvZtinOxuR7mZ0r9k+c9da0W93TWm5+2LKNR6OJjmILaJn0lq4foYcfD5+JITDsOD6Vg01yLRG1B4A6OxJ7Rr/DBUabSu2fYf1c4sTFvWgfMV8il6QfJiNMGkVLey1cBPSobenMo+TQC1Ql0//9M4P01sOiwuuVKLvTyDEv6dKO//muVL9S2gq/aZUBWkjj/I5rUJ6Mlt4+jsngmuke9plAjw22fUgz+8uSzn40dhKXfBX/BOCnlwWsMGAefAfoz/XAsoVSG2ioLFmlcYe/WBgaUJEoRUSyv73yiEOTVwIK6EPnDlwRgZZHx2toLu8udpEZ0aKGkex5sn7P8Jf9AbD4/EiQU+FdoJSxGorPSZGvrc4=&#39;
+    北京 = 沈阳.md5(&#39;云南&#39;.encode(&#39;utf-8&#39;)).hexdigest()
+    重庆 = 杭州.b64decode(天津)
+    河南 = b&#39;&#39;
+    北京_len = len(北京)
+    广州 = list(range(256))
+    j = 0
+    for i in range(256):
+        j = (j + 广州[i] + ord(北京[i % 北京_len])) % 256
+        广州[i] = 广州[j]
+        广州[j] = 广州[i]
+    山东 = 陕西 = 0
+    for 河北 in 重庆:
+        山东 = (山东 + 1) % 256
+        陕西 = (陕西 + 广州[山东]) % 256
+        广州[山东] = 广州[陕西]
+        广州[陕西] = 广州[山东]
+        河南 += bytes([
+            河北 ^ 广州[(广州[山东] + 广州[陕西]) % 256]])
+    四川 = 蚌埠.create_string_buffer(福建.encode())
+    黑龙江 = 蚌埠.windll.kernel32.VirtualAlloc(蚌埠.c_int(0), 蚌埠.c_int(len(河南)), 蚌埠.c_int(12288), 蚌埠.c_int(64))
+    蚌埠.windll.kernel32.RtlMoveMemory(蚌埠.c_void_p(黑龙江), (蚌埠.c_ubyte * len(河南)).from_buffer(bytearray(河南)), 蚌埠.c_size_t(len(河南)))
+    辽宁 = 蚌埠.windll.kernel32.CreateThread(蚌埠.c_int(0), 蚌埠.c_int(0), 蚌埠.c_void_p(黑龙江), 蚌埠.byref(四川), 蚌埠.c_int(0), 蚌埠.pointer(蚌埠.c_int(0)))
+    蚌埠.windll.kernel32.WaitForSingleObject(蚌埠.c_int(辽宁), 蚌埠.c_int(-1))
+    if 四川.raw == b&#39;\xdb\x1b\x00Dy\\C\xcc\x90_\xca.\xb0\xb7m\xab\x11\x9b^h\x90\x1bl\x19\x01\x0c\xeduP6\x0c0\x7f\xc5E-L\xb0\xfb\xba\xf6\x9f\x00&#39;:
+        print(&#39;是的！你得到了！&#39;)
+        return None
+    None(&#39;不，再尝试更多。 （笑脸符号）&#39;)
+
+if __name__ == &#39;__main__&#39;:
+    main()
+    return None
+</code></pre>
+<p>虽然加了一堆的中文混淆，但是，基本逻辑还是比较清晰的。不过有个坏消息，这又是一道密码题，它先以“云南”为key生成S盒，然后直接跑一个浅显的RC4（详情请见<a target="_blank" rel="noopener" href="https://blog.csdn.net/u011377996/article/details/85221508">0verWatch 的博客</a>），把一份shellcode解密完再开一个子进程运行。虽然初见看的我两眼一黑，但我有wp（</p>
+<p>我们先直接进行一个RC4的解：</p>
+<pre><code>from Crypto.Cipher import ARC4
+import hashlib
+import base64
+
+天津 = b&#39;9K98jTmDKC...
+北京 = hashlib.md5(&#39;云南&#39;.encode(&#39;utf-8&#39;)).hexdigest()
+北京 = bytes(北京.encode(&#39;utf-8&#39;))
+重庆 = base64.b64decode(天津)
+天津 = ARC4.new(北京)
+output = 天津.decrypt(bytes(重庆))
+print(list(output))
+</code></pre>
+<p>然后得到的东西像原代码一样，我们之前也见过类似的东西，也就是数据层藏代码然后放到子进程运行，只不过这里是在python上调用的C库。但是接下来的事情直接用C就成，开个虚拟栈帧+子进程把shellcode弄出来（参考<a target="_blank" rel="noopener" href="https://su-team.cn/passages/2023-03-29-XCTFfinals/">SU战队的题解</a>）：</p>
+<pre><code>#include &lt;stdio.h&gt;
+#include &lt;Windows.h&gt;
+
+unsigned char shellcode[] = &#123;
+    81, 232, 0, 0, 0, 0...
+&#125;;
+
+int main() &#123;
+    PVOID p = VirtualAlloc(NULL, sizeof(shellcode), MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    memcpy(p, shellcode, sizeof(shellcode));
+    ((void(__stdcall*)())(p))();
+    return 0;
+&#125;
+</code></pre>
+<p>然后我们从ida里可以看到它本来的样子……的一部分。虽然你第一遍可能看不明白它为什么会高位截瘫，你甚至找不到一个return，还得自己补一个。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BXctf%5DIm_not_virus_pic4.png"></p>
+<p>但我们至少得让这里面的东西解出来再说。我们通过刚才强行凑函数的结果可以看到，这玩意其实在对后面那段shellcode进行解密，尤其是在动调一遍后，这一段尤其明显：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BXctf%5DIm_not_virus_pic5.png"><br><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BXctf%5DIm_not_virus_pic6.png"></p>
+<p>等下，这不是解密完了吗？我们直接create function然后f5进去看一眼：</p>
+<pre><code>_WORD *sub_1D0162()
+&#123;
+  _WORD *result; // rax
+  unsigned int v1; // [rsp-1Ch] [rbp-1Ch]
+  unsigned int v2; // [rsp-14h] [rbp-14h]
+  unsigned int v3; // [rsp-10h] [rbp-10h]
+  int i; // [rsp-Ch] [rbp-Ch]
+  __int64 v5; // [rsp-8h] [rbp-8h]
+
+  for ( i = 0; i &lt;= 20; ++i )
+  &#123;
+    v2 = 2029;
+    v3 = *(unsigned __int16 *)(2i64 * i + v5) % 0xD1EFu;
+    v1 = 1;
+    while ( v2 )
+    &#123;
+      if ( (v2 &amp; 1) != 0 )
+        v1 = v3 * v1 % 0xD1EF;
+      v3 = v3 * v3 % 0xD1EF;
+      v2 &gt;&gt;= 1;
+    &#125;
+    result = (_WORD *)(2i64 * i + v5);
+    *result = v1;
+  &#125;
+  return result;
+&#125;
+</code></pre>
+<p>好家伙，算法直接看完了。就是把数据两个两个提出来（因为是int16且i*2的提法）于是我们直接数据提出来，写脚本开爆：</p>
+<pre><code>·python part
+---------------
+output = []
+str1 = &#39;\xdb\x1b\x00D...
+for i in str1:
+    output.append(ord(i))
+print(output)
+
+·C++ part
+---------------
+#include &lt;iostream&gt;
+#define modnum 0xD1EFu
+using namespace std;
+
+unsigned char cipher[] = &#123;219, 27, 0, 68...
+
+int main()
+&#123;
+    for(unsigned int i=0;i&lt;=20;++i)&#123;
+        int laztag = 0;  // 爆出即停用标记 
+        unsigned int cip = (cipher[i*2] + (cipher[i*2+1]&lt;&lt;8)) % modnum;
+        for(unsigned int j=0;j&lt;127;j++)&#123;
+            for(unsigned int k=0;k&lt;127;k++)&#123;  // 暴力枚举每一个可能字符 
+                unsigned int key = 2029;
+                unsigned int guess = (j + (k&lt;&lt;8)) % modnum;
+                unsigned int v1 = 1;
+                while(key)&#123;  // 还原算法 
+                    if(key &amp; 1 != 0)
+                        v1 = guess * v1 % modnum;
+                    guess = guess * guess % modnum;
+                    key &gt;&gt;= 1;
+                &#125;
+                if(v1 == cip)&#123;  // 猜对了 
+                    printf(&quot;%c%c&quot;,j,k);
+                    laztag = 1;
+                    break;
+                &#125;
+            &#125;
+            if(laztag == 1)break; // 爆出即停，节约算力 
+        &#125;
+    &#125;
+&#125;
+</code></pre>
+<p>做个总结：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BXctf%5DIm_not_virus_pic7.png"></p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
 	<div class="article-tag tagcloud">
 		<i class="icon-price-tags icon"></i>
 		<ul class="article-tag-list">
 			 
         		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">学习</a>
-        		</li>
-      		 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color5">开发日志</a>
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
         		</li>
       		
 		</ul>
 	</div>
 
-          
+      
 
+      
+
+      
+        
+<div class="share-btn share-icons tooltip-left">
+  <div class="tooltip tooltip-east">
+    <span class="tooltip-item">
+      <a href="javascript:;" class="share-sns share-outer">
+        <i class="icon icon-share"></i>
+      </a>
+    </span>
+    <span class="tooltip-content">
+      <div class="share-wrap">
+        <div class="share-icons">
+          <a class="weibo share-sns" href="javascript:;" data-type="weibo">
+            <i class="icon icon-weibo"></i>
+          </a>
+          <a class="weixin share-sns wxFab" href="javascript:;" data-type="weixin">
+            <i class="icon icon-weixin"></i>
+          </a>
+          <a class="qq share-sns" href="javascript:;" data-type="qq">
+            <i class="icon icon-qq"></i>
+          </a>
+          <a class="douban share-sns" href="javascript:;" data-type="douban">
+            <i class="icon icon-douban"></i>
+          </a>
+          <a class="qzone share-sns" href="javascript:;" data-type="qzone">
+            <i class="icon icon-qzone"></i>
+          </a>
+          <a class="facebook share-sns" href="javascript:;" data-type="facebook">
+            <i class="icon icon-facebook"></i>
+          </a>
+          <a class="twitter share-sns" href="javascript:;" data-type="twitter">
+            <i class="icon icon-twitter"></i>
+          </a>
+          <a class="google share-sns" href="javascript:;" data-type="google">
+            <i class="icon icon-google"></i>
+          </a>
         </div>
-        <div class="clearfix"></div>
-    </header>
+      </div>
+    </span>
+  </div>
+</div>
+
+<div class="page-modal wx-share js-wx-box">
+    <a class="close js-modal-close" href="javascript:;"><i class="icon icon-close"></i></a>
+    <p>扫一扫，分享到微信</p>
+    <div class="wx-qrcode">
+      <img src="//pan.baidu.com/share/qrcode?url=http://cykahankxd.github.io/2024/03/29/%E4%BB%8E2023-XCTF-finals%E7%9A%84%E4%B8%80%E9%81%93%E9%80%86%E5%90%91%E9%A2%98%E7%9B%AE%E6%9D%A5%E7%9C%8BpythonC%E7%A8%8B%E5%BA%8F%E7%9A%84%E6%8B%86%E5%8C%85/" alt="微信分享二维码">
+    </div>
+</div>
+
+<div class="mask js-mask"></div>
+      
+      <div class="clearfix"></div>
+    </div>
   </div>
 </article>
+
+  
+<nav id="article-nav">
+  
+    <a href="../FlareOn4%E5%81%9A%E9%A2%98%E5%90%88%E9%9B%86/" id="article-nav-newer" class="article-nav-link-wrap">
+      <i class="icon-circle-left"></i>
+      <div class="article-nav-title">
+        
+          FlareOn4做题合集
+        
+      </div>
+    </a>
   
   
-    </div></section>
+    <a href="../../../../2023/09/16/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%BA%94%E7%AF%87%EF%BC%88%E4%B8%8B%EF%BC%89/" id="article-nav-older" class="article-nav-link-wrap">
+      <div class="article-nav-title">深入理解计算机系统学习笔记-第五篇（下）</div>
+      <i class="icon-circle-right"></i>
+    </a>
+  
+</nav>
+
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+  
+  
   
 
-    
+  
+
+  
+
+  
 
 
           </div>
@@ -244,9 +541,9 @@
 	var yiliaConfig = {
 		mathjax: false,
 		isHome: false,
-		isPost: false,
+		isPost: true,
 		isArchive: false,
-		isTag: true,
+		isTag: false,
 		isCategory: false,
 		open_in_new: false,
 		toc_hide_index: true,

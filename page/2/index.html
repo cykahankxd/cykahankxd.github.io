@@ -166,6 +166,621 @@
           <div id="js-content" class="content-ll">
             
   
+    <article id="post-深入理解计算机系统学习笔记-第五篇（上）" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="../../2023/06/04/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%BA%94%E7%AF%87%EF%BC%88%E4%B8%8A%EF%BC%89/">深入理解计算机系统学习笔记-第五篇（上）</a>
+    </h1>
+  
+
+        
+        <a href="../../2023/06/04/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%BA%94%E7%AF%87%EF%BC%88%E4%B8%8A%EF%BC%89/" class="archive-article-date">
+  	<time datetime="2023-06-04T07:36:56.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-06-04</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h3 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h3><p>关于我上一篇完篇之后就开始疯狂ISCC，然后休息的时候打野炊和王泪，结果在各种不同电子yw之间反复摩擦这件事情.pdf</p>
+<p>关于小娜，别提了，她最近跑程序跑得很过载，估计连游戏都懒得打了。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%BA%94%E7%AF%87%E4%B8%8A-1.png"></p>
+<p>也罢，到时候给她做个全面检查。</p>
+<p>至于在程序的汇编表示之后，我们该探究些什么，想一想，直接扯硬件对于软工和逆向有点不大实际，谈网络又不可避免要请鲍师傅来扯Web Assembly，那只能是继续程序方面的内容了。</p>
+<p>所以这一期，前有巨量文本，敬请留意——</p>
+<h2 id="来谈谈异常控制流"><a href="#来谈谈异常控制流" class="headerlink" title="来谈谈异常控制流"></a>来谈谈异常控制流</h2><p>什么是异常控制流？从程序逆向来说，你可以试试对一个加了<strong>反调试</strong>的程序的main函数，或者是程序的起始点下断，然后单步步过，正常来讲，它并不会像我们在上一篇文章中提到的那样正常进入运行阶段，而是一头创进进程检查，然后让你的程序exit或者让你的ida崩溃，这就是一种异常控制流。</p>
+<p>用专业一点的术语来讲，异常控制流是应对系统状态出现特殊情况而产生的控制流突变，这种特殊情况可能是一个附带多线程的程序的其中一个线程终止，也有可能是因为堆栈溢出导致整个程序崩溃，etc。</p>
+<h3 id="但是慢着，什么是控制流"><a href="#但是慢着，什么是控制流" class="headerlink" title="但是慢着，什么是控制流"></a>但是慢着，什么是控制流</h3><p>从处理器开始上电到断电的时间里，有一个叫做“<strong>程序计数器</strong>”的寄存器（<strong>PC</strong>，又名指令指针IP、指令地址寄存器IAR等），一直在处理你下一个要处理的汇编指令的地址。汇编指令的地址在同一进程上是一段连续的序列（在堆栈上被抽象为数组），而就算是不同进程，在执行时也是一串以连续序列为元素的链表，串联着父进程的调用点与子进程的首尾。</p>
+<p>假设整个地址序列为a，当前执行的指令的地址为a<sub>k</sub>，那么，每次从a<sub>k</sub>到a<sub>k+1</sub>的地址转移就被称为<strong>控制转移</strong>，而由一系列控制转移串联的如上序列则被称为控制流。</p>
+<p>但是，我们之前也学过jmp和各种逻辑跳转，控制转移在内存中，不可能每次都是从上一个地址到下一个地址的平顺变化，由跳转、调用等导致的这些跨内存地址的控制转移，被称为<strong>突变</strong>，很多突变是必要且通常的，比方说正常的jnz call等逻辑指令组合，但如果部分突变导致了系统状态变化，比方说你程序运行的半路，又想将外源的数据写入当前进程的内存，那么这种突变就成为了<strong>“异常控制流”</strong>。</p>
+<p>通常来讲，异常控制流包括如下部分：</p>
+<h3 id="异常"><a href="#异常" class="headerlink" title="异常"></a>异常</h3><p>和“异常控制流”的定义一样，顾名不思义。异常在严格定义上来讲，只是控制流中的“突变”，用于响应处理器状态的某些变化，而并没有严格意义上界定它对于程序运行影响的正负。</p>
+<p>系统中每种可能的异常都被分配了一个唯一的非负整数编号，即<strong>异常号</strong>，其中一部分由处理器设计者分配，另外一部分由操作系统内核设计者分配。这些编号组成一张<strong>异常表</strong>，这个表的起始地址存储在CPU的<strong>异常表基址寄存器</strong>中，在系统启动时由操作系统分配和初始化，异常号为异常表元素的索引，每个元素为每个异常的跳转地址，这就形成了异常号到异常的单射</p>
+<p>这样，当系统欲抛出异常时，系统会先通过函数去抛出异常号，再对照异常表转到对应的<strong>异常处理程序</strong>，可以理解为一个间接的函数调用，只是函数调用时入栈的返回地址取决于你调用指令的位置，而异常抛出则以<strong>当前指令</strong>（事件发生时正在执行的指令）或<strong>下一条指令</strong>（事件不发生，将会在当前指令执行之后执行的指令）为返回值，视异常类型而定。且额外还会将处理器的一些状态入栈，在处理程序返回时，重新开始被中断的程序会需要这些状态。</p>
+<p>上面这段话可能说的有点暧昧，别急，慢慢来。</p>
+<p>比方说我们想要写一个阳间一点的高精度加法，但是我们分别将调用程序和高精度加法程序封装在了不同的文件里，按照我们之前提到过的，我们调用高精度加法时会产生一个call，此时除了传入的参数，压入栈中的也只剩下被调用函数的返回地址，其对应着我们call指令的下一条指令，而非下一条要执行的指令的地址。这是一般的过程调用。</p>
+<p>可是，总有些CTF出题人想给你挖个坑，他们在你阳间的程序上加入了阴间的反调试，使得你在call的时候会进行一次进程检查，一旦发现你在用反编译程序进行进程调试就像上面说的那样，给你直接抛出异常中止运行，这时候，进程检查的返回值就是你进程栈上的下一条指令，而非你调用函数的返回值，倘若你真的没有用反编译器调试，这个返回指令就会和预先存储的处理器状态一同作用，使系统回到工作状态继续运行你的程序。这是一个异常作用的过程。</p>
+<p>简而言之，异常是系统在给自己干活，调用是系统给你干活。</p>
+<p>而关于内核和用户的交互部分，这里先不急着讲，下文再说，只需要知道我们平时执行程序用的都是用户层，而异常处理程序在内核层，因此<strong>拥有所有系统资源的访问权限</strong>就行了。</p>
+<h3 id="异常的类别"><a href="#异常的类别" class="headerlink" title="异常的类别"></a>异常的类别</h3><h4 id="中断（interrupt）"><a href="#中断（interrupt）" class="headerlink" title="中断（interrupt）"></a>中断（interrupt）</h4><p>中断是<strong>异步</strong>的，即动作的执行和异常的处理不同步，因为这里的系统动作来源于处理器外部的I&#x2F;O设备，而非CPU自身的指令。</p>
+<p>比方说你敲键盘就会产生一次中断，I&#x2F;O设备向CPU的<strong>中断引脚</strong>传输一次电信号，提高引脚电压，产生电压差，从而在这一次的输入指令执行完成后触发一次对系统总线上异常的读取，进而调用相对应的<strong>中断处理程序</strong>执行中断。中断完成后，就跳转到<strong>下一条指令</strong>继续运行，中断过程并没有影响这个程序的运行。</p>
+<p>而现在处理器的速度已经足够快，中断的处理也就在一瞬间，这就使得你在输入一长串文本，比方说写你那 * 中原粗口 * 的工程学老师留下的一堆报告时，并不会感觉到老式电脑，乃至于电子打字机（谁还用这玩意啊）那样的，中断带来的卡顿。</p>
+<h4 id="陷阱（trap）"><a href="#陷阱（trap）" class="headerlink" title="陷阱（trap）"></a>陷阱（trap）</h4><p>如果说中断是一种程序设定好的，随时发生异常，那“<strong>陷阱</strong>”就是受控发生的异常。陷阱最重要的用途是用户程序和内核之间提供一个像过程一样的接口，叫做<strong>系统调用</strong>。什么意思呢？</p>
+<blockquote>
+<p>内核态与用户态是操作系统的两种运行级别，当程序运行在3级特权级上时，就可以称之为运行在用户态。因为这是最低特权级，是普通的用户进程运行的特权级，大部分用户直接面对的程序都是运行在用户态；</p>
+<p>当程序运行在0级特权级上时，就可以称之为运行在内核态。</p>
+<p>运行在用户态下的程序不能直接访问操作系统内核数据结构和程序。当我们在系统中执行一个程序时，大部分时间是运行在用户态下的，在其需要操作系统帮助完成某些它没有权力和能力完成的工作时就会切换到内核态（比如操作硬件）。</p>
+<p>这两种状态的主要差别是：</p>
+<p>处于用户态执行时，进程所能访问的内存空间和对象受到限制，其所处于占有的处理器是可被抢占的<br>处于内核态执行时，则能访问所有的内存空间和对象，且所占有的处理器是不允许被抢占的。</p>
+<p>——摘自<a target="_blank" rel="noopener" href="https://blog.csdn.net/guorui_java/article/details/113827888">哪 吒 的文章</a></p>
+</blockquote>
+<p>系统从0到3划分了三个特权级，3级为最低，0级为最高。要实现从低到高的调用，系统只提供了异常和一些特殊的中断作为窗口，令用户态主动切换到内核态，进而干一些只有系统内核能干的事情，比方说超管权限。但是，内核态到用户态的变化则是系统控制的，通过设置设置程序状态字PSW来控制。</p>
+<p>当你在用户程序中向内核请求服务，处理器提供了一个叫 <strong>syscall</strong> 的指令，用于让你向系统内核请求服务，你使用某些形式使用了syscall，比方说C的 <strong>system</strong> 指令，以向系统内核请求去进行某些事项，比方说<code>/bin/sh</code>进行系统文件查找，那么，syscall指令就会将控制权转移到到对应的异常处理程序，即对应的<strong>陷阱处理程序</strong>，以调用适当的内核程序。调用完毕后，系统会交回控制权，处理程序返回到syscall之后的命令。这就完成了一次“陷阱”的处理。</p>
+<p>值得注意的是：</p>
+<blockquote>
+<p>系统调用的机制其核心还是使用了操作系统为用户特别开放的一个中断来实现，例如Linux的int 80h中断。</p>
+</blockquote>
+<p>这也就意味着，以系统调用为代表的陷阱异常，通常来说，其本质都是中断。但是，这对于程序逆向基本没什么影响，暂且按下不表。</p>
+<h4 id="故障（错误，fault）"><a href="#故障（错误，fault）" class="headerlink" title="故障（错误，fault）"></a>故障（错误，fault）</h4><p>上述的两个异常都是可以预测和控制的，但是<strong>故障</strong>和<strong>中止</strong>并不能被预测，两者都是发生<strong>错误</strong>而非中断，区别在于这个错误是否可修复。如果一条指令导致了故障的发生，那它会相应地将控制权移交给内核的故障处理程序，处理程序要么成功修复错误，返回当前用户层指令地址继续运行，要么修复不能，直接abort中止程序运行。</p>
+<p>比方说你在ida里单步步过动态调试的时候，因为你不小心把返回地址改大了，导致返回到了一些不该返回的语句，甚至是直接创到了符号表，那么就会发生一次故障，导致你的程序停转，这时候你还可以通过手动修改返回地址来补救，以再次继续运行，要是你不想修了，你也可以直接中止调试进程。这个时候，导致错误的是你动调patch过的返回指令，而故障处理程序是你自己。</p>
+<h4 id="中止（终止，abort）"><a href="#中止（终止，abort）" class="headerlink" title="中止（终止，abort）"></a>中止（终止，abort）</h4><p>通常是一些硬件问题导致的不可逆性错误，比方说你的RAM被日穿了，电容漏电，导致你写入的数据当场爆炸。详细的DRAM故障可以参考<a target="_blank" rel="noopener" href="https://blog.csdn.net/weixin_42238387/article/details/118446634">weixin_42238387的文章</a>，本文不做赘述。</p>
+<p>细心的逆向手可能会发现，这不就跟导致你ida当场爆炸的某些反调试函数一个功用吗？反调试有很多种，而且实际上，部分反调试就是利用调试器对异常的处理来进行对调试进程的破坏的。具体可以参考<a target="_blank" rel="noopener" href="https://nnnewb.github.io/blog/p/learning-packer-06/">weakptr大佬的文章</a>。</p>
+<h3 id="进程"><a href="#进程" class="headerlink" title="进程"></a>进程</h3><p>从概念上讲，进程最普适的概念就是把进程对应一个程序的正在运行的实例，文件和实例的关系可以抽象地理解为放在存储空间上的原本和跑在内存上的副本的关系。</p>
+<p>至于进程具体的实现细节，可以参考<a target="_blank" rel="noopener" href="https://cloud.tencent.com/developer/article/1434830">这篇文章</a>。</p>
+<p>进程带来的程序运行层面的两个抽象，也就是逻辑控制流和私有地址空间。这两个抽象导致了两个假象，即你的程序看似在独占地使用处理器和内存系统。关于独立使用内存这一点，在第一篇的虚拟内存那块也提到过。</p>
+<h4 id="逻辑控制流"><a href="#逻辑控制流" class="headerlink" title="逻辑控制流"></a>逻辑控制流</h4><p>众所周知，程序中下一条指令的值只会在执行到当前指令之后才会复制到PC中，需要的时候总是被算出来的。你在ida或者ghidra之类的反汇编软件中能直观地看到指令的PC值（前提是出题人没有丧心病狂地开PIE），这些PC值唯一对应于包含在程序的可执行目标文件中的指令。而这一连串的PC值构成的序列，就是<strong>逻辑控制流</strong>。在处理器的单个核心内，一个既定的物理控制流——你可以抽象地把它看作一个时间轴，这个物理控制流被多个进程分成了对应的多个逻辑控制流，也就是在一条既定的时间轴上安排进程的运行与否。</p>
+<p>这也意味着每个进程占用处理器的时间轴区间是互不相交的，比方说你在使用word打字的时候，你想要用QQ回复一句消息，然后再回来打字，那么在处理器内核上，word的进程开始运行到你使用QQ，然后QQ的进程运行到你回完消息，接着，word的进程又占领控制权直到你把字码完。不难发现，整个过程中，不同进程在自己所排布的时间轴上，<strong>轮流</strong>使用处理器内核。</p>
+<p>一个逻辑流的执行在时间上与另一个流重叠，称为<strong>并发流</strong>。进程在处理器内核的使用上互不影响，在逻辑控制流上是互不相交的，但这不影响它们的整个流程，包括轮换时的中断，在时间轴上重叠，即逻辑控制流的重叠。还是上面的例子，你可以理解为逻辑控制流是割裂的，因为它确实导致了程序轮流占用处理器；但你也可以理解为它们是交叠的，因为QQ进程在占用与否上，其时间轴是被包含在word进程的时间轴内的。</p>
+<p>这种多个流存在同时执行的时间区间的情况也就是所谓<strong>并发</strong>。区别于<strong>“并行”</strong>的概念，并发是排列于同一物理控制流上的进程的交替运行，在空间上统一；而并行是多个进程同时进行，在时间上同步。</p>
+<p>对于并发的解释，还有<strong>多任务</strong>，也就是<strong>时间分片</strong>的概念，多任务简单来讲就是一堆进程轮流运行，每个进程执行它的控制流的一部分的每一时间段叫做 <strong>时间片</strong>。这与我们之前提到过的时间轴的思想不谋而合。</p>
+<p>所以，在整个控制流上，每个进程轮流占用处理器内核，营造出一种整个处理器上只有你当前运行的进程，或者说你眼前的程序在好好运行的假象。</p>
+<h4 id="私有地址空间"><a href="#私有地址空间" class="headerlink" title="私有地址空间"></a>私有地址空间</h4><p>顾名思义，进程在内存空间上是独立存在，且在一般情况下，某一进程无法被除自身外的其它进程读和写（也总有些例外情况，比方说windows的getThreadId）。具体而言，进程不但独占内存空间，将其与其它并行的进程隔离开来，每一个进程还有其独立的<strong>地址空间</strong>。</p>
+<p>在同一系统架构的同一语言下，这个地址空间的构造几乎完全一致，所以出现相同的地址也很正常，比方说你linux的elf就是默认以0x400000作为代码段的起始地址，再往上，从上到下就是第一篇提到过的各种头啊表啊之类的，然后就是你的堆栈。</p>
+<p>具体而言：</p>
+<blockquote>
+<p>Linux的虚拟地址空间范围为0～4G，Linux内核将这4G字节的空间分为两部分，将最高的1G字节（从虚拟地址0xC0000000到0xFFFFFFFF）供内核使用，称为“内核空间”。而将较低的3G字节（从虚拟地址0x00000000到0xBFFFFFFF）供各个进程使用，称为“用户空间。因为每个进程可以通过系统调用进入内核，因此，Linux内核由系统内的所有进程共享。于是，从具体进程的角度来看，每个进程可以拥有4G字节的虚拟空间。</p>
+<p>Linux使用两级保护机制：0级供内核使用，3级供用户程序使用，每个进程有各自的私有用户空间（0～3G），这个空间对系统中的其他进程是不可见的，最高的1GB字节虚拟内核空间则为所有进程以及内核所共享。</p>
+<p>通常32位Linux内核地址空间划分0<del>3G为用户空间，3</del>4G为内核空间</p>
+<p>——摘自<a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/26857760">张胜飞的文章</a></p>
+</blockquote>
+<p>所以，在linux系统中，内核虚拟内存和用户区域分离的架构，使得进程在表面上是相互独立，在表现上是独占内存空间的，但实际上，所有的进程都由内核直辖，也就更方便内核与进程的交互和对进程的控制。</p>
+<p>这种空间上的分离是通过<strong>模式位</strong>来实现的。通常情况下，模式位不设置，进程用户模式下，无法进行内核操作，比如停止处理器等，只能通过异常或系统接口的方式来间接调用内核指令和信息。但设置了模式位（最直观的就是kali的sudo等超管权限）的进程运行在内核模式，这时进程才能任意执行指令。</p>
+<p>但也不一定，在linux的系统里有个叫<code>/proc</code>的文件夹，里头存放着内核相关的数据结构，其中的信息能被用户层直接读取，也就意味着，进程可以反过来读取你的内核甚至硬件相关信息。</p>
+<h4 id="上下文"><a href="#上下文" class="headerlink" title="上下文"></a>上下文</h4><p>由上述内容可知，进程之间难以相互读取和操作，也就只能由内核层面的某种机制，控制它们对内核的占用状态，以方便逻辑控制流的实现和进程状态的恢复。这种时候，就需要上下文出手了。</p>
+<blockquote>
+<p>系统的两种不同运行状态，才有了上下文的概念。用户空间的应用程序，如果想请求系统服务，比如操作某个物理设备，映射设备的地址到用户空间，必须通过系统调用来实现。（系统调用是操作系统提供给用户空间的接口函数）。</p>
+<p>通过系统调用，用户空间的应用程序就会进入内核空间，由内核代表该进程运行于内核空间，这就涉及到上下文的切换，用户空间和内核空间具有不同的 地址映射，通用或专用的寄存器组，而用户空间的进程要传递很多变量、参数给内核，内核也要保存用户进程的一些寄存器、变量等，以便系统调用结束后回到用户空间继续执行。</p>
+<p>——摘自<a target="_blank" rel="noopener" href="https://bbs.huaweicloud.com/blogs/342455">嵌入式与Linux那些事 的文章</a></p>
+</blockquote>
+<p>内核为每一个进程维持一个<strong>上下文</strong>，即重启一个被抢占进程所需的状态。具体而言，上下文包括一个进程的通用目的寄存器、浮点寄存器、程序计数器、用户栈、状态寄存器、内核栈和各种内核数据结构（描述地址空间的页表、包含当前进程信息的进程表、包含进程已打开文件的信息表）等。</p>
+<p>在进程执行的时候，内核可以决定让某个之前进行到一半被抢占的进程横插一刀，重新启动，这就叫<strong>调度</strong>，调度的过程由内核中叫<strong>调度器</strong>的代码处理。每当进行调度时，都会触发一次<strong>上下文切换</strong>，即：</p>
+<p>1、保存当前进程的上下文<br>2、恢复某个先前被抢占的进程被保存的上下文<br>3、将控制传递给这个新恢复的进程</p>
+<p>相当于你打游戏打到一半，你的导师突然让你改论文去，然后你无奈给游戏存了档，这是第一步；接着无奈地打开了你的word，把你之前那篇看上去还不错的论文给拿出来，这是第二步；然后被导师的要求摁着手去把论文改了，这是第三步。两个进程分别是游戏和写论文，导师是调度器，你是负责调度和处理的内核（悲）</p>
+<p>上下文分为进程上下文和中断上下文等，进程上下文如前文所述，以及，没错，中断也可以是一种上下文，因为在中断的过程中，确实因为被中断的进程需要保存一些环境，而产生了一些用户向内核，以及内核向用户的数据传递。也就是说，内核对进程的控制，以及中断机制都会产生上下文切换。具体案例在原书中有提及，本文不多细说了。</p>
+<hr>
+<p>综上所述，咱已经把一些基础的概念给理清楚了，接下来就是一些正式的进程操作了。</p>
+<p>所以，还是那句话，前面的区域，以后再来……？！</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%BA%94%E7%AF%87%E4%B8%8A-2.png"></p>
+<p>这是什么绿皮散热法……算了，能活过来就行。下一期还指望你接着营业呢</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%BA%94%E7%AF%87%E4%B8%8A-3.png"></p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">学习</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="../../2023/06/04/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%BA%94%E7%AF%87%EF%BC%88%E4%B8%8A%EF%BC%89/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
+    <article id="post-痛苦逆向人ISCC实录" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="../../2023/05/26/%E7%97%9B%E8%8B%A6%E9%80%86%E5%90%91%E4%BA%BAISCC%E5%AE%9E%E5%BD%95/">痛苦逆向人ISCC实录</a>
+    </h1>
+  
+
+        
+        <a href="../../2023/05/26/%E7%97%9B%E8%8B%A6%E9%80%86%E5%90%91%E4%BA%BAISCC%E5%AE%9E%E5%BD%95/" class="archive-article-date">
+  	<time datetime="2023-05-26T08:00:05.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-05-26</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h3 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h3><p>说句实在话，ISCC是真的男泵，甚至还有卖答案的</p>
+<p>你看我，机械的课一大堆，还全都卡在一群人抢着上分的点</p>
+<p>二三轮一滴血都抢不着，吐了，但是逆向除了250+好像都蛮简单，复现一下也可</p>
+<h2 id="RE"><a href="#RE" class="headerlink" title="RE"></a>RE</h2><h3 id="JustDoIt"><a href="#JustDoIt" class="headerlink" title="JustDoIt"></a>JustDoIt</h3><p>复现加密代码即可</p>
+<pre><code>enc = [0x17, 0x44, 0x44, 0x0f, 0x5e, 0x0a, 8, 0x0a, 6, 0x5f, 8, 0x18, 0x57, 3, 0x1a, 0x69]
+key = [0x49, 0x53, 0x43, 0x43]
+
+for m in range(1, 16):
+    enc[m] = enc[m] ^ key[0]
+    enc[m] -= (key[m % 4]) % 5
+    enc[m] = enc[m] + (key[2] % 6) + key[3] / 6
+    enc[m] -= (key[1] / 7) + (key[0] % 7)
+
+for k in range(1, 16):
+    enc[k] -= k
+
+encfirst = enc[15]
+for j in range(15, 0, -1):
+    enc[j] = enc[j-1]
+enc[0] = encfirst
+
+for i in range(16):
+    enc[i] += 61
+
+for i in enc:
+    print(chr(int(i)), end=&#39;&#39;)
+</code></pre>
+<h3 id="变形记"><a href="#变形记" class="headerlink" title="变形记"></a>变形记</h3><p>略微尝试控制流去混淆，结果脚本都没法用。</p>
+<p>字符串倒序得到base编码，原代码中也有字符串倒序语段。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/ISCC2023RE-%E5%8F%98%E5%BD%A2%E8%AE%B0-pic1.png"></p>
+<pre><code>input = &quot;&quot;
+
+for i in range(len(input)-1, -1, -1):
+    print(input[i], end=&#39;&#39;)
+</code></pre>
+<p>解出字符与少量数字的组合，随后在控制流中找到另一个处理段，似乎对数字有特殊处理：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/ISCC2023RE-%E5%8F%98%E5%BD%A2%E8%AE%B0-pic2.png"></p>
+<p>继续溯流，发现Label10之下的主要逻辑就是对于字符判重，计数（最多为个位数），然后将数字作为字符加入新的字符串。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/ISCC2023RE-%E5%8F%98%E5%BD%A2%E8%AE%B0-pic3.png"></p>
+<p>故重复字符会以数字形式出现在字符串中，我们只需要将base出来的数字字符转换成（对应长度-1）的上一个文字字符即可。</p>
+<h3 id="《狂彪》-1"><a href="#《狂彪》-1" class="headerlink" title="《狂彪》-1"></a>《狂彪》-1</h3><p>复现代码逆推PRODUCT中的奇数位字节，但是无法获知完整数据，只能用于和区块链对拍</p>
+<pre><code>Input = 0x796B159ACD626B88
+rec = []
+res = []
+while True:
+    a = Input % 16
+    if a &gt; 9:
+        rec.append(a+55)
+    else:
+        rec.append(a+48)
+    Input = Input &gt;&gt; 4
+    if Input / 16 &lt;= 0:
+        break
+
+L = len(rec)
+for i in range(L-1, -1, -1):
+    res.append(rec[i])
+print(res)
+
+a2 = &quot;&quot;
+a3 = &quot;&quot;
+a2 += chr(12 + res[0])
+a2 += chr(41 + res[2])
+a2 += chr(48 + res[4])
+a2 += chr(59 + res[6])
+a2 += chr(48 + res[8])
+
+print(a2)
+j = 0
+for i in a2:
+    print(&quot;product[&quot; + str(j) + &quot;] is:&quot;, end=&#39;&#39;)
+    print(hex(ord(i)))
+    j += 2
+</code></pre>
+<p>尝试将参数寄存器值替换至无用常量地址并修改值，使之步过，但屡次尝试皆失败</p>
+<p>区块链部分解码得到原料4-chloroisatin和产物Ammosamide B，答案已出一半</p>
+<pre><code>import binascii
+
+get_material = [3618502788666131213697322783095070105623107215331596699973092047810475080552,1058281262647123517608537692030461]
+get_product = [3618502788666131213697322783095070105623107215331596699973092053763329075037,20243186386546719615607895858]
+get_process1 = [3618502788666131213697322783095070105623107215331596699973087511546546089720,433361630167923360325699769579027741]
+get_process2 = [3618502788666131213697322783095070105622814690435284427132955240375693632919,196824228736615904168885915933727279070460387353732017605538823168085048193]
+get_process3 = [3618502788666131213697322783095070105623107215331596699973090202942792293480,453865271870859686009512443558968829]
+get_process4 = [3618502788666131213697322783095070105623107215331596684209297756428220130934,116134304106173752838290040472410775248544248888571]
+get_process5 = [3618502788666131213697322783095070105623107215331596699973092055035805475938,390561785906337738142215509985376935339146674861]
+get_process6 = [ 3618502788666131213697322783095070105623107215331596699972936515620310327981,27026365916588459387032368716299937596899]
+get_process7 = [3618502788666131213697322783095070105623107215331596699973059256975961087183,7226332434034712610187648289138429597352157756401918758]
+get_process8 = [3618502788666131213697322783095070105623107215331596699833216824194234956751,8681453366187219654156504602948270914253927580289092492730178164518]
+get_process9 = [3618502788666131213697322783095070105623107215331596699973092052190822164855,24250728870542224371403440011046646025606]
+get_process10 = [3618502788666131213697322783095070105623107215331596699973092053763091097225,719754857826395771474544964133992746787295598]
+get_process11 = [- 32302999884,396961771411939227609093435139525806]
+get_process12 = [3618502788666131213697322783095070105623107215331596697461277884358282559945,1898285677759758986129338258729885824979973151922206961853593519407470]
+get_process13 = [3618502788666131213697322783095070105623107215331596699973091894050039732634,2485241126446291140247192738487640780058871]
+get_process14 = [- 6837661594, 1592794196753852641372653235484033004844244927]
+
+_list_1 = [get_material,get_product,get_process1,get_process2,get_process3,get_process4,get_process5,get_process6]
+_list_2 = [get_process7,get_process8,get_process9,get_process10,get_process11,get_process12,get_process13,get_process14]
+
+def parse_num_1(num): # 7之前乘两次，7包括7之后乘三次
+    print(hex(num[0]*num[0] + num[1]))
+    
+def parse_num_2(num): # 7之前乘两次，7包括7之后乘三次
+    print(hex(num[0]*num[0]*num[0] + num[1]))
+
+for i in _list_1:
+    parse_num_1(i)
+
+for i in _list_2:
+    parse_num_2(i)
+</code></pre>
+<p>后尝试patch步过所有工序和判断，结果输出错误怀疑需要完整工序才能转入正解而非暴力突破</p>
+<p>后手动爆破得出工序为原料-&gt;3-&gt;8-&gt;12-&gt;产物，于是将初始化工序执行序列改成如下序列：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/ISCC2023RE-%E7%8B%82%E9%A3%99-pic1.png"></p>
+<p>程序即可自行产出flag</p>
+<h3 id="奇门遁甲"><a href="#奇门遁甲" class="headerlink" title="奇门遁甲"></a>奇门遁甲</h3><p>控制流混淆，核心在switch case结构，破门顺序31284567</p>
+<pre><code>switch ( v41[0] )
+&#123;
+  case 1:
+    if ( v3 == 2 )
+    &#123;
+      sub_401090();
+      goto LABEL_27;
+    &#125;
+    break;
+  case 2:
+    if ( v3 == 3 )
+    &#123;
+      sub_401010(v30);
+      goto LABEL_27;
+    &#125;
+    break;
+    ……
+</code></pre>
+<p>答案为所有显示数据拼接</p>
+<h3 id="Pull-the-Wool-Over-People’s-Eyes"><a href="#Pull-the-Wool-Over-People’s-Eyes" class="headerlink" title="Pull the Wool Over People’s Eyes"></a>Pull the Wool Over People’s Eyes</h3><p>控制流混淆，主要逻辑如下，v35为输入：</p>
+<pre><code>strcpy((char *)v19, &quot;ISCC&#123;&quot;);
+Srca = &#39;&#125;&#39;;
+strcpy(v18, &quot;YouAresoClever&quot;);
+do  //冒泡排序
+  &#123;
+    for ( i = 0; i &lt; v2; ++i )
+    &#123;
+      v4 = v18[i + 1];
+      v5 = v18[i];
+      if ( v5 &gt; v4 )
+      &#123;
+        v18[i] = v4;
+        v18[i + 1] = v5;
+      &#125;
+    &#125;
+    --v2;
+  &#125;
+while ( v2 &gt; -1 ); // get v19 ISCC&#123;ACYeeeloorrsuv&#125;
+sub_401850(Src, v19, strlen((const char *)v19));
+……
+do
+  &#123;
+    v4 = v35;
+    v5 = Src;
+    v7 = (char *)v4 + v3;
+    v8 = (char *)v5 + v3;
+    *((_BYTE *)v6 + v29) = *v8 ^ *v7;
+    v3 = v29 + 1;
+    v29 = v3;
+  &#125;
+  while ( v3 &lt; v28 );
+……
+</code></pre>
+<p>结合下方二进制码，猜测应该是二进制转字节码再作处理，复现算法即可</p>
+<pre><code>key = b&#39;ISCC&#123;ACYeeeloorrsuv&#125;&#39;
+ans = &quot;0000000000000000000000000000000000000000011001110000110100110111000000110100000100001011000011010011100000111111010010100101110100010101000101000000011000000000&quot;
+for i in range(int(len(ans) / 8)):
+    print(chr(int(ans[i * 8:i * 8 + 8], 2) ^ key[i]), end=&quot;&quot;)
+</code></pre>
+<h3 id="Convert"><a href="#Convert" class="headerlink" title="Convert"></a>Convert</h3><p>主要逻辑如下：</p>
+<pre><code>for ( i = 0; ; ++i )
+  &#123;
+    result = i;
+    if ( i &gt;= a3 )
+      break;
+    *(_BYTE *)(i + a1) -= 32;
+    *(_BYTE *)(i + a1) += i;
+  &#125;
+  for ( j = 0; j &lt; 4; ++j )
+  &#123;
+    *(_BYTE *)(j + a1) += j ^ -(__int64)(*(char *)(j + a2) % 4);
+    *(_BYTE *)(j + a1 + 4) += *(char *)(j + a2) % 5;
+    *(_BYTE *)(j + a1 + 8) += 2 * j;
+    *(_BYTE *)(j + a1 + 12) += *(_BYTE *)(j + a1 + 4);
+    *(_BYTE *)(j + a1 + 16) += *(char *)(j + a2) / 5;
+    result = j + 1;
+  &#125;
+</code></pre>
+<p>逆推复现即可</p>
+<pre><code>#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+
+int main() &#123;
+    unsigned char flag[]=&#123;&#39;(&#39;, &#39;0&#39;, &#39;$&#39;, &#39;$&#39;, &#39;b&#39;, &#39;(&#39;, &#39;3&#39;, &#39;@&#39;, &#39;=&#39;, &#39;8&#39;, &#39;-&#39;, 22, -104, 80, 70, 85, 55, 74, 60, 70, 69, 24, &#39;s&#39;&#125;;
+    char key[] = &quot;ISCC&quot;;
+    int len = strlen(flag);
+    
+    for(int j=3; j&gt;=0; j--)&#123;
+    	flag[j+16] -= key[j]/5;
+    	flag[j+12] -= flag[j+4];
+    	flag[j+8] -= 2*j;
+    	flag[j+4] -= key[j]%5;
+    	flag[j] -= j ^ -(key[j]%4);
+    &#125;
+    
+    for(int i=0; i&lt;len; ++i)&#123;
+    	flag[i] += 32;
+    	flag[i] -= i;
+    &#125;
+    
+    puts((char *)flag);
+    
+    return 0;
+&#125;
+</code></pre>
+<h3 id="Congraduations"><a href="#Congraduations" class="headerlink" title="Congraduations"></a>Congraduations</h3><blockquote>
+<p>自己骂自己环节：</p>
+</blockquote>
+<blockquote>
+<p>不要急躁，姓■的，不要急躁</p>
+</blockquote>
+<blockquote>
+<p>你管那上课鸟甚，边界条件看清楚再下手，憋急着撞南墙，别死钻牛角尖想着算法，细节，细节</p>
+</blockquote>
+<pre><code>qmemcpy(v5, &quot;abcdefghijklmnopqrstuvwxyz&quot;, 26);
+  qmemcpy(v4, &quot;ABCDEFGHIJKLMNOPQRSTUVWXYZ&quot;, 26);
+  for ( i = 0; ; ++i )
+  &#123;
+    result = i + a1;
+    if ( !*(_BYTE *)(i + a1) )
+      break;
+    if ( *(char *)(i + a1) &lt; 97 || *(char *)(i + a1) &gt; 122 )
+    &#123;
+      if ( *(char *)(i + a1) &gt;= 65 &amp;&amp; *(char *)(i + a1) &lt;= 90 )
+        *(_BYTE *)(i + a1) = v4[(*(char *)(i + a1) - 65 + a2 + 26) % 26];
+    &#125;
+    else
+    &#123;
+      *(_BYTE *)(i + a1) = v5[(*(char *)(i + a1) - 97 + a2 + 26) % 26];
+    &#125;
+  &#125;
+……
+  for ( i = 0; i &lt; a3; ++i )
+    *(_BYTE *)(i + a1) -= 30;
+  for ( j = 0; j &lt; a3 - 1; ++j )
+    *(_BYTE *)(j + a1) -= *(_BYTE *)(j + a1 + 1);
+  for ( k = 0; ; ++k )
+  &#123;
+    result = a3 - 1;
+    if ( k &gt;= a3 - 1 )
+      break;
+    *(_BYTE *)(k + a1) ^= *(_BYTE *)(a2 + 1);
+  &#125;
+</code></pre>
+<p>局部凯撒密码+字符串变换，复现算法即可</p>
+<pre><code>#include &lt;iostream&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+using namespace std;
+char c[] = &#123;-91,67,83,-108,68,66,-120,113,64,-87,-77,-89,2,-84,-71,-124,121,85,95,-97,115,-69,-68,23,-9,&#39;_&#39;&#125;;
+char lower[] = &quot;abcdefghijklmnopqrstuvwxyz&quot;;
+char upper[] = &quot;ABCDEFGHIJKLMNOPQRSTUVWXYZ&quot;;
+char key[] = &quot;ISCC&quot;;
+void transfer2()&#123;
+    for(int i=0;i&lt;26;i++)&#123;
+        if(c[i]&gt;=&#39;A&#39; &amp;&amp; c[i]&lt;=&#39;Z&#39;)
+            c[i] = upper[(c[i]-&#39;A&#39;+1)%26];
+        if(c[i]&gt;=&#39;a&#39; &amp;&amp; c[i] &lt;= &#39;z&#39;)
+            c[i] = lower[(c[i]-&#39;a&#39;+1)%26];
+    &#125;
+&#125;
+void transfer1()&#123;
+    for (int k=0;k&lt;25;k++)c[k] ^= key[1];
+    for (int j=25;j&gt;=0;j--) c[j] += c[j+1];
+    for (int i=0;i&lt;26;i++) c[i] += 30;
+&#125;
+int main()
+&#123;
+    transfer1();
+    transfer2();
+    for(int i=0;i&lt;26;i++)cout&lt;&lt;c[i];
+    return 0;
+&#125;
+</code></pre>
+<h3 id="CrackMePlease"><a href="#CrackMePlease" class="headerlink" title="CrackMePlease"></a>CrackMePlease</h3><p>一点反调试没加，直接strcmp下断点，读取str1即可。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/ISCC2023RE-CrackMePlease-pic1.png"></p>
+<h2 id="Misc"><a href="#Misc" class="headerlink" title="Misc"></a>Misc</h2><h3 id="擂台-芝士雪豹"><a href="#擂台-芝士雪豹" class="headerlink" title="擂台-芝士雪豹"></a>擂台-芝士雪豹</h3><p>第一层：rar伪加密，指定加密位改成80即可</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/ISCC2023misc-%E8%8A%9D%E5%A3%AB%E9%9B%AA%E8%B1%B9-pic1.png"></p>
+<p>第二层为zip加密，考虑到内嵌压缩包过长可以使用已知明文攻击，但所有脚本使用攻击均显示加密方式未知。</p>
+<p>archpr显示如下：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/ISCC2023misc-%E8%8A%9D%E5%A3%AB%E9%9B%AA%E8%B1%B9-pic2.png"></p>
+<p>bkcrack显示如下：</p>
+<pre><code>PS F:\带学\CTF\bkcrack-1.5.0-win64\bkcrack-1.5.0-win64&gt; .\bkcrack.exe -C .\zipfiles.zip -c 49183-secret.zip -p plain.txt -o 0x1e
+bkcrack 1.5.0 - 2022-07-07
+Zip error: entry &quot;49183-secret.zip&quot; is encrypted with an unsupported algorithm.
+</code></pre>
+<h3 id="人生之路"><a href="#人生之路" class="headerlink" title="人生之路"></a>人生之路</h3><p>图片要求用windows大图标模式查看，但这样一来，根据提示，在“脚下”的只剩下文件名+后缀，输入，成功解压。</p>
+<p>得到flag.txt为：</p>
+<pre><code>eAbJtAbJeA bAtJeAtJbA bAtAeA bAtAeA bJtJbJeJtJeJ tAxJeJexJtbJteJ xAteJxeJtA bAxAeAtAteJ tAxJeAxJtA bAtJeAtJbA teJxeJtbJtJ teAxeAteAxeA bAtJeAtJbA bAtAeAxJbJ teAxbJxeJtbA xAteAxA tAeAxAbA xAteJxeJtA tAxJeJexJtbJteJ teAxeAteAxeA eJtJeJbJtJbJ 
+</code></pre>
+<p>接下来纯脑洞，因为小写字符仅出现四个且间隔一定，猜想凯撒密码替换字符“wasd”为“xbte”，另外两个字符也可能是字符替换，但规律不明，预计代表线段长短。手动对齐凯撒密码，使用python matplotlib根据字符串画图：</p>
+<pre><code>import string
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MultipleLocator
+
+c = &quot;eAbJtAbJeA bAtJeAtJbA bAtAeA bAtAeA bJtJbJeJtJeJ tAxJeJexJtbJteJ xAteJxeJtA bAxAeAtAteJ tAxJeAxJtA bAtJeAtJbA teJxeJtbJtJ teAxeAteAxeA bAtJeAtJbA bAtAeAxJbJ teAxbJxeJtbA xAteAxA tAeAxAbA xAteJxeJtA tAxJeJexJtbJteJ teAxeAteAxeA eJtJeJbJtJbJ &quot;.strip()
+a = c.split(&quot; &quot;)
+for i in range(len(a)):
+    a[i] = a[i].replace(&quot;x&quot;, &quot;w&quot;)
+    a[i] = a[i].replace(&quot;b&quot;, &quot;a&quot;)
+    a[i] = a[i].replace(&quot;t&quot;, &quot;s&quot;)
+    a[i] = a[i].replace(&quot;e&quot;, &quot;d&quot;)
+
+stloc_x = 0
+stloc_y = 30
+
+for i in range(len(a)):
+    j = 0
+    if a[i][0] == &#39;w&#39;:
+        if a[i][j + 1] == &#39;A&#39; or a[i][j + 2] == &#39;A&#39;:
+            stloc_y = 15
+        else:
+            stloc_y = 22.5
+    while j &lt; len(a):
+        lenadd = 0
+        try:
+            if a[i][j+1] in string.ascii_uppercase:
+                if a[i][j+1] == &#39;J&#39;:
+                    lenadd = 7.5
+                else:
+                    lenadd = 15
+                if a[i][j] == &#39;w&#39;:
+                    x = [stloc_x, stloc_x]
+                    y = [stloc_y, stloc_y + lenadd]
+                    plt.plot(x,y)
+                    stloc_y += lenadd
+                if a[i][j] == &#39;a&#39;:
+                    x = [stloc_x, stloc_x - lenadd]
+                    y = [stloc_y, stloc_y]
+                    plt.plot(x,y)
+                    stloc_x -= lenadd
+                if a[i][j] == &#39;s&#39;:
+                    x = [stloc_x, stloc_x]
+                    y = [stloc_y, stloc_y - lenadd]
+                    plt.plot(x, y)
+                    stloc_y -= lenadd
+                if a[i][j] == &#39;d&#39;:
+                    x = [stloc_x, stloc_x + lenadd]
+                    y = [stloc_y, stloc_y]
+                    plt.plot(x, y)
+                    stloc_x += lenadd
+            else:
+                if a[i][j+2] == &#39;J&#39;:
+                    lenadd = 7.5
+                else:
+                    lenadd = 15
+                org_x = stloc_x
+                org_y = stloc_y
+                if a[i][j] == &#39;w&#39;: stloc_y += lenadd
+                if a[i][j] == &#39;a&#39;: stloc_x -= lenadd
+                if a[i][j] == &#39;s&#39;: stloc_y -= lenadd
+                if a[i][j] == &#39;d&#39;: stloc_x += lenadd
+                if a[i][j+1] == &#39;w&#39;: stloc_y += lenadd
+                if a[i][j+1] == &#39;a&#39;: stloc_x -= lenadd
+                if a[i][j+1] == &#39;s&#39;: stloc_y -= lenadd
+                if a[i][j+1] == &#39;d&#39;: stloc_x += lenadd
+                x = [org_x, stloc_x]
+                y = [org_y, stloc_y]
+                plt.plot(x, y)
+                j += 1
+        except IndexError:
+            print(&quot;Err&quot;)
+        j += 2
+    stloc_x += 50
+    stloc_y = 30
+
+x_major_locator = MultipleLocator(5)
+ax = plt.gca()
+ax.xaxis.set_major_locator(x_major_locator)
+plt.show()
+</code></pre>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="../../2023/05/26/%E7%97%9B%E8%8B%A6%E9%80%86%E5%90%91%E4%BA%BAISCC%E5%AE%9E%E5%BD%95/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
     <article id="post-DASCTF X SU 2023 四月赛 可能不会更新的复现" class="article article-type-post  article-index" itemscope itemprop="blogPost">
   <div class="article-inner">
     
@@ -1257,284 +1872,6 @@ while 1:
 
 
   
-    <article id="post-深入理解计算机系统学习笔记-第三篇（上）" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="../../2023/01/12/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%B8%89%E7%AF%87%EF%BC%88%E4%B8%8A%EF%BC%89/">深入理解计算机系统学习笔记-第三篇（上）</a>
-    </h1>
-  
-
-        
-        <a href="../../2023/01/12/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%B8%89%E7%AF%87%EF%BC%88%E4%B8%8A%EF%BC%89/" class="archive-article-date">
-  	<time datetime="2023-01-12T14:43:53.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-01-12</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h4 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h4><p>本人理解可能有所偏差，为了避免被误导，建议配合原书理解</p>
-<hr>
-<p>话说要春节了呢~ 那么，小娜，你还要穿着那套旧棉衣吗？</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%8A1.png"></p>
-<p>好吧，可能上次答应给她装的新语言模块还没加载完全，得等上一段时间了。</p>
-<p>不过，我们也可以看到，身为计算姬的小娜和正常的计算机有个共性，它们对于一切的数据，本质上都是以二进制看待的。毕竟从电子管开始，计算机就是由无数01逻辑运算单元构成的。至于苏维埃曾经开发过的，理论上更快的三进制计算机……另当别论。</p>
-<p>计算机的各种运转基本都离不开二进制数，比方说高中计算机课程上学过的原码、补码、反码，以及大学C语言课提及的短长整形和无符号整数等，不同系统和编程语言还有自己对应的二进制表示方式，就不在开头细讲了。</p>
-<p>原书中主要讨论无符号编码（unsigned）、补码（two’s-complement）和浮点数（floating-point，本质上是以2为基数的科学计数法），以及C标准和Java标准下支持的表示和运算，所以我可能会穿插一些其它的内容进行拓展。由于原书对应章节本体过长，本次笔记分上（可能有中）下篇。</p>
-<p>所以——准备好了吗！（芭芭拉开大）</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%8A2.png"></p>
-<p>啊这……原来你的加载速度这么快的吗……</p>
-<h3 id="那就让我们进入正题——信息是如何存储的"><a href="#那就让我们进入正题——信息是如何存储的" class="headerlink" title="那就让我们进入正题——信息是如何存储的"></a>那就让我们进入正题——信息是如何存储的</h3><p>众所周知，数据在计算机中的最小单位被称作位（b，bit），但是，真正可寻址的最小单位是更高一级的字节（byte），至于为什么……各位可以参考<a target="_blank" rel="noopener" href="https://www.jianshu.com/p/bc8252f18ecf?ivk_sa=1024320u">yanfeizhang</a>和<a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/61133284">pk2017</a>的文章，以及百度百科上的描述。</p>
-<h4 id="为什么一定是位"><a href="#为什么一定是位" class="headerlink" title="为什么一定是位"></a>为什么一定是位</h4><p>字节就是用来表示完整的字符的。在费拉不堪的早期计算机中，为了实现虚拟内存的概念，普遍采用4&#x2F;6位BCD编码，但BCD面对字母和符号非常乏力，于是有了ASCII。再之后ASCII也不够用了，于是IBM设计了一套八位的EBCDIC编码，于是现行的字节大小就是8位。也就是说，从概念上看，目前依靠8位的编码可以完整地表达一个字符的信息。</p>
-<p>从硬件上看，每一块内存都由若干芯片（chip）组成，每个芯片又分八个bank，在每个bank内部存在着一个n*8的电容矩阵，在数据意义上相当于一个每个元素存储着八个位的信息的数组，而芯片上同一位置的元素又在内存中组成连续的64bit数据，这相当于在芯片上最小的单位就是8bit的字节。</p>
-<p>并且，使用ida的同学们都知道，程序的每条汇编指令对应的<strong>虚拟内存</strong>地址，其刚好是8位十六进制数，这刚好与64bit的大小对上了。</p>
-<p>在硬件和软件，抽象和具象的概念互补下，8位的byte似乎成为了现行标准下最理想，最稳定的基础单位。当然，如果要像毛子一样硬薅三进制，实现新标准，那么，为之努力吧，这可是连当年的苏联都办不到的事情啊（哭</p>
-<p><em>ps：我国已经在进行三进制光子计算机的尝试（喜），感兴趣的可以移步<a target="_blank" rel="noopener" href="https://m.thepaper.cn/baijiahao_14808770">相关文章</a></em></p>
-<hr>
-<p>回到正题，既然刚才提到了虚拟内存和地址等概念，那么就由此展开。我们之前提到过，在概念上，内存相当于一个庞大的线性数组，<strong>虚拟地址空间</strong>就是在此之上的一个个独立进程所占用的内存空间的抽象，其中的<strong>地址</strong>不只是抽象的数据，也是对于每一个字节的唯一映射。至于我们是如何表示字节的……</p>
-<h4 id="位模式和十六进制"><a href="#位模式和十六进制" class="headerlink" title="位模式和十六进制"></a>位模式和十六进制</h4><p>我们引入位模式的概念，实际上，位模式就是通过二进制表示法表示一个字节的信息，数值从0到255，对应十六进制就是0到0xFF（或者FFh之类的，不同标准下有不同的表示方法）。至于为什么通常用十六进制进行位模式的表示，个人理解，十进制和二进制的转换有着天然的复杂性，而二进制本身……</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%8A3.png"></p>
-<p>非常的冗长且烦人。而十六进制作为2的幂次方，和二进制在进制转换上有着天然的适性，天然适合位运算，并且也适合表示以字节为单位的信息的值。并且，本身的数据长度也刚好能够用数字+字母的形式表示，即0 ~ 9和A ~ F，也方便编码之间的转换等操作。</p>
-<p>但光能表示字节还不够，我们往往要表述一串字符串，或者是一串数字。我们还需要其它的概念来完善储存空间。</p>
-<h4 id="字长"><a href="#字长" class="headerlink" title="字长"></a>字长</h4><blockquote>
-<p>计算机在存储、传送或操作时，作为一个单元的一组二进制码称为字，一个字中的二进制位的位数称为字长。  </p>
-<div style="text-align: right">————百度百科</div>
-</blockquote>
-<p>字长决定着虚拟地址空间的最大大小，而虚拟地址的范围就是2的字长次方减一。字长也与硬件条件脱不开干系，计算机中大多数寄存器的大小是一个字长。计算机处理的典型数值也可能是以字长为单位。现行常用字长即32位和64位，至于16位老古董和诸如39位和24位的奇葩另当别论。</p>
-<p>哦对了，我好像忘了，小娜脑子里是有39位的兼容设备来着……</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%8A4.png"></p>
-<p>行了小娜，要发脾气的话待会再发，咱们先把正事讲完。</p>
-<p>由于字长的大小也影响着编译时分配虚拟地址的过程，理论上，不同机器使用不同编译器编译程序时，不同类型数据，有无符号，是否为指针，占用的字节也不一样。详细可以参考原书的内容，本文不再赘述，但相关内容要牢记，尤其是做逆向和pwn的时候，有大用。</p>
-<p>不过现在64位的机器一般都做了对32位的向下兼容，这使得两种字长的程序都可以在64位机器上运行。而且，ISO C99标准也特地引入了一套不随编译器和机器变化的固定数据类型，以及后来推出的一系列标准，这使得同字长的不同机器之间有一套相同的数据标准，规范化和兼容也更加容易。</p>
-<h4 id="寻址和字节顺序"><a href="#寻址和字节顺序" class="headerlink" title="寻址和字节顺序"></a>寻址和字节顺序</h4><p>逆向手在处理没有被ida反编译直接定义的数据的时候往往会碰到一些很麻的情况：面对不同的题目，每当你找到一个数据的地址，有时数据是按字节倒序存储的，有时则是顺序存储。</p>
-<p>这涉及到程序中每个对象在内存中的地址和排列方式，以地址为基底，n字节长度的数据会排列在从数据地址开始直到地址+(n-1)的位置。而排列的方式，也就是<strong>字节顺序</strong>，有两个通用规则：<strong>大端法</strong>和<strong>小端法</strong>。</p>
-<p>具体而言，我们像小娜一样用二进制看，设一个数据占了w个二进制位，每一位下标表示从w-1到0，比方说一个十六进制整数0x10face，它的第w-1位便是十六进制1的最高二进制位0。最高有效字节包含位为w-1到w-8，最低有效字节则是7到0。所谓大端和小端，便是从最高有效字节到最低有效字节，和从最低有效字节到最高有效字节的分别。</p>
-<p>比方说，0x10face用小端序表示，按地址顺序排列就按从最低有效字节到最高有效字节，也就是“cefa10”，而大端序则是原汁原味的排列。</p>
-<p>在不同机器中，使用的字节序也不尽相同。我们常见的大多数Intel设备使用小端序，部分新型机器使用双端序，但会根据操作系统的变化而固定某一端序，这点在书中有涉及到代码层面的详细提及，这里只做简要说明。至于IOS系统，各类衍生Linux系统的端序，各位可以自行研究。</p>
-<h3 id="非数字数据类型的表示"><a href="#非数字数据类型的表示" class="headerlink" title="非数字数据类型的表示"></a>非数字数据类型的表示</h3><p>既然我们已经有一套完整的数据机制了，那么，在此之上实现各种数据的存储和处理也不是难事。</p>
-<p>这一篇笔记并未过多提及整数相关的内容，因为太多了。</p>
-<h4 id="字符串"><a href="#字符串" class="headerlink" title="字符串"></a>字符串</h4><p>在C语言中，字符串的实现是一个以空值（null，0）为结尾的字符数组（大概也是有这层逻辑在，strlen显示的字符串长度为正常的n，而非代码层面通常的结尾下标n-1）。通常，每一个元素用某种固定编码（目前一般是ascii码）表示。任何以ASCII作为字符编码的系统上，C代码的结果都大抵一致。</p>
-<p>在Java中，字符串的实现则更为复杂。对于已知的字符串值和对应的字符串变量，Java分别将它们置于常量池和堆中，感兴趣的可以看看<a target="_blank" rel="noopener" href="https://blog.csdn.net/qq_43432942/article/details/124333980">一名奇怪的玩家</a>的文章，或者自行百度，或者科学上网。（其实C也是有类似的机制的，只不过在实现方面多少跟java有点差异）</p>
-<h4 id="代码"><a href="#代码" class="headerlink" title="代码"></a>代码</h4><p>前面我们也提到过，不同机器，不同系统上对代码的编译不尽相同，也正因如此，处理它们的时候往往会产生不同的机器语言代码。这里便不再赘述。</p>
-<h4 id="布尔代数"><a href="#布尔代数" class="headerlink" title="布尔代数"></a>布尔代数</h4><p>现如今的逻辑数学的发展，总离不开一个叫做乔治·布尔的人（laobideng）。作为二元逻辑之父，他创造了一个二进制逻辑系统，将0和1分别定义为假（false）和真（true），并定下了逻辑运算的规则。他的理论很大程度上成为了现代计算机学科的一大基础。</p>
-<p>而布尔代数和现代电子逻辑运算纠缠不清的关系，这里就不展开了。我们需要知道的是，在计算机的逻辑运算中，也必定存在着对应的或、与、非和异或关系。</p>
-<p>书中还提到了一个叫做叫“位向量”的概念。位向量定长，其运算可以定义为参数的每个对应元素之间的位运算。这些令人头疼的数学内容还得结合原书的拓展内容理解。</p>
-<h4 id="既然都扯到位运算了"><a href="#既然都扯到位运算了" class="headerlink" title="既然都扯到位运算了"></a>既然都扯到位运算了</h4><p>那就自然要扯到我们常用的C语言位运算和逻辑运算啦~</p>
-<p>除了最基本的，对于位运算的或（|）与（&amp;）非（ ~ ）和异或（ ^ ），C语言还提供了一组逻辑运算符，对应命题逻辑中的或（||）与（&amp;&amp;）非（!），所谓命题逻辑和位运算的差别，你可以简单地理解为，前者是针对不同表达式（可以是函数甚至程序）之间的逻辑关系，后者则是针对二进制数值之间的关系。</p>
-<p>此外，对于位运算，C还提供了移位操作：左移（&lt;&lt;n）和右移（&gt;&gt;n），效果上对应整形十进制运算的乘2的幂次方和除以2的幂次方，实际上则分别对应着所有二进制位增n位并末尾补0，和所有二进制位降n位并取整。</p>
-<p>与C相比，Java对于逻辑右移有着明确定义，符号“&gt;&gt;”代表算数右移固定位数，而“&gt;&gt;&gt;”代表逻辑位移，可以结合书本以及网上相关内容理解。而python的逻辑位移则与C大致相同，可以结合<a target="_blank" rel="noopener" href="https://blog.csdn.net/u013516861/article/details/104204464">钱德勒马</a>的文章理解。</p>
-<h3 id="作个暂时的总结"><a href="#作个暂时的总结" class="headerlink" title="作个暂时的总结"></a>作个暂时的总结</h3><p>我们明白了为什么计算机的运算会这么执着于二进制、位和字节，以及一部分数据结构是如何实现的。下一篇笔记，我们会扯一扯我们暂时还没开始细讲的整形。</p>
-<p>那么，还是那句结束词：前面的区域，以后再来探……哎不是？！</p>
-<p>（报纸糊脸的声音）</p>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">学习</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="../../2023/01/12/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%B8%89%E7%AF%87%EF%BC%88%E4%B8%8A%EF%BC%89/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-    <article id="post-深入理解计算机系统学习笔记-第二篇" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="../../2023/01/09/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%BA%8C%E7%AF%87/">深入理解计算机系统学习笔记-第二篇</a>
-    </h1>
-  
-
-        
-        <a href="../../2023/01/09/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%BA%8C%E7%AF%87/" class="archive-article-date">
-  	<time datetime="2023-01-09T13:02:38.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-01-09</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h4 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h4><p>本人理解可能有所偏差，为了避免被误导，建议配合原书理解</p>
-<hr>
-<p>话题回到我们让程序跑起来的问题上，上次我们好不容易理解了小娜是怎么接收代码的，但是我们不可能让一个程序光编译不运行，所以，我们今天研究研究小娜是怎么让程序在脑子里跑起来的……</p>
-<p>所以，小娜，你什么时候把你那破bgm给停了？</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/IMG_20230102_170241.jpg"></p>
-<p>你有在听吗小娜！？</p>
-<h3 id="首先是命令行"><a href="#首先是命令行" class="headerlink" title="首先是命令行"></a>首先是命令行</h3><p>算了，先不管她了，我们先讲点熟悉的东西。</p>
-<p>命令行，想必各位都不陌生，在windows里有“能量外壳”和命令提示符cmd，在Unix有shell，Linux的各大门派也有各自的命令行终端……但是，它们有一个相仿的性质——会将内置指令之外的某种未知字段当作某些程序来运行，比方说当我们在windows系统的cmd输入<code>./hello_world.exe</code>时，就会尝试找到并运行hallo_world.exe。</p>
-<p>但是为什么一开始要提这个看上去没啥可讲的东西呢？</p>
-<h3 id="因为真相就在表象背后"><a href="#因为真相就在表象背后" class="headerlink" title="因为真相就在表象背后"></a>因为真相就在表象背后</h3><p>追根究底，第一台计算机是一堆电子管构成的庞然大物，所有抽象的数学运算都通过物理手段来实现。哪怕是到了现代，计算机的体积缩小再缩小，也逃不开逻辑电路与电学元器件的必然。所以，我们可视的终端背后，是这么一个庞然大物——</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%A1%AC%E4%BB%B6%E7%B3%BB%E7%BB%9F%E7%BB%93%E6%9E%84.png"></p>
-<blockquote>
-<p>图片摘自<a target="_blank" rel="noopener" href="https://space.bilibili.com/354767108">九曲阑干</a>的视频</p>
-</blockquote>
-<p>当然，现在的CPU和相关部件被压缩再压缩，已经到了就算是小娜脑子里都能塞上好几个的级别了……</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/IMG_20230102_170247.jpg"></p>
-<p>当然，不是在调侃你，小娜……原来你醒着吗？！</p>
-<p>我们先来梳理一下整台计算机的大致架构：</p>
-<h4 id="首先是作为核心的CPU"><a href="#首先是作为核心的CPU" class="headerlink" title="首先是作为核心的CPU"></a>首先是作为核心的CPU</h4><p><strong>1、PC（Program Counter，但直译并不能表述清楚其真实用途）</strong>：一个存储单条指令地址的元件，通常存储一个字的数据。不断向处理器发送需要执行的指令的内存地址，并不断被处理器更新指向下一条指令的地址（不一定相邻，你可以试着拿ida给一个稍复杂一点的程序的开头下断点，然后f8单步步过试试看）。</p>
-<p><strong>2、寄存器文件（Register file）</strong>：可以看作一个临时存放数据的空间，存储数值时会覆盖寄存器原本的值。</p>
-<p><strong>3、算术逻辑单元（arithmetic and logic unit，即ALU）</strong>：从寄存器中提取数值并进行运算，得到的结果保存到某一受提取的寄存器中</p>
-<p>这些元器件的实现方式要到《深入理解计算机系统》的第四章才讲述，在此按下不表。</p>
-<h4 id="然后是整个I-x2F-O结构"><a href="#然后是整个I-x2F-O结构" class="headerlink" title="然后是整个I&#x2F;O结构"></a>然后是整个I&#x2F;O结构</h4><p>整个结构包含如下构件：</p>
-<p><strong>1、主存（Main memory，又称内存）：</strong>由一组动态随机存取存储器（DRAM）芯片组成的临时存储设备，在处理器执行程序时，用来存放程序和程序处理的数据。逻辑上是一个从零开始的，线性的字节数组，每个字节都有唯一对应的地址。</p>
-<p><strong>2、总线（bus）：</strong>贯穿整个计算机系统的一组电子管道，负责将信息在部件间传递，通常被设计成传送定长的字节块，即字（word），字中的字节数（即字长）在各类系统中可能有所不同（32位4字节&#x2F;64位8字节）。</p>
-<p><strong>3、I&#x2F;O设备：</strong>简单来讲，负责在外部环境与系统之间进行数据交流。你可以将它粗暴地理解为你的显示屏、键盘鼠标等等设备。每个I&#x2F;O设备都通过一个控制器（IO设备本身或者系统的主板上的电路组）或者适配器（在主板插槽上的卡）与IO总线相连。</p>
-<p>此外，用于远程传输数据的网络，也可看作是一种I&#x2F;O设备。系统可以将数据从主存复制到适配器，再经由适配器与网络沟通，从而将数据传输到另一台机器上。在原书中还举例了本地与telnet服务器的交互，在此不多赘述。</p>
-<p><strong>4、CPU：</strong>如上所述</p>
-<h4 id="然后再回头谈谈程序是怎么运行的"><a href="#然后再回头谈谈程序是怎么运行的" class="headerlink" title="然后再回头谈谈程序是怎么运行的"></a>然后再回头谈谈程序是怎么运行的</h4><p>1、我们通过shell程序执行程序运行的指令，shell会读取I&#x2F;O设备（习惯上是键盘）的输入。比方说，我们输入“.&#x2F;hello”，shell就会先将这些字符逐个读取到寄存器，再放到内存中。</p>
-<p>2、当我们输入回车键，电脑上的shell就知道我们结束了一次命令的输入。接下来，系统会尝试执行一系列命令，读取可执行文件hello，将整个代码和数据从磁盘复制到主存。复制过程使用DMA（Direct Memory Access）技术，数据不经过处理器，从磁盘直达内存。</p>
-<p>3、在代码和数据加载到主存后，处理器就开始将目标程序中的机器语言指令按照一定顺序执行。比方说我们的程序只是输出“Hello！World”，那么，程序中的指令就会将“Hello！World”中的字节从主存复制到寄存器文件上，再从寄存器复制到显示设备上。</p>
-<p>所以，不是把U盘啥的塞小娜嘴里，小娜就可以口算莫比乌斯反演的，你得好好地写完代码，编译成程序，然后再通过I&#x2F;O设备输入指令，通过一系列复杂的操作使之执行……</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/IMG_20230102_170300.jpg"></p>
-<p>都说了别把代码直接塞她嘴里了……</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/IMG_20230102_170306.jpg"></p>
-<h3 id="是不是少了点什么"><a href="#是不是少了点什么" class="headerlink" title="是不是少了点什么"></a>是不是少了点什么</h3><p>不像我们人脑会直观地对信息进行处理。如上，即便是执行一个简单的“输出某个语句”的程序，计算机系统都要费上大量的时间，将信息从某个地方挪到另一个地方，在大量这样的挪移操作后才会进行处理。</p>
-<p>并且，根据机械原理，较大的存储设备往往比较小的存储设备运行的慢。越大的存储容量，意味着越大的时间开销，以及更加费拉不堪的运行速度。这就意味着现代电脑越是发展，需要解决的存储矛盾就越发的与日俱增。比方说寄存器和主存的容量差就已经有点子离谱了，处理器对两个容器的存取速度那也是一个天上一个地下。</p>
-<p>不过嘛，各位在上计算机理论的时候应该就注意到过一个名词：高速缓存存储器（即cache），这个本体比主存小得多的玩意通过存放处理器近期可能需要的信息，来降低数据传输过程中的时间开销。L1高速缓存位于处理器芯片上，容量达数万字节，访问速度和访问寄存器文件一样快。容量十倍甚至百倍与L1的L2寄存器通过一条特殊总线连接到处理器，但访问它的速度依旧比主存快5~10倍。比较新型的系统甚至还有三级高速缓存，这里就不展开了。总而言之，cache的思路就是通过一个更小的，速度更快的存储设备，来代为执行大量重复的数据操作。</p>
-<p>按照这样力大砖飞的想法，存储设备之间甚至可以形成一个层次结构，在处理器和存储器之间，插入一个更小更快的存储设备，层层垒上，从远程服务器存储到最低一级的寄存器，每一层的存储容量从大到小，形成一个类似金字塔的结构。具体实现方案各位可以自行了解，在此先不细讲。</p>
-<p>所以，和其它各式计算机一样，这么一坨额外的玩意，就盘踞在小娜的脑子里。不过，随着硬件技术的发展，cache在外形上的大小也在随之减小，要不然，整个结构估计都要从小娜的脑子里溢出来了——</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/IMG_20230102_170313.jpg"></p>
-<p>感兴趣的可以自行了解一下cache的发展史，这里可以看看<a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/31422201">知乎用户老狼</a>的文章。</p>
-<h3 id="那么问题来了"><a href="#那么问题来了" class="headerlink" title="那么问题来了"></a>那么问题来了</h3><p>上面提到的程序运行流程，都是在经由shell的操作下进行的。但是shell自己并没有直接访问包括硬盘、键盘、显示屏等硬件设备。那么问题来了，是什么在控制这些硬件完成外界与系统，硬件与系统的交互的呢？</p>
-<p>答案是操作系统。理论上，操作系统相当于硬件和程序之间的一层软件，所有程序对硬件的操作都必须通过操作系统完成。一方面，操作系统完成了“标准化”，即为软件提供一套统一高效的硬件交互机制，另一方面，操作系统也实现了“可控化”，可以防止程序失控造成硬件的Physical Damage。</p>
-<p>为了实现“标准化”和“可控化”，操作系统引入了几个抽象的概念，与硬件系统相对应：</p>
-<blockquote>
-<p>文件：<strong>IO设备</strong></p>
-<p>虚拟内存：<strong>主存</strong>、IO设备</p>
-<p>进程：<strong>处理器</strong>、主存、IO设备</p>
-<p><em>虚拟机：<strong>操作系统</strong>、处理器、主存、IO设备</em></p>
-</blockquote>
-<p>我们从大到小，一个一个来看：</p>
-<h4 id="1、进程"><a href="#1、进程" class="headerlink" title="1、进程"></a>1、进程</h4><p>对操作系统正在运行的一个程序的一种抽象。进程的<strong>“并发”</strong>则指的是数个进程的指令交错执行，通过处理器在进程间切换实现。</p>
-<p>操作系统保持跟踪进程运行所需的所有状态信息，即<strong>上下文</strong>，包括PC和寄存器文件的当前值，以及主存的内容。单处理器系统任何时候都只能执行一个进程的代码，要切换进程就会发生<strong>上下文切换</strong>，保存当前进程的上下文，恢复新进程的上下文。</p>
-<p>例如，上述的hello和shell就相当于两个不同的进程，shell负责接收我们输入的指令，而在我们输入“.&#x2F;hello”时，shell通过一个名叫<strong>系统调用(system call)<strong>的专门指令来执行我们执行hello的请求。此时，控制权移交给操作系统，</strong>hello进程</strong>及其<strong>上下文</strong>被创建，而后控制权又被移交给<strong>hello进程</strong>，期间发生hello与shell的<strong>上下文切换</strong>。在hello进程结束后，控制权又被移回shell，shell的上下文恢复。</p>
-<p>进程的转换通过操作系统的<strong>内核（kernel）</strong>管理，它是系统管理全部进程所用代码和数据的集合。应用通过<strong>系统调用</strong>指令将控制权传递给内核，内核则执行被请求的操作并返回应用程序。</p>
-<p>这个过程这就好比你要写一篇论文（请求），去图书馆（系统）找资料，此时这件事的控制权在你。于是你向图书管理员（内核）请求能不能给点相关的资料（系统调用、进程转换），管理员非常热情，他把相关的书籍列了出来，此时这件事的控制权在管理员身上。（进程转换）你从中找到了你要找的书，兴高采烈地办了借阅手续，此时这件事的控制权在你。但是，计算机对这种事情的效率，肯定比你和图书管理员的对话要高效的多……额……</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/IMG_20230102_170318.jpg"></p>
-<p>算了我还是给小娜装个阳间点的语言模块吧。</p>
-<p>当然，在现代系统中还有<strong>线程</strong>的概念，每个线程都运行在进程的上下文中，共享同样的代码和全局数据。多线程的程序往往能比多个单线程进程更高效地共享和使用数据。</p>
-<h4 id="2、虚拟内存"><a href="#2、虚拟内存" class="headerlink" title="2、虚拟内存"></a>2、虚拟内存</h4><p>虚拟内存营造了一种每个进程都在独占使用主存的假象，因为每个进程中看到的内存都是一致的，这点在反汇编软件中体现的非常直观（每个程序的内存首地址都一样）。这些观感上的内存空间被称为<strong>虚拟地址空间</strong>，整个空间结构上分为：</p>
-<blockquote>
-<p><strong>程序代码和数据</strong>：从进程的固定起始地址开始，<strong>代码区和数据区</strong>按照之前提到的可执行文件的内容初始化，大小在此过程中被固定。</p>
-<p><strong>堆</strong>：代码和数据区之后就是运行时<strong>堆</strong>，不像代码和数据，这部分空间在运行时可自由伸缩，取决于你是否调用了某些标准库函数</p>
-<p><strong>共享库</strong>：存放类似C标准库和数学库这样的共享库和代码的区域。</p>
-<p><strong>栈</strong>：和堆一样可以自由伸缩，在函数被调用时伸，返回时缩。编译器则用它实现函数的调用。</p>
-<p><strong>内核虚拟内存</strong>：地址空间顶部的区域，不允许应用程序读写其中的内容或者直接调用其中定义的函数，但一切需要内核参与的操作必须调用内核来完成。你可以理解为虚拟内存空间的ROM。</p>
-</blockquote>
-<p>详细内容要到原书第九章讲述，这里便不再展开。</p>
-<h4 id="3、文件"><a href="#3、文件" class="headerlink" title="3、文件"></a>3、文件</h4><p>所谓文件，在系统中就是一串字节序列，文件可以看作是系统向应用程序提供的一种统一的数据标准。对于系统中每个细分下来的部分，你都可以看作是文件。比如，每个I&#x2F;O设备都可以看成是文件。</p>
-<p>而这种统一的标准也降低了软件在不同硬件设备上兼容的操作复杂性。原书中主要讲述的是采用Unix I&#x2F;O调用读写文件的过程，这些内容在第十章体现。</p>
-<h4 id="4、虚拟机"><a href="#4、虚拟机" class="headerlink" title="4、虚拟机"></a>4、虚拟机</h4><p>相信各位已经用过不止一次虚拟机了吧？</p>
-<p>虚拟机的抽象概念，实际上是提供了一种针对整个计算机，包括操作系统在内的抽象概念。顾名思义，虚拟机通过在软件层面模拟具有完整系统功能的，在独立隔离环境中运行的计算机系统，来实现在同一台硬件，同一个系统中兼容不同系统环境的效果。通俗点来讲，就是让你的电脑能在windows里跑linux之类的。</p>
-<hr>
-<p>由此可见，不论是在硬件层面，还是在抽象的软件、系统层面，运行程序都是一个费劲的过程，更不用说让运行程序的过程更快了。</p>
-<p>书中第一章末尾还提到了加速比、Amdahl定律、并发、并行等概念，这些都对系统更高效的运转，有着更好的帮助。但是由于上述所有的内容在第一章中并未细讲，外加今天的笔记已经够长了，所以……</p>
-<p>前面的道路，以后再来探索吧？</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/IMG_20230102_170323.jpg"></p>
-<p>要是找到了什么莫名其妙的flag，就来nsilab的ctf平台看看吧（笑）</p>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">学习</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="../../2023/01/09/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%BA%8C%E7%AF%87/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
   
     <nav id="page-nav">
       <a class="extend prev" rel="prev" href="../../">&amp;laquo; Prev</a><a class="page-number" href="../../">1</a><span class="page-number current">2</span><a class="page-number" href="../3/">3</a><a class="page-number" href="../4/">4</a><a class="extend next" rel="next" href="../3/">Next &amp;raquo;</a>
@@ -1549,7 +1886,7 @@ while 1:
   <div class="outer">
     <div id="footer-info">
     	<div class="footer-left">
-    		&copy; 2023 Driven·Cyka·Hank
+    		&copy; 2024 Driven·Cyka·Hank
     	</div>
       	<div class="footer-right">
       		<a href="http://hexo.io/" target="_blank">Hexo</a>  Theme <a href="https://github.com/litten/hexo-theme-yilia" target="_blank">Yilia</a> by Litten

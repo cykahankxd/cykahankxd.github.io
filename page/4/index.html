@@ -166,6 +166,365 @@
           <div id="js-content" class="content-ll">
             
   
+    <article id="post-强网杯2022折磨复现系列" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="../../2022/09/02/%E5%BC%BA%E7%BD%91%E6%9D%AF2022%E6%8A%98%E7%A3%A8%E5%A4%8D%E7%8E%B0%E7%B3%BB%E5%88%97/">强网杯2022折磨复现系列</a>
+    </h1>
+  
+
+        
+        <a href="../../2022/09/02/%E5%BC%BA%E7%BD%91%E6%9D%AF2022%E6%8A%98%E7%A3%A8%E5%A4%8D%E7%8E%B0%E7%B3%BB%E5%88%97/" class="archive-article-date">
+  	<time datetime="2022-09-02T11:13:25.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-09-02</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h3 id="Previously"><a href="#Previously" class="headerlink" title="Previously"></a>Previously</h3><p>这些鬼题都太折磨了，感觉不是我能好好做的</p>
+<p>于是去找题解怼了一波，希望碰到类似的玩意至少能有点头绪</p>
+<h3 id="Reverse"><a href="#Reverse" class="headerlink" title="Reverse"></a>Reverse</h3><h4 id="GameMaster"><a href="#GameMaster" class="headerlink" title="GameMaster"></a>GameMaster</h4><p>游戏题，打开，发现是经典21点游戏，但是不知道获胜条件。</p>
+<p>考虑到游戏随机性过大，强行写算法贪过去不太现实，于是打算逆进去看看获胜条件。ida对付微软的鬼东西基本没辙，于是用一个好用的工具——dnspy解决：</p>
+<blockquote>
+<p>dnSpy is a debugger and .NET assembly editor. You can use it to edit and debug assemblies even if you don’t have any source code available. </p>
+<p>——dnSpy official Github site</p>
+</blockquote>
+<p>总而言之，面向对象，可实例化，以及各种优势，你可以找到一万个用它的理由。</p>
+<p>我们直接把这玩意和附属dll之类的甩进dnspy，就直接逆出来一堆东西，比方说游戏内置的金手指（作弊码）goldFunc，作弊码分四段，第一段没大用，其余的每次输入正确就会触发对应AchivePoint。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/goldFunc.png"></p>
+<p>但是先不急，打开Main函数，一开始读gamemassage，并存入全局变量memory。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Main1.png"></p>
+<p>注意到键盘操作底下塞了个verifyCode：</p>
+<pre><code>……
+case (ConsoleKey)63:
+case (ConsoleKey)64:
+    continue;
+case ConsoleKey.Escape:
+    Program.verifyCode(arrayList, game);
+    continue;
+case ConsoleKey.Spacebar:
+……
+</code></pre>
+<p>点进去，这玩意是调用goldFunc对键盘操作进行判断的，</p>
+<pre><code>private static void verifyCode(ArrayList arrayList, Game game)
+    &#123;
+        string str = &quot;&quot;;
+        for (int i = 0; i &lt; arrayList.Count; i++)
+        &#123;
+            str += arrayList[i].ToString()[0].ToString();
+        &#125;
+        Program.goldFunc(arrayList, game);
+        arrayList.Clear();
+    &#125;
+</code></pre>
+<p>那么回到作弊码函数，注意到第二段作弊码中AchivePoint处含有如下数据和解码：</p>
+<pre><code>byte[] key = new byte[]&#123;								66,													114,
+    97,
+    105,
+    110,
+    115,
+    116,
+    111,
+    114,
+    109,
+    105,
+    110,
+    103,
+    33,
+    33,
+    33
+&#125;;
+ICryptoTransform cryptoTransform = new RijndaelManaged
+&#123;
+    Key = key,
+    Mode = CipherMode.ECB,
+    Padding = PaddingMode.Zeros
+&#125;.CreateDecryptor();
+Program.m = cryptoTransform.TransformFinalBlock(Program.memory, 0, Program.memory.Length);
+</code></pre>
+<p>而在第一段和第三段当中也有对数据进行类似操作：</p>
+<pre><code>game.Player.Bet -= 22m;
+for (int i = 0; i &lt; Program.memory.Length; i++)
+&#123;
+    byte[] array = Program.memory;
+    int num = i;
+    array[num] ^= 34;
+&#125;
+
+……
+
+game.Player.Balance -= 27m;
+Environment.SetEnvironmentVariable(&quot;AchivePoint3&quot;, game.Player.Balance.ToString());
+BinaryFormatter binaryFormatter = new BinaryFormatter();
+MemoryStream serializationStream = new MemoryStream(Program.m);
+binaryFormatter.Deserialize(serializationStream);
+</code></pre>
+<p>那么金手指干了些啥不言而喻：</p>
+<blockquote>
+<p>1、对gamemassage进行一个34的异或</p>
+<p>2、再进行ECB解码</p>
+<p>3、反序列化</p>
+</blockquote>
+<p>那么现在就有两种思路：</p>
+<p>1、复现金手指的算法，然后拿到处理过的gamemassage</p>
+<p>2、打入金手指，拿到处理过的gamemassage</p>
+<p>考虑到做法2临场尝试屡次碰壁，这里就参考<a target="_blank" rel="noopener" href="https://blog.jamiexu.cn/2022/08/01/%E3%80%90CTF&WriteUP&Re%E3%80%912022%E5%BC%BA%E7%BD%91%E6%9D%AF%20%E2%80%9DReverse%E2%80%9C%20WriteUp/">Jamie743 dalao的文章</a>，从题目给的原程序扒代码下来对着数据的pg狠狠地铎：</p>
+<pre><code>using System.Runtime.Serialization.Formatters.Binary;
+using System.Security.Cryptography;
+using System.IO;
+using System;
+
+Console.WriteLine(&quot;Hello, World!&quot;);
+
+byte[] memory;
+byte[] m;
+byte[] key =
+&#123;
+    66,114,97,105,110,115,116,111,114,109,105,110,103,33,33,33
+&#125;;
+
+ICryptoTransform cryptoTransform = new RijndaelManaged
+&#123;
+   Key = key,
+   Mode = CipherMode.ECB,
+   Padding = PaddingMode.Zeros
+ &#125;.CreateDecryptor();
+
+FileStream fileStream = File.OpenRead(&quot;gamemessage&quot;);
+int num = (int)fileStream.Length;
+memory = new byte[num];
+
+fileStream.Position = 0L;
+fileStream.Read(memory, 0, num);
+
+m = new byte[num];
+
+for (int i = 0; i &lt; memory.Length; i++)
+    m[i] = (byte)(memory[i] ^ 34);
+
+m = cryptoTransform.TransformFinalBlock(m, 0, m.Length);
+
+BinaryFormatter binaryFormatter = new BinaryFormatter();
+MemoryStream serializationStream = new MemoryStream(m);
+binaryFormatter.Deserialize(serializationStream);
+
+FileStream fileStream2 = File.Create(&quot;gamemessage2&quot;);
+fileStream2.Write(m, 0, m.Length);
+</code></pre>
+<p>有一点玄学的地方，这玩意在C#项目中的默认文件输入输出位置不是在当前文件夹，而是bin下的Dbg文件夹，不知道是什么原理。</p>
+<p>但是有一点可以肯定，解出来的gamemassage2肯定不能拿编辑器直接看。万策尽，但只是RE方面。微软弄出来的东西跟PE文件经常沾上，关键就是DOS头，也就是所谓的MZ头。我们就010editor打开，找MZ头：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/gotit.png"></p>
+<p>文件头到手，把前面的部分删去省得逆的时候出错。再塞回dnSpy开始逆：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/flagmain.png"></p>
+<p>提flag的部分就在这了。首先将num1、num2、num3存入array之后加密，结果存入array2。结合上面的输入，理论上这些数据要通过游戏本体的金手指得到，但由于其过程太过复杂，我们还是利用z3和原gamemassage的Check1函数解方程算了……</p>
+<p>找<a target="_blank" rel="noopener" href="https://blog.jamiexu.cn/2022/08/01/%E3%80%90CTF&WriteUP&Re%E3%80%912022%E5%BC%BA%E7%BD%91%E6%9D%AF%20%E2%80%9DReverse%E2%80%9C%20WriteUp/">Jamie743 dalao</a>和<a target="_blank" rel="noopener" href="https://blog.csdn.net/qq_40201069/article/details/120877548">凡_tastic dalao</a>现学了一波z3位运算操作：</p>
+<pre><code>import z3
+
+first = [101, 5, 80, 213, 163, 26, 59, 38, 19, 6, 173, 189, 198, 166, 140, 183, 42, 247, 223, 24, 106, 20, 145, 37, 24, 7, 22, 191, 110, 179, 227, 5, 62, 9, 13, 17, 65, 22, 37, 5]
+
+x = z3.BitVec(&quot;num1&quot;, 64) #这里是64位程序，保险起见用64位解
+y = z3.BitVec(&quot;num2&quot;, 64)
+z = z3.BitVec(&quot;num3&quot;, 64)
+
+KeyStream = [0] * len(first)
+
+num = -1
+
+for i in range(320):  #还是那句话，源码里有现成的就趁热
+    x = (((x &gt;&gt; 29 ^ x &gt;&gt; 28 ^ x &gt;&gt; 25 ^ x &gt;&gt; 23) &amp; 1) | x &lt;&lt; 1)
+    y = (((y &gt;&gt; 30 ^ y &gt;&gt; 27) &amp; 1) | y &lt;&lt; 1)
+    z = (((z &gt;&gt; 31 ^ z &gt;&gt; 30 ^ z &gt;&gt; 29 ^ z &gt;&gt; 28 ^ z &gt;&gt; 26 ^ z &gt;&gt; 24) &amp; 1) | z &lt;&lt; 1)
+    if i % 8 == 0:
+        num += 1
+    KeyStream[num] = ((KeyStream[num] &lt;&lt; 1) | (
+        ((z &gt;&gt; 32 &amp; 1 &amp; (x &gt;&gt; 30 &amp; 1)) ^ (((z &gt;&gt; 32 &amp; 1) ^ 1) &amp; (y &gt;&gt; 31 &amp; 1)))))
+
+solver = z3.Solver()
+
+for i in range(len(first)):
+    solver.add(first[i] == KeyStream[i])
+
+if solver.check() == z3.sat:
+    mod = solver.model()
+    print(mod)
+</code></pre>
+<p>于是可以得到三个num:</p>
+<blockquote>
+<p>[num2 &#x3D; 868387187, num3 &#x3D; 3131229747, num1 &#x3D; 156324965]</p>
+</blockquote>
+<p>刚才看解密的主逻辑，还有俩步骤，一个是ParseKey函数：</p>
+<pre><code>for (int i = 0; i &lt; 3; i++)
+&#123;
+    for (int j = 0; j &lt; 4; j++)
+    &#123;
+        Key[i * 4 + j] = (byte)(L[i] &gt;&gt; j * 8 &amp; 255UL);
+    &#125;
+&#125;
+</code></pre>
+<p>一个是最后一步：</p>
+<pre><code>for (int i = 0; i &lt; array5.Length; i++)
+&#123;
+    array5[i] ^= array4[i % array4.Length];
+&#125;
+</code></pre>
+<p>通通在py里头复现一波完事：</p>
+<pre><code>v = [156324965, 868387187, 3131229747]
+
+array4 = [0]*12
+
+for i in range(3):
+    for j in range(4):
+        array4[i*4+j] = (v[i] &gt;&gt; j * 8 &amp; 255)
+
+array5 = [60, 100, 36, 86, 51, 251, 167, 108, 116, 245, 207, 223, 40, 103, 34, 62, 22, 251, 227]
+
+print(&quot;flag&#123;&quot;, end=&#39;&#39;)
+
+for i in range(len(array5)):
+    array5[i] ^= array4[i % len(array4)]
+    print(chr(array5[i]), end=&#39;&#39;)
+
+print(&quot;&#125;&quot;)
+</code></pre>
+<blockquote>
+<p>flag{Y0u_@re_G3meM3s7er!}</p>
+</blockquote>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="../../2022/09/02/%E5%BC%BA%E7%BD%91%E6%9D%AF2022%E6%8A%98%E7%A3%A8%E5%A4%8D%E7%8E%B0%E7%B3%BB%E5%88%97/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
+    <article id="post-这个博客的第一篇文章" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="../../2022/08/31/%E8%BF%99%E4%B8%AA%E5%8D%9A%E5%AE%A2%E7%9A%84%E7%AC%AC%E4%B8%80%E7%AF%87%E6%96%87%E7%AB%A0/">这个博客的第一篇文章</a>
+    </h1>
+  
+
+        
+        <a href="../../2022/08/31/%E8%BF%99%E4%B8%AA%E5%8D%9A%E5%AE%A2%E7%9A%84%E7%AC%AC%E4%B8%80%E7%AF%87%E6%96%87%E7%AB%A0/" class="archive-article-date">
+  	<time datetime="2022-08-31T12:41:19.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-08-31</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h3 id="Previously"><a href="#Previously" class="headerlink" title="Previously"></a>Previously</h3><p>一开始打算随便整一个博客，结果用错了方法，外加弄不清文件的结构导致了成吨的意外，现在重新弄一个。</p>
+<p>（结果弄的时候还把站点的地址打错了，导致图片进不来）</p>
+<p>之后会慢慢把本人在NSICTF的内容引进，以后就作为本人题解的一个集散地，同时整些花活。</p>
+<p>人菜，勿喷</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/DrinkingMudrock.gif"></p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">杂谈</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="../../2022/08/31/%E8%BF%99%E4%B8%AA%E5%8D%9A%E5%AE%A2%E7%9A%84%E7%AC%AC%E4%B8%80%E7%AF%87%E6%96%87%E7%AB%A0/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
     <article id="post-DASCTF2022-07赋能赛复现" class="article article-type-post  article-index" itemscope itemprop="blogPost">
   <div class="article-inner">
     
@@ -797,7 +1156,7 @@ __int64 __fastcall main(__int64 a1, char **a2, char **a3)
   <div class="outer">
     <div id="footer-info">
     	<div class="footer-left">
-    		&copy; 2023 Driven·Cyka·Hank
+    		&copy; 2024 Driven·Cyka·Hank
     	</div>
       	<div class="footer-right">
       		<a href="http://hexo.io/" target="_blank">Hexo</a>  Theme <a href="https://github.com/litten/hexo-theme-yilia" target="_blank">Yilia</a> by Litten

@@ -254,6 +254,893 @@
 
 
   
+    <article id="post-FlareOn4做题合集" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="2024/03/29/FlareOn4%E5%81%9A%E9%A2%98%E5%90%88%E9%9B%86/">FlareOn4做题合集</a>
+    </h1>
+  
+
+        
+        <a href="2024/03/29/FlareOn4%E5%81%9A%E9%A2%98%E5%90%88%E9%9B%86/" class="archive-article-date">
+  	<time datetime="2024-03-29T12:34:43.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-03-29</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h3 id="notepad"><a href="#notepad" class="headerlink" title="notepad"></a>notepad</h3><p><em>ps.在做这道题之前请注意<a target="_blank" rel="noopener" href="https://twitter.com/pmontesel/status/905543404326670336">如下内容</a>：</em></p>
+<blockquote>
+<p>If “notepad.exe” in #flareon4 on Win10 crashes just patch 0x01013C54 to make it “push 0x6e2bca17”</p>
+</blockquote>
+<p><em>ps.2 以及，flareon上的原装题目大概率只适用于win7及以下部分版本的windows，建议部分无法正常打开的题目替换为buu上的移植版食用</em></p>
+<p>打开一看，除了一开始会显示某些莫名其妙的时间之外，似乎就是一个普通的32位记事板？</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn4%5Dnotepad_pic1.png"></p>
+<p>虽然不知道它在干什么，但是当我们点进去的时候，我们会看到start调用了一些东西：</p>
+<pre><code>strcpy(v27, &quot;%USERPROFILE%&quot;);
+strcpy(v8, &quot;\\flareon2016challenge&quot;);
+strcpy(v10, &quot;ImageHlp.dll&quot;);
+strcpy(v9, &quot;CheckSumMappedFile&quot;);
+strcpy(v15, &quot;user32.dll&quot;);
+strcpy(v12, &quot;MessageBoxA&quot;);
+</code></pre>
+<p>FlareOn4是2017年的，我们要把上一届比赛（16年）的题目给弄下来放自己的用户文件夹里头。试着再度运行，但是除了什么跟刚才一样之外都没发生……等下，什么时候多出来一个<code>key.bin</code>？</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn4%5Dnotepad_pic2.png"></p>
+<p>虽然但是，我们回头先看看程序本体，主函数里面出现了成吨类似的结构：</p>
+<pre><code>v16[0] = sub_1015310((int)v5, 0x63D6C065);
+</code></pre>
+<p>动态调试可以发现其实际上是对<code>kernel32.dll</code>库的调用，每次将一个函数的地址压栈。而我们将整个调用链拉出来会发现，start部分似乎就是将上述文件夹中符合条件（并且这个条件多半和文件的更新日期，也就是题目文件编译的日期有关系）的程序提出来，塞点什么。</p>
+<pre><code>Stack[00000840]:000DFEF0 aUser32Dll_0 db &#39;user32.dll&#39;,0
+Stack[00000840]:000DFEFB db    0
+Stack[00000840]:000DFEFC dd offset kernel32_FindFirstFileA
+Stack[00000840]:000DFF00 dd offset kernel32_FindNextFileA
+Stack[00000840]:000DFF04 dd offset kernel32_FindClose
+Stack[00000840]:000DFF08 dd 0
+Stack[00000840]:000DFF0C dd offset kernel32_CreateFileA
+Stack[00000840]:000DFF10 dd offset kernel32_CreateFileMappingA
+Stack[00000840]:000DFF14 dd offset kernel32_MapViewOfFile
+Stack[00000840]:000DFF18 dd offset kernel32_CloseHandle
+Stack[00000840]:000DFF1C dd offset kernel32_WriteFile
+Stack[00000840]:000DFF20 dd offset kernel32_GetFileSize
+Stack[00000840]:000DFF24 dd offset kernel32_FlushViewOfFile
+Stack[00000840]:000DFF28 dd offset kernel32_LoadLibraryA
+Stack[00000840]:000DFF2C dd offset kernel32_GetProcAddress
+Stack[00000840]:000DFF30 dd 0
+Stack[00000840]:000DFF34 dd offset kernel32_GetModuleHandleA
+Stack[00000840]:000DFF38 dd offset kernel32_UnmapViewOfFile
+Stack[00000840]:000DFF3C dd 0
+Stack[00000840]:000DFF40 dd 0
+Stack[00000840]:000DFF44 dd 0
+Stack[00000840]:000DFF48 dd 0
+Stack[00000840]:000DFF4C dd offset kernel32_ExpandEnvironmentStringsA
+Stack[00000840]:000DFF50 dd offset kernel32_FileTimeToSystemTime
+Stack[00000840]:000DFF54 dd offset kernel32_GetTimeFormatA
+Stack[00000840]:000DFF58 dd offset kernel32_GetDateFormatA
+Stack[00000840]:000DFF5C dd offset kernel32_ReadFile
+</code></pre>
+<p>问题来了，是哪几个程序呢？比较简单粗暴的办法是挨个试一遍，最后，发现challenge1、DudeLocker、khaki和unknown在题目的notepad运行之后，都会有一些莫名其妙的弹窗，而唯独unknown的弹窗是”What’s wrong with my keyfile?”。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn4%5Dnotepad_pic3.png"></p>
+<p>不用猜，unknown肯定是最后一个打开的程序，而第一个肯定是notepad.exe。至于剩下几个的顺序，一种办法是挨个试一遍，三个相异元素的全排列而已（实际上你直接按首字母排序的话，顺序运行下来就是一遍过）。还有一种是按时间查找，但是因为部分题目使用的是buu的移植版，使用上一个打开的程序的弹窗里的时间可能还是对不上号。</p>
+<p>至于最后一种，每次运行完上一个程序，key.bin里肯定会多出些什么，直接将里面每次多出的内容到还没打开的程序里挨个找一遍，绝对会找到匹配的结果，以DudeLocker为例：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn4%5Dnotepad_pic4.png"></p>
+<p>反正怎么顺手怎么来。最后的flag一定是：</p>
+<blockquote>
+<p><a href="mailto:&#98;&#108;&#x34;&#x35;&#55;&#x5f;&#x66;&#x72;&#x30;&#109;&#95;&#x74;&#x68;&#51;&#x5f;&#x70;&#x34;&#53;&#55;&#x40;&#x66;&#x6c;&#97;&#x72;&#101;&#45;&#x6f;&#x6e;&#46;&#99;&#111;&#x6d;">&#98;&#108;&#x34;&#x35;&#55;&#x5f;&#x66;&#x72;&#x30;&#109;&#95;&#x74;&#x68;&#51;&#x5f;&#x70;&#x34;&#53;&#55;&#x40;&#x66;&#x6c;&#97;&#x72;&#101;&#45;&#x6f;&#x6e;&#46;&#99;&#111;&#x6d;</a></p>
+</blockquote>
+<p><em>谁家好人会用自己出过的题目当题目内容，还放在C盘占空间的啊kora</em></p>
+<h3 id="shell"><a href="#shell" class="headerlink" title="shell"></a>shell</h3><p>看到代码的一瞬间，我有点害怕这玩意会不会有什么php特性：</p>
+<pre><code>&lt;?php $o__o_ = base64_decode(
+    &quot;QAYLHhIJbzIQC...&quot;
+);
+$o_o = isset($_POST[&quot;o_o&quot;]) ? $_POST[&quot;o_o&quot;] : &quot;&quot;;
+$o_o = md5($o_o) . substr(MD5(strrev($o_o)), 0, strlen($o_o));
+for ($o___o = 0; $o___o &lt; 2268; $o___o++) &#123;
+    $o__o_[$o___o] = chr((ord($o__o_[$o___o]) ^ ord($o_o[$o___o])) % 256);
+    $o_o .= $o__o_[$o___o];
+&#125;
+if (MD5($o__o_) == &quot;43a141570e0c926e0e3673216a4dd73d&quot;) &#123;
+    if (isset($_POST[&quot;o_o&quot;])) &#123;
+        @setcookie(&quot;o_o&quot;, $_POST[&quot;o_o&quot;]);
+    &#125;
+    $o___o = create_function(&quot;&quot;, $o__o_);
+    unset($o_o, $o__o_);
+    $o___o();
+&#125; else &#123;
+    echo &#39;&lt;form method=&quot;post&quot; action=&quot;shell.php&quot;&gt;&lt;input type=&quot;text&quot; name=&quot;o_o&quot; value=&quot;&quot;/&gt;&lt;input type=&quot;submit&quot; value=&quot;&amp;gt;&quot;/&gt;&lt;/form&gt;&#39;;
+&#125; ?&gt;
+</code></pre>
+<p>但好在事实上并没有。不过这么长的密文看上去有点哈人，还拿字符串正反两遍的md5的合体做key，64位，看着更哈人了。不过就没啥招解决吗？</p>
+<p>注意看这一句代码：</p>
+<pre><code>$o_o .= $o__o_[$o___o];
+</code></pre>
+<p>如果说这个for要正常运行不至于抛出索引越界（毕竟key只有64位，但这for的上限足足2268），那这个<code>.=</code>只剩下一种可能：拿加密后的字符当key的末尾继续加密。也就是说，第65位开始都可以用前文直接爆。</p>
+<p>可问题在于：在生成后续的key之前，前文也必须得被加密啊，所以根本问题还是怎么爆出原文和key。</p>
+<p>一种很浅显的办法就是遍历所有可能用到的php函数，因为密文解密的结果实际上就是php代码：</p>
+<pre><code>@setcookie(&quot;o_o&quot;, $_POST[&quot;o_o&quot;]);
+create_function(&quot;&quot;, $o__o_);
+</code></pre>
+<p>但是逆向手可能很难知道所有可能的CTF常用php函数，所以赛场上得去请教web手或者挨个试一遍。</p>
+<p>另一种更简单的办法，MD5本身只有16个字符的字符集，我们直接循环前64位，对于每一位，根据之前的算法来看，从第一次根据key加密过后，之后每64位的加密都是以前64位为key加密，也就是说，我们爆破每一位key的时候，只需要向后以64为间隔循环异或，检测值是否为阳间字符就行了。（思路参考<a target="_blank" rel="noopener" href="https://thomasw.dev/post/flareon-2017-10-shell/">Thomasd的博客</a>和<a target="_blank" rel="noopener" href="https://mokhdzanifaeq.github.io/2017/10/17/flareon-2017/">mkhdznfq的博客</a>）</p>
+<pre><code>from base64 import b64decode
+
+f = open(&#39;output.txt&#39;, &#39;w&#39;)
+crypted = b64decode(&quot;QAYLHhIJbzIQC...&quot;)
+
+
+def check(offset, tmp):
+    for sit in range(offset, 2268, 64):  # 以64为间隔开始遍历，判断是否为正常字符
+        tmp = (crypted[sit] ^ tmp) % 256  # 继续以当前加密字符为key向后遍历
+        if 32 &lt;= tmp &lt; 127 or tmp == 10 or tmp == 13:  # 若为正常字符
+            continue
+        return -1
+    return 1
+
+
+for i in range(64):  # 剩下的事情就是遍历md5字符集了
+output = &#39;md5set[&#39; + str(i) + &#39;]=[&#39;
+for j in md5charset:
+    if check(i, ord(j)) == 1:
+        output += &#39;\&#39;&#39; + j + &#39;\&#39;, &#39;
+output = output[:-2] + &#39;]&#39;
+print(output, file=f)
+
+f.close()
+</code></pre>
+<p>但是如果是纯暴力，最后爆出来的产物还是会产生一些不定结果。但既然都暴力了那为什么不爆到底呢？递归生成树，挨个试一遍！</p>
+<p>然而最后发现根本跑不通。究其原因还是64位的超长key带来的巨大运算量让人难以接受（足足10^28种可能性）。那剩下的只能是先手动调整key，看看能不能产生一些可能可以看见的结果：</p>
+<pre><code>from base64 import b64decode
+from hashlib import *
+
+crypted = b64decode(
+    &quot;QAYLHhIJbzIQCl...&quot;)
+key = &quot;...&quot;
+key = [char for char in key]
+output = &quot;&quot;
+
+for i in range(len(crypted)):
+    output += chr((crypted[i] ^ ord(key[i])) % 256)
+    key += output[i]
+
+print(output)
+</code></pre>
+<p>这个过程是相当漫长与折磨的。就算你脑子里有一万种php指令，调整key也得半天。所以我们需要把可能的明文也打印出来，看看到底啥玩意是可能整理出一个可用的cookie的明文，然后再找对应的key：</p>
+<pre><code>from base64 import b64decode
+
+f = open(&#39;output.txt&#39;, &#39;w&#39;)
+f2 = open(&#39;output_origin.txt&#39;, &#39;w&#39;)
+crypted = b64decode(&quot;QAYLHhIJbzIQC...&quot;)
+md5charset = &quot;0123456789abcdef&quot;
+
+
+def check(offset, tmp):
+    for sit in range(offset, 2268, 64):  # 以64为间隔开始遍历，判断是否为正常字符
+        tmp = (crypted[sit] ^ tmp) % 256  # 继续以当前加密字符为key向后遍历
+        if 32 &lt;= tmp &lt; 127 or tmp == 10 or tmp == 13:  # 若为正常字符
+            continue
+        return -1
+    return 1
+
+
+def exchange(tmp):
+    if 32 &lt;= tmp &lt; 127:
+        return chr(tmp)
+    else:
+        return &#39;\\x&#39; + str(tmp)
+
+
+for i in range(64):  # 剩下的事情就是遍历md5字符集了
+    output = &#39;md5set[&#39; + str(i) + &#39;]=[&#39;
+    output_origin = &#39;original_set[&#39; + str(i) + &#39;]=[&#39;
+    for j in md5charset:
+        if check(i, ord(j)) == 1:
+            output += &#39;\&#39;&#39; + j + &#39;\&#39;, &#39;
+            output_origin += &#39;\&#39;&#39; + exchange((crypted[i] ^ ord(j)) % 256) + &#39;\&#39;, &#39;
+    output = output[:-2] + &#39;]&#39;
+    output_origin = output_origin[:-2] + &#39;]&#39;
+    print(output, file=f)
+    print(output_origin, file=f2)
+
+f.close()
+f2.close()
+</code></pre>
+<p>然后再把生成的可能明文和可能key一个个比对，看看什么样的key组合可以凑出一个算是cookie的明文。这个过程需要比较繁琐的手工，但没办法，谁叫电脑也不一定跑得动呢？</p>
+<p>手操得出<code>key=db6952b84a49b934acb436418ad9d93d237df05769afc796d067bccb379f2cac</code>，再塞回去得到cookie：</p>
+<pre><code>$d=&#39;&#39;;
+$key = &quot;&quot;;
+if (isset($_POST[&#39;o_o&#39;]))
+  $key = $_POST[&#39;o_o&#39;];
+if (isset($_POST[&#39;hint&#39;]))
+  $d = &quot;www.p01.org&quot;;
+if (isset($_POST[&#39;t&#39;])) &#123;
+  if ($_POST[&#39;t&#39;] == &#39;c&#39;) &#123;
+    $d = base64_decode(&#39;SDcGHg1feV...&#39;);
+    $key = preg_replace(&#39;/(.)../&#39;, &#39;$1&#39;, $key);
+  &#125;
+  if ($_POST[&#39;t&#39;] == &#39;s&#39;) &#123;
+    $d = base64_decode(&#39;VBArMg1H...&#39;);
+    $key = preg_replace(&#39;/.(.)./&#39;, &#39;$1&#39;, $key);
+  &#125;
+  if ($_POST[&#39;t&#39;] == &#39;w&#39;) &#123;
+    $d = base64_decode(&#39;DycdGg1hYj...&#39;);
+    $key = preg_replace(&#39;/..(.)/&#39;, &#39;$1&#39;, $key);
+  &#125;
+  while(strlen($key) &lt; strlen($d))
+    $key = $key.$key;
+  $d = $d ^ $key;
+&#125;
+if (strlen($d))
+    echo $d;
+else
+    echo &#39;&lt;form action=&quot;shell.php&quot; method=&quot;post&quot;&gt;&lt;input type=&quot;hidden&quot; name=&quot;o_o&quot; value=&quot;&#39;.$key.&#39;&quot;&gt;&lt;input type=&quot;radio&quot; name=&quot;t&quot; value=&quot;c&quot;&gt; Raytraced Checkboard&lt;br&gt; &lt;input type=&quot;radio&quot; name=&quot;t&quot; value=&quot;s&quot;&gt; p01 256b Starfield&lt;br&gt; &lt;input type=&quot;radio&quot; name=&quot;t&quot; value=&quot;w&quot;&gt; Wolfensteiny&lt;br&gt;&lt;input type=&quot;submit&quot; value=&quot;Show&quot;/&gt;&lt;/form&gt;&#39;;
+</code></pre>
+<p>但是这里的<code>preg_replace</code>又在干什么？其实通过在线编译，我们可以知道这里的每一项<code>preg_replace</code>都分别在取key中每3个字符的第一&#x2F;二&#x2F;三个，分别组成一个新的key用于进行异或：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/buu_%5BFlareOn2017%5D_shell_pic1.png"></p>
+<p>剩下的事情就好办了，爆！</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/buu_%5BFlareOn2017%5D_shell_pic2.png"></p>
+<p>啊？！</p>
+<p>所以这个POST的key传进来的时候还带变的是吗？这下多爆三个密文了，这么玩是吧.jpg，更悲惨的是这回不是md5了，这下任何字符都有可能了。</p>
+<p>而且，还有一件可怕的事情，我们到现在依旧不知道flag是藏在代码里还是就是哪一个环节的key。</p>
+<p>不过嘛，思路还是有的。注意这里：</p>
+<pre><code>if (isset($_POST[&#39;hint&#39;]))
+  $d = &quot;www.p01.org&quot;;
+</code></pre>
+<p>我们点进去一看，发现这是个压行老哥的博客，专注压行二十年。但我们不止要查看相关的代码，从直觉上看，上述密文拼接起来有足足998个字符，而整个网页字数相近且符合出题日期，并且含有有效代码的文章有：DWITTER SON1K、WOLFENSTEINY、TEA STORM等。而它们之中的代码都是html。顺着这条线索，我们推测原文当中应当含有“&lt;body”之类的，html特有的字段。并且，由于第三部分的长度比第1、2段甚至多出整整42个字符，我们甚至可以直接开始暴力循环密文后42位，看看有没有什么捞的着的东西：</p>
+<pre><code>from base64 import b64decode
+
+code = [[] for i in range(3)]
+code[2] = b64decode(&#39;DycdGg1hY...&#39;)
+origin = &quot;&lt;/body&gt;&quot;
+origin = [ord(char) for char in origin]
+
+# 密文最短只有316位
+for i in range(316, len(code[2]) - len(origin)):
+    tmp = &quot;&quot;
+    for j in range(len(origin)):
+        tmp += chr(code[2][i + j] ^ origin[j])
+    print(&quot;offset %i decode is %s&quot; % (i, tmp))
+</code></pre>
+<p>最后结果也就三个能看的，还都是乱码。但是，秉持着不会做就瞎蒙乱猜的原则，这三个能看的结果当中，也就一个能和网页沾上边的：<code>部分密文^&#39;&lt;/body&gt;&#39;=@a-.m3Q</code></p>
+<p>且慢，如果我们看一看原比赛的网址：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/buu_%5BFlareOn2017%5D_shell_pic3.png"></p>
+<pre><code>__@__a__-__.__m__3__Q
+   flare-on.com
+     *  *  *  *
+</code></pre>
+<p>W……T……F……什么顶级抽象脑洞</p>
+<p>然后我们有端联想一下，这玩意的末位如果真是“@+比赛官网”，那我们不就可以通过暴力向前遍历完整版密文找到key可能的长度，进而暴力遍历可能的字符找到flag吗？所以我们直接对着三段密文挨个试一遍：</p>
+<pre><code>from base64 import b64decode
+
+code = [[] for i in range(3)]
+code[0] = b64decode(&#39;SDcGHg...&#39;)
+code[1] = b64decode(&#39;VBArMg1H...&#39;)
+code[2] = b64decode(&#39;DycdGg1h...&#39;)
+
+possible_key = [[] for i in range(3)]  # @flare-on.com，但根据原算法，一份key拆三份用
+possible_key[0] = &#39;froc&#39;
+possible_key[1] = &#39;leno&#39;
+possible_key[2] = &#39;@a-.m&#39;
+
+f = open(&quot;burp_second_output.txt&quot;, &#39;w&#39;)
+for i in range(3):
+    f.write(&quot;in code %i:\n&quot; % i)
+    for j in range(len(code[i]) - len(possible_key[i])):
+        tmp = &quot;&quot;
+        possible_tag = 1
+        for k in range(len(possible_key[i])):
+            c = (code[i][j+k] ^ ord(possible_key[i][k])) % 256
+            tmp += chr(c)
+            if c &lt; 32 or c &gt; 126:
+                possible_tag = 0
+        if possible_tag == 1:
+            f.write(&quot;   offset %i decode is %s\n&quot; % (j, tmp))
+</code></pre>
+<p>于是我们可以清晰地看到一些字段中浮现了html相关字段，以及这位p01老哥的部分代码字段。其中以这里尤为明显：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/buu_%5BFlareOn2017%5D_shell_pic4.png"></p>
+<p>考虑到这个箭头应该不太可能凭空出现（实际上那是html的注释标志），我们姑且认为flag长度在39左右。这样的话，每部分key还有8~9位未知。于是我们开始尝试爆破，再结合wolfensteiny文章的源代码，原文的算法之类的，以及之前的暴力代码多跑几遍一顿瞎猜：</p>
+<pre><code>from base64 import b64decode
+
+f = open(&#39;output2.txt&#39;, &#39;w&#39;)
+f2 = open(&#39;output2_origin.txt&#39;, &#39;w&#39;)
+
+code = [[] for i in range(3)]  # 继续拆成三个解
+code[0] = b64decode(&#39;SDcGHg1f...&#39;)
+code[1] = b64decode(&#39;VBArMg1HY...&#39;)
+code[2] = b64decode(&#39;DycdGg1hYjl8...&#39;)
+keylen = [13, 13, 13]
+
+
+def check(offset, enc, tmp, keyl):  # 输入当前偏移量、待解密字符串、当前待判断key位，当前key长度
+    for sit in range(offset, len(enc), keyl):
+        c = (enc[sit] ^ tmp) % 256
+        if 32 &lt;= c &lt;= 126 or c == 10 or c == 13:
+            continue
+        else:
+            return -1
+    return 1
+
+
+def exchange(tmp):
+    if 32 &lt;= tmp &lt;= 126:
+        return chr(tmp)
+    else:
+        return &#39;\\x&#39; + str(tmp)
+
+
+for i in range(9):  # key剩余位数第i位
+    for k in range(3):  # 第k个密文串/key
+        output = &#39;possible_key[&#39; + str(3*i+k) + &#39;]=[&#39;
+        output_origin = &#39;original_set[&#39; + str(3*i+k) + &#39;]=[&#39;
+        for j in range(32, 127):  # ascii表第j个可用字符
+            if check(i, code[k], j, keylen[k]) == 1:
+                output += &#39;\&#39;&#39; + chr(j) + &#39;\&#39;, &#39;
+                output_origin += &#39;\&#39;&#39; + exchange((code[k][i] ^ j) % 256) + &#39;\&#39;, &#39;
+        output = output + &#39;]&#39;
+        output_origin = output_origin + &#39;]&#39;
+        print(output, file=f)
+        print(output_origin, file=f2)
+
+f.close()
+f2.close()
+</code></pre>
+<p>考虑到剩下的密文也极有可能是html代码，那么开头的字符也很有可能是三个重复的html头，并且按出题人的习惯还会接两个不同ascii码的换行，我们照着这个思路一个位一个位的比对：</p>
+<pre><code># th3_xOr_is_waaaay_too_w34k@
+
+t_rsaatwk
+&lt;html&gt;
+
+
+hx__ayo3@
+&lt;html&gt;
+
+
+3Oiwa_o4
+&lt;html&gt;
+ 
+ 
+</code></pre>
+<p>这不但验证了我们之前对key尾的猜想，还把前面完完整整的吐出来了。所以最后的结果应该是：</p>
+<blockquote>
+<p>th3_ xOr_ is_ waaaay_ too_ <a href="mailto:&#119;&#51;&#52;&#x6b;&#x40;&#x66;&#108;&#97;&#114;&#x65;&#45;&#111;&#110;&#x2e;&#x63;&#111;&#109;">&#119;&#51;&#52;&#x6b;&#x40;&#x66;&#108;&#97;&#114;&#x65;&#45;&#111;&#110;&#x2e;&#x63;&#111;&#109;</a></p>
+</blockquote>
+<p>顺带，你把这个key放到php运行器上解密，你会发现这些明文都是p01老哥的杰作……套了些不明所谓的玩意。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/buu_%5BFlareOn2017%5D_shell_pic5.png"></p>
+<p><em>ps.1 你确定这题真的不放在misc或者crypto？<br>ps.2 在最后的爆破环节我一开始把长度当40看爆了半天，还调了一整个晚上的算法，最后才发现其实是我一开始看的39，我人傻了（各种意义上）</em><br><em>ps.3 出题人你(wo)没(cxx)有(ni)心(mx)</em><br><em>ps.4 buu导题的时候导错了flag导致中间的’O’变成’0’才能过，忘周知</em></p>
+<h3 id="zsud"><a href="#zsud" class="headerlink" title="zsud"></a>zsud</h3><p>一上来发现像是迷宫题，但又不那么正统，我们的视野直接被封死了，目前唯一可以得到信息的途径就是h(elp)和l(ook)：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn4%5Dzsud_pic1.png"></p>
+<pre><code>Game commands:
+h[elp] - See this help
+q[uit] - Exit the game
+
+Area commands:
+l[ook] [object] - Look at the room [or at an optional object)
+n[orth] - Move north
+s[outh] - Move south
+e[ast] - Move east
+w[est] - Move west
+u[p] - Move up
+d[own] - Move down
+
+Personal commands:
+say &lt;someone&gt; &lt;words...&gt; - Say &lt;words...&gt; to &lt;someone&gt;
+wear &lt;inventory-item&gt; - Put &lt;inventory-item&gt; on
+remove &lt;thing&gt; - Take &lt;thing&gt; off
+
+Inventory commands:inv[entory] - Check your inventory
+get &lt;object&gt; [location] - Get object [from within optional location])
+drop &lt;object&gt; - Put object down
+</code></pre>
+<p>方向键并不是wasd而是东南西北，但不管怎么说，我们都应该四处转转。往南走是outside直接死路，往北走的话，里面会有一些奇怪的结构，于是我们直接画一张地图，顺带把有关键道具的地方给标注了：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn4%5Dzsud_pic2.png"></p>
+<p>但是我们对于现在要做的事情一头雾水，遂喂die和ida，找到一条鲸鱼以及它的所在函数和地址：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn4%5Dzsud_pic3.png"></p>
+<p>但打开程序跟进网页之后也只剩下一条鲸鱼：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn4%5Dzsud_pic4.png"></p>
+<p>其它什么也没有，感觉脑子要喂鲸鱼了。但是我们发现，打开时会出现一个<code>clrhost</code>的调试信息，搜一下是个能在汇编程序中打开一个CLR环境，并通过一个自启动的控制台跑C#代码的玩意。相关内容可以参考<a target="_blank" rel="noopener" href="https://github.com/KevinVoell/CLRHost">CLRhost本体</a>以及<a target="_blank" rel="noopener" href="https://blog.csdn.net/lidandan2016/article/details/77868043">lidandan2016
+</a>的文章。</p>
+<p>我们还发现某些函数调用了一些空全局变量作为函数，可能在程序运行过程中会有一些对.NET调用库的解码也说不定？用CheatEngine一开果真看到了不对劲的<code>whiskey_tango_flareon.dll</code>。</p>
+<p>虽然但是，回到解谜游戏本体，我们似乎发现从drawers里拿走钥匙之后，再前往Mandiant offices，key上不但有新内容，我们还发现有新路可以走了，新路连到的work area似乎是一个无限大且方向延伸为6个的空间：</p>
+<pre><code>&gt; l key
+You BANKbEPxukZfP2EikF8jN04iqGJY0RjM3p++Rci2RiUFvS9RbjWYzbbJ3BSerzwGc9EZkKTvv1JbHOD6ldmehDxyJGa60UJXsKQwr9bU3WsyNkNsVd/XtN9/6kesgmswA5Hvroc2NGYa91gCVvlaYg4U8RiyigMCKj598yfTMc1/koEDpZUhl9Dy4ZhxUUFHbiYRXFARiYNSiqJAEYNB0r93nsAQPNogNrqg23OYd3RPp4THd8G6vkJUXltRgXv7px2CWdOHuxKBVq6EduMFSKpnNB7jAKojNf1oGECrtR5pHdG1LhtTtH6lFE7IVTEKOHD+TMO1VUh0Bpa37WhIAKEwpuyp5+Tspyh0GidHtYcNWfzLNBXymmrhzvta2nJ+FtI6KWXgAAMJdUCy6YrGbWFoR2ChpeWlZLf7cQ1Awh27y6hOV19R6IKOpQzCOQLNjUplm4SOltwRU0pH6BYCeoYXbyRl3kk92uXoBsBXwxdo9QoLBOAdJmKnN95VBT03a+jS3ku3YLwXR29GIlsCfdkVKr4J1d/Xal//e+Bqq1xMEucIdnNSwr4hlOtdpLrPyfnCVkBcadlRC6hGitbptCknTCUniXCCOE1NkWSVi3v5VrXkPGAvw/iRu7F2BimC+o3tIdWPpxkcfks6zVQSiFJjVzrt28+QUb28+YRaCkPhfZALYKQLU3DR5YJw64sL40tykTI68evyRF/Fnp4VTNlWQHXPJ+Y6yCHZnrb8NdIRDPfm1wxOQJbdeaEZSa3AgqI2wW0pPBnf69vVAq4qjxyrI1LPL9hzd7cBfqnohjyDy/t78TZOh0hX++W6zkMl0Ez6I2CHxop3vzg1/9iQig0WAglmdqiAhKbDFSM7kGPf5Reyphx27uzxHAllP7LrX1vF7o9v4vcCrHE7dJpuisSWhsx3rtJsBA15mdMAbuj1ErOpWLMbXCYfhpSj6GLOHOU/PqeDoktZs9BLS+V11PcxaVVwHBGfCimMe61mSFD0hhYJXgTxbwKDvIS...
+----------
+&gt; n
+...
+You go north
+The key emanates some warmth...
+the Mandiant offices
+This is where the magic happens. To the west, open work areas, cubicles, offices, and adjustable desks stretch out and intersect in a dazzling maze as far as the eye can see.  
+
+Exits: North South East 
+</code></pre>
+<p>但是这个key到底是用来开啥的尚且未知，我们拿着钥匙稍微走走，会发现部分操作会使得钥匙变热并且让密文部分解密，部分输出<code>Hmm...</code>并导致解密停止。</p>
+<pre><code>&gt; n
+You go north
+The key emanates some warmth...
+the northeast hallway
+This hallway links the snack/lunch area with the IT access junction.  
+
+Exits: South East 
+
+&gt; l key
+You can start to zXykaHk29xWQzs7kNrmhu4oN0TsxM7iyJ4tmttuCijPJ2G0VA3xCFLvUnmYb/P3Ae+sO/wdNm1OpZX5AltsADOBqgr2uErcM9BeKqlOCmfH2SPfDXoZN7p5PoZe9RPv0reF1C6Rse23MtetFeffgvPztw/ZRnxIiAg9jKhL8……
+</code></pre>
+<p>思来想去，应该是要让钥匙全程红温才能把这一大串密文解密完成。问题来了，我们该怎么走才能让钥匙全程热乎呢？</p>
+<p>一种方法当然是暴力走无数遍，直觉来看，表层肯定是顺时针或者逆时针把整个有限部分转一遍（测试是从大厅开始顺时针，然后宿舍先女后男），然后再去无限房摸路，但是那样未免也太耗时间（参考<a target="_blank" rel="noopener" href="https://thomasw.dev/post/flareon-2017-7-zsud/">Thomas佬的题解</a>，他的暴力代码整整走了一个钟头）。</p>
+<p>另外一种就是直接通过IDA的东西提取dll，然后从里面找寻路的办法。我们先从CE里头看上面提到的dll的函数包含：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn4%5Dzsud_pic5.png"></p>
+<p>再从IDA里头找到对应的MZ头：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn4%5Dzsud_pic6.png"></p>
+<p>然后把所有看着挺像的东西dump出来塞进DNSpy里：</p>
+<pre><code>private static string Decrypt2(byte[] cipherText, string key)
+&#123;
+    byte[] bytes = Encoding.UTF8.GetBytes(key);
+    byte[] array = new byte[16];
+    byte[] iv = array;
+    string result = null;
+    using (RijndaelManaged rijndaelManaged = new RijndaelManaged())
+    &#123;
+        rijndaelManaged.Key = bytes;
+        rijndaelManaged.IV = iv;
+        ICryptoTransform transform = rijndaelManaged.CreateDecryptor(rijndaelManaged.Key, rijndaelManaged.IV);
+        using (MemoryStream memoryStream = new MemoryStream(cipherText))
+        &#123;
+            using (CryptoStream cryptoStream = new CryptoStream(memoryStream, transform, CryptoStreamMode.Read))
+            &#123;
+                using (StreamReader streamReader = new StreamReader(cryptoStream))
+                &#123;
+                    result = streamReader.ReadToEnd();
+                &#125;
+            &#125;
+        &#125;
+    &#125;
+    return result;
+
+public static int Smth(string arg)
+&#123;
+    using (PowerShell powerShell = PowerShell.Create())
+    &#123;
+        try
+        &#123;
+            byte[] cipherText = Convert.FromBase64String(arg);
+            string script = four.Decrypt2(cipherText, &quot;soooooo_sorry_zis_is_not_ze_flag&quot;);
+            powerShell.AddScript(script);
+            Collection&lt;PSObject&gt; collection = powerShell.Invoke();
+            foreach (PSObject value in collection)
+            &#123;
+                Console.WriteLine(value);
+            &#125;
+        &#125;
+        catch (Exception ex)
+        &#123;
+            Console.WriteLine(&quot;Exception received&quot;);
+        &#125;
+    &#125;
+    return 0;
+&#125;
+</code></pre>
+<p>虽然知道我们的钥匙经历了AES加密，Key是<code>soooooo_sorry_zis_is_not_ze_flag</code>，但IV未知（八成是输入的路线转换成的东西）。这时候，从CE看运行时内存，我们又会发现一些对其它指令的解码，且基本以function打头（如下是字节码放进赛博厨子烤的结果）：</p>
+<pre><code>   function Invoke-MoveDirection($char, $room, $direction, $trailing) &#123;
+    $nextroom = $null
+    $movetext = &quot;You can&#39;t go $direction.&quot;
+    $statechange_tristate = $null
+
+    $nextroom = Get-RoomAdjoining $room $direction
+    if ($nextroom -ne $null) &#123;
+        $key = Get-ThingByKeyword $char &#39;key&#39;
+        if (($key -ne $null) -and ($script:okaystopnow -eq $false)) &#123;
+            $dir_short = ([String]$direction[0]).ToLower()
+
+            $&#123;N&#125; = $&#123;sC`Ri`Pt:MS`VcRt&#125;::(&quot;&#123;1&#125;&#123;0&#125;&quot; -f&#39;nd&#39;,&#39;ra&#39;).Invoke()
+</code></pre>
+<p>这不就是我们在程序控制台里看到的东西吗？在这里，我们可以看到key的初定义，看到各种输出，甚至是——不对，上面那个不就是行动轮的代码吗？顺藤摸瓜找到全局变量direction的定义：</p>
+<pre><code>$directions = @(&#39;n&#39;, &#39;north&#39;, &#39;s&#39;, &#39;south&#39;, &#39;e&#39;, &#39;east&#39;, &#39;w&#39;, &#39;west&#39;, &#39;u&#39;, &#39;up&#39;, &#39;d&#39;, &#39;down&#39;)
+$directions_short = @&#123;&#39;n&#39; = &#39;north&#39;; &#39;s&#39; = &#39;south&#39;; &#39;e&#39; = &#39;east&#39;; &#39;w&#39; = &#39;west&#39;; &#39;u&#39; = &#39;up&#39;; &#39;d&#39; = &#39;down&#39;&#125;
+$directions_enum = @&#123;&#39;n&#39; = 0; &#39;s&#39; = 1; &#39;e&#39; = 2; &#39;w&#39; = 3; &#39;u&#39; = 4; &#39;d&#39; = 5&#125;
+$prepositions = @&#123;&#39;north&#39; = &#39;north of&#39;; &#39;south&#39; = &#39;south of&#39;; &#39;east&#39; = &#39;east of&#39;; &#39;west&#39; = &#39;west of&#39;; &#39;uu&#39; = &#39;above&#39;; &#39;down&#39; = &#39;below&#39;&#125;
+</code></pre>
+<p>很好，我们现在只需要在程序的静态资源里头找到一串只有0~5的序列就行了。dword列表一翻，很快的找，然后简单转换一下变成路线：</p>
+<pre><code>way = &#39;30022111023022333540540540140240123540123123123123540&#39;
+dir = &#39;nsewud&#39;
+oput = &quot;&quot;
+for i in way:
+    oput += dir[ord(i) - 48]
+print(oput)
+</code></pre>
+<p>按照路线走就会传送回大门，然后你的key变成了这样：</p>
+<pre><code>&gt; l key
+You can start to make out some words but you need to follow the RIGHT_PATH!@66696e646b6576696e6d616e6469610d0a // findkevinmandia
+</code></pre>
+<p>好，这就去找Kevin。不过在此之前，这里还有一个函数——</p>
+<pre><code>function Invoke-Say($char, $room, $trailing) &#123;
+    $resp = &quot;It doesn&#39;t talk back&quot;
+
+    $ar = $trailing.Split()
+    if ($ar.Length -lt 2) &#123;
+        return &quot;Syntax: say &lt;someone&gt; &lt;words...&gt;&quot;
+    &#125;
+
+    $to_whom = $ar[0]
+    $words = $ar[1..99999]
+
+    $thing = Get-ThingByKeyword $room $to_whom
+    if ($thing.Name -eq &quot;Kevin Mandia&quot;) &#123;
+        $resp = &quot;Kevin says a friendly &#39;hello&#39; and then looks back down at his computer. He&#39;s busy turbo-hacking.&quot;
+
+        $key = Get-ThingByKeyword $room &#39;key&#39;
+
+        $helmet = $null
+        foreach ($thing in $char.Wearing) &#123;
+            if ($thing.Keywords -contains &quot;helmet&quot;) &#123;
+                $helmet = $thing
+            &#125;
+        &#125;
+
+        if (($key -ne $null) -and ($helmet -ne $null)) &#123;
+            $md5 = New-Object System.Security.Cryptography.MD5CryptoServiceProvider
+            $utf8 = New-Object System.Text.UTF8Encoding
+            $hash = [System.BitConverter]::ToString($md5.ComputeHash($utf8.GetBytes($key.Desc)))
+
+
+            $Data = [System.Convert]::FromBase64String(&quot;EQ/Mv3f/1XzW4FO8N55+DIOkeWuM70Bzln7Knumospan&quot;)
+            $Key = [System.Text.Encoding]::ASCII.GetBytes($hash)
+
+            # Adapated from the gist by harmj0y et al
+            $R=&#123;$D,$K=$Args;$H=$I=$J=0;$S=0..255;0..255|%&#123;$J=($J+$S[$_]+$K[$_%$K.Length])%256;$S[$_],$S[$J]=$S[$J],$S[$_]&#125;;$D|%&#123;$I=($I+1)%256;$H=($H+$S[$I])%256;$S[$I],$S[$H]=$S[$H],$S[$I];$_-bxor$S[($S[$I]+$S[$H])%256]&#125;&#125;
+            $x = (&amp; $r $data $key | ForEach-Object &#123; &quot;&#123;0:X2&#125;&quot; -f $_ &#125;) -join &#39; &#39;
+            $resp = &quot;`nKevin says, with a nod and a wink: &#39;$x&#39;.&quot;
+            $resp += &quot;`n`nBet you didn&#39;t know he could speak hexadecimal! :-)&quot;
+        &#125;
+    &#125;
+
+    return $resp
+&#125;
+</code></pre>
+<p>看样子我们得在完成一系列步骤后去老板办公室把头盔带上，再把key撇了。于是我们照做试试看：</p>
+<pre><code>&gt; get helmet
+You get A football helmet.
+
+&gt; wear helmet
+You put the helmet on your head. It looks objectively awesome.
+
+&gt; drop key
+You drop a key
+
+&gt; say kevin hi
+
+Kevin says, with a nod and a wink: &#39;6D 75 64 64 31 6E 67 5F 62 79 5F 79 30 75 72 35 33 6C 70 68 40 66 6C 61 72 65 2D 6F 6E 2E 63 6F 6D&#39;.
+
+Bet you didn&#39;t know he could speak hexadecimal! :-)
+</code></pre>
+<p>flag到手！</p>
+<blockquote>
+<p>flag{<a href="mailto:&#x6d;&#117;&#x64;&#x64;&#49;&#110;&#103;&#95;&#x62;&#121;&#x5f;&#x79;&#x30;&#x75;&#x72;&#x35;&#51;&#x6c;&#112;&#x68;&#64;&#x66;&#108;&#x61;&#x72;&#x65;&#45;&#111;&#x6e;&#46;&#99;&#x6f;&#x6d;">&#x6d;&#117;&#x64;&#x64;&#49;&#110;&#103;&#95;&#x62;&#121;&#x5f;&#x79;&#x30;&#x75;&#x72;&#x35;&#51;&#x6c;&#112;&#x68;&#64;&#x66;&#108;&#x61;&#x72;&#x65;&#45;&#111;&#x6e;&#46;&#99;&#x6f;&#x6d;</a>}</p>
+</blockquote>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="2024/03/29/FlareOn4%E5%81%9A%E9%A2%98%E5%90%88%E9%9B%86/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
+    <article id="post-从2023-XCTF-finals的一道逆向题目来看pythonC程序的拆包" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="2024/03/29/%E4%BB%8E2023-XCTF-finals%E7%9A%84%E4%B8%80%E9%81%93%E9%80%86%E5%90%91%E9%A2%98%E7%9B%AE%E6%9D%A5%E7%9C%8BpythonC%E7%A8%8B%E5%BA%8F%E7%9A%84%E6%8B%86%E5%8C%85/">从2023 XCTF finals的一道逆向题目来看pythonC程序的拆包</a>
+    </h1>
+  
+
+        
+        <a href="2024/03/29/%E4%BB%8E2023-XCTF-finals%E7%9A%84%E4%B8%80%E9%81%93%E9%80%86%E5%90%91%E9%A2%98%E7%9B%AE%E6%9D%A5%E7%9C%8BpythonC%E7%A8%8B%E5%BA%8F%E7%9A%84%E6%8B%86%E5%8C%85/" class="archive-article-date">
+  	<time datetime="2024-03-29T12:30:10.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-03-29</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <blockquote>
+<p>题目为XCTF2023的“我不是病毒2.0”</p>
+</blockquote>
+<p>die查看，发现是个拟态C++，实际上是个python3.10程序，万幸它没用3.11，遂直接用pyinstxtractor和pycdc跟它爆了。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BXctf%5DIm_not_virus_pic1.png"></p>
+<p>具体怎么爆可以看<a target="_blank" rel="noopener" href="https://www.fortinet.com/blog/threat-research/unpacking-python-executables-windows-linux">fortinet上的教程</a>、一篇<a target="_blank" rel="noopener" href="https://0xec.blogspot.com/2017/02/extracting-encrypted-pyinstaller.html">有关解码加密pyc的文章</a>，以及<a target="_blank" rel="noopener" href="https://sakura520.life/post/8be8.html">Redamancy的博客</a>。第一步肯定还是尝试使用pyinstxtractor拆解exe文件，但当你拆解完成之后，你会发现主函数对一个 意⭐义⭐不⭐明 的pyc进行调用：</p>
+<pre><code>import sign
+sign.main()
+</code></pre>
+<p>这意味着源代码其实是在解压出的pyc包中的这个自定义pyc模块：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BXctf%5DIm_not_virus_pic2.png"></p>
+<p>但是怎么解码呢？我们得先明白，这个python程序是如何打包的，以及为什么会出现这样的加密数据：</p>
+<h3 id="python程序的打包"><a href="#python程序的打包" class="headerlink" title="python程序的打包"></a>python程序的打包</h3><p>（资料参考<a target="_blank" rel="noopener" href="https://blog.csdn.net/qq_33934427/article/details/129152909">王小希ww 的博客</a>和<a target="_blank" rel="noopener" href="https://www.cnblogs.com/weilaiqinkong/p/17240065.html">琴声悠悠-悠悠琴声 的博客</a>）</p>
+<p>目前python程序的打包方式主要是通过PyInstaller或setupTools来实现的。前者是将python文件及其调用模块打包成一个可执行文件（exe&#x2F;elf），后者则是将其作为python用的软件包打包，并发布到PyPI或者其它软件包管理器中，作为其它python程序的调用库被下载和使用。当然，你也可以选择直接拷贝一份你的运行环境并写一个启动程序，不过，这种方法的稳定性、高效性和安全性就取决于你的代码能力和肝度了（笑</p>
+<p>关于pyinstaller打包命令参数如下：</p>
+<blockquote>
+<p>-w 表示希望在生成的.exe程序运行过程中，不要出现cmd黑框，一般用于打包GUI界面</p>
+<p>-F：表示希望将所有的程序全部打包在一起，生成的只有一个.exe文件，这样的文件集成度高，但是运行速度慢<br>（如果不写-F，生成的还有一堆.dll文件，这样的程序里文件很多，但是运行速度比较快）</p>
+<p>-D：生成一个文件目录包含可执行文件和相关动态链接库和资源文件等<br>（对于打包结果较大的项目，选用-d生成目录相比单可执行文件的打包方式，执行速度更快，但包含更加多的文件）</p>
+<p>-p：自定义需要加载的类的路径</p>
+<p>-i：自己做的软件可以放上自己的图标，分享一个网站，可以把其他格式图片转成ico格式</p>
+</blockquote>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BXctf%5DIm_not_virus_pic3.png"></p>
+<p>需要注意的是，被打包的python文件在import某个包内的其它模块的时候，需要添加调用包的根目录名，或者将被调用模块的根目录打包成一个新包，否则会因为找不到调用模块而报错。</p>
+<p>而我们看到的这一个程序，明显是-F指令生成的集成程序。至于为什么使用pyinstxtractor解包后看到的调用包是一堆encrypted的包，是因为pyinstaller还可以使用特定的key参数对代码进行AES加密，比方说：</p>
+<pre><code>pyinstaller --key 123 demo.py
+</code></pre>
+<p>但实际上，这个加密有个致命的弱点，那就是存放key的<code>pyimod00_crypto_key</code>，以及入口函数<code>main.py</code>并没有加密。这样，我们的目标库和加密key简直就是开盖即食。于是先用pycdc反编译一下key，然后用代码解pyc加密的同时加上一下文件头，最后用pycdc处理一手：</p>
+<pre><code>import tinyaes
+import zlib
+CRYPT_BLOCK_SIZE = 16
+# 从pyimod00_crypto_key里把key拽出来
+key = bytes(&#39;HelloHiHowAreYou&#39;, &#39;utf-8&#39;)
+inf = open(&#39;./PYZ-00.pyz_extracted/sign.pyc.encrypted&#39;, &#39;rb&#39;) # encrypted file input
+outf = open(&#39;sign.pyc&#39;, &#39;wb&#39;) # output file
+# 代码块就这么长，能AES的不多，先初始化一手
+iv = inf.read(CRYPT_BLOCK_SIZE)
+cipher = tinyaes.AES(key, iv)
+# 解码并解压
+plaintext = zlib.decompress(cipher.CTR_xcrypt_buffer(inf.read()))
+# 写入pyc文件头
+outf.write(b&#39;\x6f\x0d\x0d\x0a\0\0\0\0\0\0\0\0\0\0\0\0&#39;)
+# 写入解码过的pyc
+outf.write(plaintext)
+
+inf.close()
+outf.close()
+</code></pre>
+<p>最后爆出来这一坨：</p>
+<pre><code>import hashlib as 沈阳
+import base64 as 杭州
+import ctypes as 蚌埠
+
+def main():
+    蚌埠.windll.kernel32.VirtualAlloc.restype = 蚌埠.c_void_p
+    福建 = input(&#39;您的输入：&#39;)
+    天津 = &#39;9K98jTmDKCXlg9E2kepX4nAi8H0DB57IU57ybV37xjrw2zutw+KnxkoYur3IZzi2ep5tDC6jimCJ7fDpgQ5F3fJu4wHA0LVq9FALbjXN6nMy57KrU8DEloh+Cji3ED3eEl5YWAyb8ktBoyoOkL1c9ASWUPBniHmD7RSqWcNkykt/USjhft9+aV930Jl5VjD6qcXyZTfjnY5MH3u22O9NBEXLj3Y9N5VjEgF2cFJ+Tq7jj92iIlEkNvx8Jl+eH5/hipsonKLTnoLGXs4a0tTQX/uXQOTMBbtd70x04w1Pa0fp+vA9tCw+DXvXj0xmX8c5HMybhpPrwQYDonx7xtS+vRIj/OmU7GxkHOOqYdsGmGdTjTAUEBvZtinOxuR7mZ0r9k+c9da0W93TWm5+2LKNR6OJjmILaJn0lq4foYcfD5+JITDsOD6Vg01yLRG1B4A6OxJ7Rr/DBUabSu2fYf1c4sTFvWgfMV8il6QfJiNMGkVLey1cBPSobenMo+TQC1Ql0//9M4P01sOiwuuVKLvTyDEv6dKO//muVL9S2gq/aZUBWkjj/I5rUJ6Mlt4+jsngmuke9plAjw22fUgz+8uSzn40dhKXfBX/BOCnlwWsMGAefAfoz/XAsoVSG2ioLFmlcYe/WBgaUJEoRUSyv73yiEOTVwIK6EPnDlwRgZZHx2toLu8udpEZ0aKGkex5sn7P8Jf9AbD4/EiQU+FdoJSxGorPSZGvrc4=&#39;
+    北京 = 沈阳.md5(&#39;云南&#39;.encode(&#39;utf-8&#39;)).hexdigest()
+    重庆 = 杭州.b64decode(天津)
+    河南 = b&#39;&#39;
+    北京_len = len(北京)
+    广州 = list(range(256))
+    j = 0
+    for i in range(256):
+        j = (j + 广州[i] + ord(北京[i % 北京_len])) % 256
+        广州[i] = 广州[j]
+        广州[j] = 广州[i]
+    山东 = 陕西 = 0
+    for 河北 in 重庆:
+        山东 = (山东 + 1) % 256
+        陕西 = (陕西 + 广州[山东]) % 256
+        广州[山东] = 广州[陕西]
+        广州[陕西] = 广州[山东]
+        河南 += bytes([
+            河北 ^ 广州[(广州[山东] + 广州[陕西]) % 256]])
+    四川 = 蚌埠.create_string_buffer(福建.encode())
+    黑龙江 = 蚌埠.windll.kernel32.VirtualAlloc(蚌埠.c_int(0), 蚌埠.c_int(len(河南)), 蚌埠.c_int(12288), 蚌埠.c_int(64))
+    蚌埠.windll.kernel32.RtlMoveMemory(蚌埠.c_void_p(黑龙江), (蚌埠.c_ubyte * len(河南)).from_buffer(bytearray(河南)), 蚌埠.c_size_t(len(河南)))
+    辽宁 = 蚌埠.windll.kernel32.CreateThread(蚌埠.c_int(0), 蚌埠.c_int(0), 蚌埠.c_void_p(黑龙江), 蚌埠.byref(四川), 蚌埠.c_int(0), 蚌埠.pointer(蚌埠.c_int(0)))
+    蚌埠.windll.kernel32.WaitForSingleObject(蚌埠.c_int(辽宁), 蚌埠.c_int(-1))
+    if 四川.raw == b&#39;\xdb\x1b\x00Dy\\C\xcc\x90_\xca.\xb0\xb7m\xab\x11\x9b^h\x90\x1bl\x19\x01\x0c\xeduP6\x0c0\x7f\xc5E-L\xb0\xfb\xba\xf6\x9f\x00&#39;:
+        print(&#39;是的！你得到了！&#39;)
+        return None
+    None(&#39;不，再尝试更多。 （笑脸符号）&#39;)
+
+if __name__ == &#39;__main__&#39;:
+    main()
+    return None
+</code></pre>
+<p>虽然加了一堆的中文混淆，但是，基本逻辑还是比较清晰的。不过有个坏消息，这又是一道密码题，它先以“云南”为key生成S盒，然后直接跑一个浅显的RC4（详情请见<a target="_blank" rel="noopener" href="https://blog.csdn.net/u011377996/article/details/85221508">0verWatch 的博客</a>），把一份shellcode解密完再开一个子进程运行。虽然初见看的我两眼一黑，但我有wp（</p>
+<p>我们先直接进行一个RC4的解：</p>
+<pre><code>from Crypto.Cipher import ARC4
+import hashlib
+import base64
+
+天津 = b&#39;9K98jTmDKC...
+北京 = hashlib.md5(&#39;云南&#39;.encode(&#39;utf-8&#39;)).hexdigest()
+北京 = bytes(北京.encode(&#39;utf-8&#39;))
+重庆 = base64.b64decode(天津)
+天津 = ARC4.new(北京)
+output = 天津.decrypt(bytes(重庆))
+print(list(output))
+</code></pre>
+<p>然后得到的东西像原代码一样，我们之前也见过类似的东西，也就是数据层藏代码然后放到子进程运行，只不过这里是在python上调用的C库。但是接下来的事情直接用C就成，开个虚拟栈帧+子进程把shellcode弄出来（参考<a target="_blank" rel="noopener" href="https://su-team.cn/passages/2023-03-29-XCTFfinals/">SU战队的题解</a>）：</p>
+<pre><code>#include &lt;stdio.h&gt;
+#include &lt;Windows.h&gt;
+
+unsigned char shellcode[] = &#123;
+    81, 232, 0, 0, 0, 0...
+&#125;;
+
+int main() &#123;
+    PVOID p = VirtualAlloc(NULL, sizeof(shellcode), MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    memcpy(p, shellcode, sizeof(shellcode));
+    ((void(__stdcall*)())(p))();
+    return 0;
+&#125;
+</code></pre>
+<p>然后我们从ida里可以看到它本来的样子……的一部分。虽然你第一遍可能看不明白它为什么会高位截瘫，你甚至找不到一个return，还得自己补一个。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BXctf%5DIm_not_virus_pic4.png"></p>
+<p>但我们至少得让这里面的东西解出来再说。我们通过刚才强行凑函数的结果可以看到，这玩意其实在对后面那段shellcode进行解密，尤其是在动调一遍后，这一段尤其明显：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BXctf%5DIm_not_virus_pic5.png"><br><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BXctf%5DIm_not_virus_pic6.png"></p>
+<p>等下，这不是解密完了吗？我们直接create function然后f5进去看一眼：</p>
+<pre><code>_WORD *sub_1D0162()
+&#123;
+  _WORD *result; // rax
+  unsigned int v1; // [rsp-1Ch] [rbp-1Ch]
+  unsigned int v2; // [rsp-14h] [rbp-14h]
+  unsigned int v3; // [rsp-10h] [rbp-10h]
+  int i; // [rsp-Ch] [rbp-Ch]
+  __int64 v5; // [rsp-8h] [rbp-8h]
+
+  for ( i = 0; i &lt;= 20; ++i )
+  &#123;
+    v2 = 2029;
+    v3 = *(unsigned __int16 *)(2i64 * i + v5) % 0xD1EFu;
+    v1 = 1;
+    while ( v2 )
+    &#123;
+      if ( (v2 &amp; 1) != 0 )
+        v1 = v3 * v1 % 0xD1EF;
+      v3 = v3 * v3 % 0xD1EF;
+      v2 &gt;&gt;= 1;
+    &#125;
+    result = (_WORD *)(2i64 * i + v5);
+    *result = v1;
+  &#125;
+  return result;
+&#125;
+</code></pre>
+<p>好家伙，算法直接看完了。就是把数据两个两个提出来（因为是int16且i*2的提法）于是我们直接数据提出来，写脚本开爆：</p>
+<pre><code>·python part
+---------------
+output = []
+str1 = &#39;\xdb\x1b\x00D...
+for i in str1:
+    output.append(ord(i))
+print(output)
+
+·C++ part
+---------------
+#include &lt;iostream&gt;
+#define modnum 0xD1EFu
+using namespace std;
+
+unsigned char cipher[] = &#123;219, 27, 0, 68...
+
+int main()
+&#123;
+    for(unsigned int i=0;i&lt;=20;++i)&#123;
+        int laztag = 0;  // 爆出即停用标记 
+        unsigned int cip = (cipher[i*2] + (cipher[i*2+1]&lt;&lt;8)) % modnum;
+        for(unsigned int j=0;j&lt;127;j++)&#123;
+            for(unsigned int k=0;k&lt;127;k++)&#123;  // 暴力枚举每一个可能字符 
+                unsigned int key = 2029;
+                unsigned int guess = (j + (k&lt;&lt;8)) % modnum;
+                unsigned int v1 = 1;
+                while(key)&#123;  // 还原算法 
+                    if(key &amp; 1 != 0)
+                        v1 = guess * v1 % modnum;
+                    guess = guess * guess % modnum;
+                    key &gt;&gt;= 1;
+                &#125;
+                if(v1 == cip)&#123;  // 猜对了 
+                    printf(&quot;%c%c&quot;,j,k);
+                    laztag = 1;
+                    break;
+                &#125;
+            &#125;
+            if(laztag == 1)break; // 爆出即停，节约算力 
+        &#125;
+    &#125;
+&#125;
+</code></pre>
+<p>做个总结：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BXctf%5DIm_not_virus_pic7.png"></p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="2024/03/29/%E4%BB%8E2023-XCTF-finals%E7%9A%84%E4%B8%80%E9%81%93%E9%80%86%E5%90%91%E9%A2%98%E7%9B%AE%E6%9D%A5%E7%9C%8BpythonC%E7%A8%8B%E5%BA%8F%E7%9A%84%E6%8B%86%E5%8C%85/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
     <article id="post-深入理解计算机系统学习笔记-第五篇（下）" class="article article-type-post  article-index" itemscope itemprop="blogPost">
   <div class="article-inner">
     
@@ -1884,621 +2771,6 @@ else&#123;
 
 
   
-    <article id="post-深入理解计算机系统学习笔记-第五篇（上）" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="2023/06/04/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%BA%94%E7%AF%87%EF%BC%88%E4%B8%8A%EF%BC%89/">深入理解计算机系统学习笔记-第五篇（上）</a>
-    </h1>
-  
-
-        
-        <a href="2023/06/04/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%BA%94%E7%AF%87%EF%BC%88%E4%B8%8A%EF%BC%89/" class="archive-article-date">
-  	<time datetime="2023-06-04T07:36:56.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-06-04</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h3 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h3><p>关于我上一篇完篇之后就开始疯狂ISCC，然后休息的时候打野炊和王泪，结果在各种不同电子yw之间反复摩擦这件事情.pdf</p>
-<p>关于小娜，别提了，她最近跑程序跑得很过载，估计连游戏都懒得打了。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%BA%94%E7%AF%87%E4%B8%8A-1.png"></p>
-<p>也罢，到时候给她做个全面检查。</p>
-<p>至于在程序的汇编表示之后，我们该探究些什么，想一想，直接扯硬件对于软工和逆向有点不大实际，谈网络又不可避免要请鲍师傅来扯Web Assembly，那只能是继续程序方面的内容了。</p>
-<p>所以这一期，前有巨量文本，敬请留意——</p>
-<h2 id="来谈谈异常控制流"><a href="#来谈谈异常控制流" class="headerlink" title="来谈谈异常控制流"></a>来谈谈异常控制流</h2><p>什么是异常控制流？从程序逆向来说，你可以试试对一个加了<strong>反调试</strong>的程序的main函数，或者是程序的起始点下断，然后单步步过，正常来讲，它并不会像我们在上一篇文章中提到的那样正常进入运行阶段，而是一头创进进程检查，然后让你的程序exit或者让你的ida崩溃，这就是一种异常控制流。</p>
-<p>用专业一点的术语来讲，异常控制流是应对系统状态出现特殊情况而产生的控制流突变，这种特殊情况可能是一个附带多线程的程序的其中一个线程终止，也有可能是因为堆栈溢出导致整个程序崩溃，etc。</p>
-<h3 id="但是慢着，什么是控制流"><a href="#但是慢着，什么是控制流" class="headerlink" title="但是慢着，什么是控制流"></a>但是慢着，什么是控制流</h3><p>从处理器开始上电到断电的时间里，有一个叫做“<strong>程序计数器</strong>”的寄存器（<strong>PC</strong>，又名指令指针IP、指令地址寄存器IAR等），一直在处理你下一个要处理的汇编指令的地址。汇编指令的地址在同一进程上是一段连续的序列（在堆栈上被抽象为数组），而就算是不同进程，在执行时也是一串以连续序列为元素的链表，串联着父进程的调用点与子进程的首尾。</p>
-<p>假设整个地址序列为a，当前执行的指令的地址为a<sub>k</sub>，那么，每次从a<sub>k</sub>到a<sub>k+1</sub>的地址转移就被称为<strong>控制转移</strong>，而由一系列控制转移串联的如上序列则被称为控制流。</p>
-<p>但是，我们之前也学过jmp和各种逻辑跳转，控制转移在内存中，不可能每次都是从上一个地址到下一个地址的平顺变化，由跳转、调用等导致的这些跨内存地址的控制转移，被称为<strong>突变</strong>，很多突变是必要且通常的，比方说正常的jnz call等逻辑指令组合，但如果部分突变导致了系统状态变化，比方说你程序运行的半路，又想将外源的数据写入当前进程的内存，那么这种突变就成为了<strong>“异常控制流”</strong>。</p>
-<p>通常来讲，异常控制流包括如下部分：</p>
-<h3 id="异常"><a href="#异常" class="headerlink" title="异常"></a>异常</h3><p>和“异常控制流”的定义一样，顾名不思义。异常在严格定义上来讲，只是控制流中的“突变”，用于响应处理器状态的某些变化，而并没有严格意义上界定它对于程序运行影响的正负。</p>
-<p>系统中每种可能的异常都被分配了一个唯一的非负整数编号，即<strong>异常号</strong>，其中一部分由处理器设计者分配，另外一部分由操作系统内核设计者分配。这些编号组成一张<strong>异常表</strong>，这个表的起始地址存储在CPU的<strong>异常表基址寄存器</strong>中，在系统启动时由操作系统分配和初始化，异常号为异常表元素的索引，每个元素为每个异常的跳转地址，这就形成了异常号到异常的单射</p>
-<p>这样，当系统欲抛出异常时，系统会先通过函数去抛出异常号，再对照异常表转到对应的<strong>异常处理程序</strong>，可以理解为一个间接的函数调用，只是函数调用时入栈的返回地址取决于你调用指令的位置，而异常抛出则以<strong>当前指令</strong>（事件发生时正在执行的指令）或<strong>下一条指令</strong>（事件不发生，将会在当前指令执行之后执行的指令）为返回值，视异常类型而定。且额外还会将处理器的一些状态入栈，在处理程序返回时，重新开始被中断的程序会需要这些状态。</p>
-<p>上面这段话可能说的有点暧昧，别急，慢慢来。</p>
-<p>比方说我们想要写一个阳间一点的高精度加法，但是我们分别将调用程序和高精度加法程序封装在了不同的文件里，按照我们之前提到过的，我们调用高精度加法时会产生一个call，此时除了传入的参数，压入栈中的也只剩下被调用函数的返回地址，其对应着我们call指令的下一条指令，而非下一条要执行的指令的地址。这是一般的过程调用。</p>
-<p>可是，总有些CTF出题人想给你挖个坑，他们在你阳间的程序上加入了阴间的反调试，使得你在call的时候会进行一次进程检查，一旦发现你在用反编译程序进行进程调试就像上面说的那样，给你直接抛出异常中止运行，这时候，进程检查的返回值就是你进程栈上的下一条指令，而非你调用函数的返回值，倘若你真的没有用反编译器调试，这个返回指令就会和预先存储的处理器状态一同作用，使系统回到工作状态继续运行你的程序。这是一个异常作用的过程。</p>
-<p>简而言之，异常是系统在给自己干活，调用是系统给你干活。</p>
-<p>而关于内核和用户的交互部分，这里先不急着讲，下文再说，只需要知道我们平时执行程序用的都是用户层，而异常处理程序在内核层，因此<strong>拥有所有系统资源的访问权限</strong>就行了。</p>
-<h3 id="异常的类别"><a href="#异常的类别" class="headerlink" title="异常的类别"></a>异常的类别</h3><h4 id="中断（interrupt）"><a href="#中断（interrupt）" class="headerlink" title="中断（interrupt）"></a>中断（interrupt）</h4><p>中断是<strong>异步</strong>的，即动作的执行和异常的处理不同步，因为这里的系统动作来源于处理器外部的I&#x2F;O设备，而非CPU自身的指令。</p>
-<p>比方说你敲键盘就会产生一次中断，I&#x2F;O设备向CPU的<strong>中断引脚</strong>传输一次电信号，提高引脚电压，产生电压差，从而在这一次的输入指令执行完成后触发一次对系统总线上异常的读取，进而调用相对应的<strong>中断处理程序</strong>执行中断。中断完成后，就跳转到<strong>下一条指令</strong>继续运行，中断过程并没有影响这个程序的运行。</p>
-<p>而现在处理器的速度已经足够快，中断的处理也就在一瞬间，这就使得你在输入一长串文本，比方说写你那 * 中原粗口 * 的工程学老师留下的一堆报告时，并不会感觉到老式电脑，乃至于电子打字机（谁还用这玩意啊）那样的，中断带来的卡顿。</p>
-<h4 id="陷阱（trap）"><a href="#陷阱（trap）" class="headerlink" title="陷阱（trap）"></a>陷阱（trap）</h4><p>如果说中断是一种程序设定好的，随时发生异常，那“<strong>陷阱</strong>”就是受控发生的异常。陷阱最重要的用途是用户程序和内核之间提供一个像过程一样的接口，叫做<strong>系统调用</strong>。什么意思呢？</p>
-<blockquote>
-<p>内核态与用户态是操作系统的两种运行级别，当程序运行在3级特权级上时，就可以称之为运行在用户态。因为这是最低特权级，是普通的用户进程运行的特权级，大部分用户直接面对的程序都是运行在用户态；</p>
-<p>当程序运行在0级特权级上时，就可以称之为运行在内核态。</p>
-<p>运行在用户态下的程序不能直接访问操作系统内核数据结构和程序。当我们在系统中执行一个程序时，大部分时间是运行在用户态下的，在其需要操作系统帮助完成某些它没有权力和能力完成的工作时就会切换到内核态（比如操作硬件）。</p>
-<p>这两种状态的主要差别是：</p>
-<p>处于用户态执行时，进程所能访问的内存空间和对象受到限制，其所处于占有的处理器是可被抢占的<br>处于内核态执行时，则能访问所有的内存空间和对象，且所占有的处理器是不允许被抢占的。</p>
-<p>——摘自<a target="_blank" rel="noopener" href="https://blog.csdn.net/guorui_java/article/details/113827888">哪 吒 的文章</a></p>
-</blockquote>
-<p>系统从0到3划分了三个特权级，3级为最低，0级为最高。要实现从低到高的调用，系统只提供了异常和一些特殊的中断作为窗口，令用户态主动切换到内核态，进而干一些只有系统内核能干的事情，比方说超管权限。但是，内核态到用户态的变化则是系统控制的，通过设置设置程序状态字PSW来控制。</p>
-<p>当你在用户程序中向内核请求服务，处理器提供了一个叫 <strong>syscall</strong> 的指令，用于让你向系统内核请求服务，你使用某些形式使用了syscall，比方说C的 <strong>system</strong> 指令，以向系统内核请求去进行某些事项，比方说<code>/bin/sh</code>进行系统文件查找，那么，syscall指令就会将控制权转移到到对应的异常处理程序，即对应的<strong>陷阱处理程序</strong>，以调用适当的内核程序。调用完毕后，系统会交回控制权，处理程序返回到syscall之后的命令。这就完成了一次“陷阱”的处理。</p>
-<p>值得注意的是：</p>
-<blockquote>
-<p>系统调用的机制其核心还是使用了操作系统为用户特别开放的一个中断来实现，例如Linux的int 80h中断。</p>
-</blockquote>
-<p>这也就意味着，以系统调用为代表的陷阱异常，通常来说，其本质都是中断。但是，这对于程序逆向基本没什么影响，暂且按下不表。</p>
-<h4 id="故障（错误，fault）"><a href="#故障（错误，fault）" class="headerlink" title="故障（错误，fault）"></a>故障（错误，fault）</h4><p>上述的两个异常都是可以预测和控制的，但是<strong>故障</strong>和<strong>中止</strong>并不能被预测，两者都是发生<strong>错误</strong>而非中断，区别在于这个错误是否可修复。如果一条指令导致了故障的发生，那它会相应地将控制权移交给内核的故障处理程序，处理程序要么成功修复错误，返回当前用户层指令地址继续运行，要么修复不能，直接abort中止程序运行。</p>
-<p>比方说你在ida里单步步过动态调试的时候，因为你不小心把返回地址改大了，导致返回到了一些不该返回的语句，甚至是直接创到了符号表，那么就会发生一次故障，导致你的程序停转，这时候你还可以通过手动修改返回地址来补救，以再次继续运行，要是你不想修了，你也可以直接中止调试进程。这个时候，导致错误的是你动调patch过的返回指令，而故障处理程序是你自己。</p>
-<h4 id="中止（终止，abort）"><a href="#中止（终止，abort）" class="headerlink" title="中止（终止，abort）"></a>中止（终止，abort）</h4><p>通常是一些硬件问题导致的不可逆性错误，比方说你的RAM被日穿了，电容漏电，导致你写入的数据当场爆炸。详细的DRAM故障可以参考<a target="_blank" rel="noopener" href="https://blog.csdn.net/weixin_42238387/article/details/118446634">weixin_42238387的文章</a>，本文不做赘述。</p>
-<p>细心的逆向手可能会发现，这不就跟导致你ida当场爆炸的某些反调试函数一个功用吗？反调试有很多种，而且实际上，部分反调试就是利用调试器对异常的处理来进行对调试进程的破坏的。具体可以参考<a target="_blank" rel="noopener" href="https://nnnewb.github.io/blog/p/learning-packer-06/">weakptr大佬的文章</a>。</p>
-<h3 id="进程"><a href="#进程" class="headerlink" title="进程"></a>进程</h3><p>从概念上讲，进程最普适的概念就是把进程对应一个程序的正在运行的实例，文件和实例的关系可以抽象地理解为放在存储空间上的原本和跑在内存上的副本的关系。</p>
-<p>至于进程具体的实现细节，可以参考<a target="_blank" rel="noopener" href="https://cloud.tencent.com/developer/article/1434830">这篇文章</a>。</p>
-<p>进程带来的程序运行层面的两个抽象，也就是逻辑控制流和私有地址空间。这两个抽象导致了两个假象，即你的程序看似在独占地使用处理器和内存系统。关于独立使用内存这一点，在第一篇的虚拟内存那块也提到过。</p>
-<h4 id="逻辑控制流"><a href="#逻辑控制流" class="headerlink" title="逻辑控制流"></a>逻辑控制流</h4><p>众所周知，程序中下一条指令的值只会在执行到当前指令之后才会复制到PC中，需要的时候总是被算出来的。你在ida或者ghidra之类的反汇编软件中能直观地看到指令的PC值（前提是出题人没有丧心病狂地开PIE），这些PC值唯一对应于包含在程序的可执行目标文件中的指令。而这一连串的PC值构成的序列，就是<strong>逻辑控制流</strong>。在处理器的单个核心内，一个既定的物理控制流——你可以抽象地把它看作一个时间轴，这个物理控制流被多个进程分成了对应的多个逻辑控制流，也就是在一条既定的时间轴上安排进程的运行与否。</p>
-<p>这也意味着每个进程占用处理器的时间轴区间是互不相交的，比方说你在使用word打字的时候，你想要用QQ回复一句消息，然后再回来打字，那么在处理器内核上，word的进程开始运行到你使用QQ，然后QQ的进程运行到你回完消息，接着，word的进程又占领控制权直到你把字码完。不难发现，整个过程中，不同进程在自己所排布的时间轴上，<strong>轮流</strong>使用处理器内核。</p>
-<p>一个逻辑流的执行在时间上与另一个流重叠，称为<strong>并发流</strong>。进程在处理器内核的使用上互不影响，在逻辑控制流上是互不相交的，但这不影响它们的整个流程，包括轮换时的中断，在时间轴上重叠，即逻辑控制流的重叠。还是上面的例子，你可以理解为逻辑控制流是割裂的，因为它确实导致了程序轮流占用处理器；但你也可以理解为它们是交叠的，因为QQ进程在占用与否上，其时间轴是被包含在word进程的时间轴内的。</p>
-<p>这种多个流存在同时执行的时间区间的情况也就是所谓<strong>并发</strong>。区别于<strong>“并行”</strong>的概念，并发是排列于同一物理控制流上的进程的交替运行，在空间上统一；而并行是多个进程同时进行，在时间上同步。</p>
-<p>对于并发的解释，还有<strong>多任务</strong>，也就是<strong>时间分片</strong>的概念，多任务简单来讲就是一堆进程轮流运行，每个进程执行它的控制流的一部分的每一时间段叫做 <strong>时间片</strong>。这与我们之前提到过的时间轴的思想不谋而合。</p>
-<p>所以，在整个控制流上，每个进程轮流占用处理器内核，营造出一种整个处理器上只有你当前运行的进程，或者说你眼前的程序在好好运行的假象。</p>
-<h4 id="私有地址空间"><a href="#私有地址空间" class="headerlink" title="私有地址空间"></a>私有地址空间</h4><p>顾名思义，进程在内存空间上是独立存在，且在一般情况下，某一进程无法被除自身外的其它进程读和写（也总有些例外情况，比方说windows的getThreadId）。具体而言，进程不但独占内存空间，将其与其它并行的进程隔离开来，每一个进程还有其独立的<strong>地址空间</strong>。</p>
-<p>在同一系统架构的同一语言下，这个地址空间的构造几乎完全一致，所以出现相同的地址也很正常，比方说你linux的elf就是默认以0x400000作为代码段的起始地址，再往上，从上到下就是第一篇提到过的各种头啊表啊之类的，然后就是你的堆栈。</p>
-<p>具体而言：</p>
-<blockquote>
-<p>Linux的虚拟地址空间范围为0～4G，Linux内核将这4G字节的空间分为两部分，将最高的1G字节（从虚拟地址0xC0000000到0xFFFFFFFF）供内核使用，称为“内核空间”。而将较低的3G字节（从虚拟地址0x00000000到0xBFFFFFFF）供各个进程使用，称为“用户空间。因为每个进程可以通过系统调用进入内核，因此，Linux内核由系统内的所有进程共享。于是，从具体进程的角度来看，每个进程可以拥有4G字节的虚拟空间。</p>
-<p>Linux使用两级保护机制：0级供内核使用，3级供用户程序使用，每个进程有各自的私有用户空间（0～3G），这个空间对系统中的其他进程是不可见的，最高的1GB字节虚拟内核空间则为所有进程以及内核所共享。</p>
-<p>通常32位Linux内核地址空间划分0<del>3G为用户空间，3</del>4G为内核空间</p>
-<p>——摘自<a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/26857760">张胜飞的文章</a></p>
-</blockquote>
-<p>所以，在linux系统中，内核虚拟内存和用户区域分离的架构，使得进程在表面上是相互独立，在表现上是独占内存空间的，但实际上，所有的进程都由内核直辖，也就更方便内核与进程的交互和对进程的控制。</p>
-<p>这种空间上的分离是通过<strong>模式位</strong>来实现的。通常情况下，模式位不设置，进程用户模式下，无法进行内核操作，比如停止处理器等，只能通过异常或系统接口的方式来间接调用内核指令和信息。但设置了模式位（最直观的就是kali的sudo等超管权限）的进程运行在内核模式，这时进程才能任意执行指令。</p>
-<p>但也不一定，在linux的系统里有个叫<code>/proc</code>的文件夹，里头存放着内核相关的数据结构，其中的信息能被用户层直接读取，也就意味着，进程可以反过来读取你的内核甚至硬件相关信息。</p>
-<h4 id="上下文"><a href="#上下文" class="headerlink" title="上下文"></a>上下文</h4><p>由上述内容可知，进程之间难以相互读取和操作，也就只能由内核层面的某种机制，控制它们对内核的占用状态，以方便逻辑控制流的实现和进程状态的恢复。这种时候，就需要上下文出手了。</p>
-<blockquote>
-<p>系统的两种不同运行状态，才有了上下文的概念。用户空间的应用程序，如果想请求系统服务，比如操作某个物理设备，映射设备的地址到用户空间，必须通过系统调用来实现。（系统调用是操作系统提供给用户空间的接口函数）。</p>
-<p>通过系统调用，用户空间的应用程序就会进入内核空间，由内核代表该进程运行于内核空间，这就涉及到上下文的切换，用户空间和内核空间具有不同的 地址映射，通用或专用的寄存器组，而用户空间的进程要传递很多变量、参数给内核，内核也要保存用户进程的一些寄存器、变量等，以便系统调用结束后回到用户空间继续执行。</p>
-<p>——摘自<a target="_blank" rel="noopener" href="https://bbs.huaweicloud.com/blogs/342455">嵌入式与Linux那些事 的文章</a></p>
-</blockquote>
-<p>内核为每一个进程维持一个<strong>上下文</strong>，即重启一个被抢占进程所需的状态。具体而言，上下文包括一个进程的通用目的寄存器、浮点寄存器、程序计数器、用户栈、状态寄存器、内核栈和各种内核数据结构（描述地址空间的页表、包含当前进程信息的进程表、包含进程已打开文件的信息表）等。</p>
-<p>在进程执行的时候，内核可以决定让某个之前进行到一半被抢占的进程横插一刀，重新启动，这就叫<strong>调度</strong>，调度的过程由内核中叫<strong>调度器</strong>的代码处理。每当进行调度时，都会触发一次<strong>上下文切换</strong>，即：</p>
-<p>1、保存当前进程的上下文<br>2、恢复某个先前被抢占的进程被保存的上下文<br>3、将控制传递给这个新恢复的进程</p>
-<p>相当于你打游戏打到一半，你的导师突然让你改论文去，然后你无奈给游戏存了档，这是第一步；接着无奈地打开了你的word，把你之前那篇看上去还不错的论文给拿出来，这是第二步；然后被导师的要求摁着手去把论文改了，这是第三步。两个进程分别是游戏和写论文，导师是调度器，你是负责调度和处理的内核（悲）</p>
-<p>上下文分为进程上下文和中断上下文等，进程上下文如前文所述，以及，没错，中断也可以是一种上下文，因为在中断的过程中，确实因为被中断的进程需要保存一些环境，而产生了一些用户向内核，以及内核向用户的数据传递。也就是说，内核对进程的控制，以及中断机制都会产生上下文切换。具体案例在原书中有提及，本文不多细说了。</p>
-<hr>
-<p>综上所述，咱已经把一些基础的概念给理清楚了，接下来就是一些正式的进程操作了。</p>
-<p>所以，还是那句话，前面的区域，以后再来……？！</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%BA%94%E7%AF%87%E4%B8%8A-2.png"></p>
-<p>这是什么绿皮散热法……算了，能活过来就行。下一期还指望你接着营业呢</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%BA%94%E7%AF%87%E4%B8%8A-3.png"></p>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">学习</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="2023/06/04/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%BA%94%E7%AF%87%EF%BC%88%E4%B8%8A%EF%BC%89/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-    <article id="post-痛苦逆向人ISCC实录" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="2023/05/26/%E7%97%9B%E8%8B%A6%E9%80%86%E5%90%91%E4%BA%BAISCC%E5%AE%9E%E5%BD%95/">痛苦逆向人ISCC实录</a>
-    </h1>
-  
-
-        
-        <a href="2023/05/26/%E7%97%9B%E8%8B%A6%E9%80%86%E5%90%91%E4%BA%BAISCC%E5%AE%9E%E5%BD%95/" class="archive-article-date">
-  	<time datetime="2023-05-26T08:00:05.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-05-26</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h3 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h3><p>说句实在话，ISCC是真的男泵，甚至还有卖答案的</p>
-<p>你看我，机械的课一大堆，还全都卡在一群人抢着上分的点</p>
-<p>二三轮一滴血都抢不着，吐了，但是逆向除了250+好像都蛮简单，复现一下也可</p>
-<h2 id="RE"><a href="#RE" class="headerlink" title="RE"></a>RE</h2><h3 id="JustDoIt"><a href="#JustDoIt" class="headerlink" title="JustDoIt"></a>JustDoIt</h3><p>复现加密代码即可</p>
-<pre><code>enc = [0x17, 0x44, 0x44, 0x0f, 0x5e, 0x0a, 8, 0x0a, 6, 0x5f, 8, 0x18, 0x57, 3, 0x1a, 0x69]
-key = [0x49, 0x53, 0x43, 0x43]
-
-for m in range(1, 16):
-    enc[m] = enc[m] ^ key[0]
-    enc[m] -= (key[m % 4]) % 5
-    enc[m] = enc[m] + (key[2] % 6) + key[3] / 6
-    enc[m] -= (key[1] / 7) + (key[0] % 7)
-
-for k in range(1, 16):
-    enc[k] -= k
-
-encfirst = enc[15]
-for j in range(15, 0, -1):
-    enc[j] = enc[j-1]
-enc[0] = encfirst
-
-for i in range(16):
-    enc[i] += 61
-
-for i in enc:
-    print(chr(int(i)), end=&#39;&#39;)
-</code></pre>
-<h3 id="变形记"><a href="#变形记" class="headerlink" title="变形记"></a>变形记</h3><p>略微尝试控制流去混淆，结果脚本都没法用。</p>
-<p>字符串倒序得到base编码，原代码中也有字符串倒序语段。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/ISCC2023RE-%E5%8F%98%E5%BD%A2%E8%AE%B0-pic1.png"></p>
-<pre><code>input = &quot;&quot;
-
-for i in range(len(input)-1, -1, -1):
-    print(input[i], end=&#39;&#39;)
-</code></pre>
-<p>解出字符与少量数字的组合，随后在控制流中找到另一个处理段，似乎对数字有特殊处理：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/ISCC2023RE-%E5%8F%98%E5%BD%A2%E8%AE%B0-pic2.png"></p>
-<p>继续溯流，发现Label10之下的主要逻辑就是对于字符判重，计数（最多为个位数），然后将数字作为字符加入新的字符串。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/ISCC2023RE-%E5%8F%98%E5%BD%A2%E8%AE%B0-pic3.png"></p>
-<p>故重复字符会以数字形式出现在字符串中，我们只需要将base出来的数字字符转换成（对应长度-1）的上一个文字字符即可。</p>
-<h3 id="《狂彪》-1"><a href="#《狂彪》-1" class="headerlink" title="《狂彪》-1"></a>《狂彪》-1</h3><p>复现代码逆推PRODUCT中的奇数位字节，但是无法获知完整数据，只能用于和区块链对拍</p>
-<pre><code>Input = 0x796B159ACD626B88
-rec = []
-res = []
-while True:
-    a = Input % 16
-    if a &gt; 9:
-        rec.append(a+55)
-    else:
-        rec.append(a+48)
-    Input = Input &gt;&gt; 4
-    if Input / 16 &lt;= 0:
-        break
-
-L = len(rec)
-for i in range(L-1, -1, -1):
-    res.append(rec[i])
-print(res)
-
-a2 = &quot;&quot;
-a3 = &quot;&quot;
-a2 += chr(12 + res[0])
-a2 += chr(41 + res[2])
-a2 += chr(48 + res[4])
-a2 += chr(59 + res[6])
-a2 += chr(48 + res[8])
-
-print(a2)
-j = 0
-for i in a2:
-    print(&quot;product[&quot; + str(j) + &quot;] is:&quot;, end=&#39;&#39;)
-    print(hex(ord(i)))
-    j += 2
-</code></pre>
-<p>尝试将参数寄存器值替换至无用常量地址并修改值，使之步过，但屡次尝试皆失败</p>
-<p>区块链部分解码得到原料4-chloroisatin和产物Ammosamide B，答案已出一半</p>
-<pre><code>import binascii
-
-get_material = [3618502788666131213697322783095070105623107215331596699973092047810475080552,1058281262647123517608537692030461]
-get_product = [3618502788666131213697322783095070105623107215331596699973092053763329075037,20243186386546719615607895858]
-get_process1 = [3618502788666131213697322783095070105623107215331596699973087511546546089720,433361630167923360325699769579027741]
-get_process2 = [3618502788666131213697322783095070105622814690435284427132955240375693632919,196824228736615904168885915933727279070460387353732017605538823168085048193]
-get_process3 = [3618502788666131213697322783095070105623107215331596699973090202942792293480,453865271870859686009512443558968829]
-get_process4 = [3618502788666131213697322783095070105623107215331596684209297756428220130934,116134304106173752838290040472410775248544248888571]
-get_process5 = [3618502788666131213697322783095070105623107215331596699973092055035805475938,390561785906337738142215509985376935339146674861]
-get_process6 = [ 3618502788666131213697322783095070105623107215331596699972936515620310327981,27026365916588459387032368716299937596899]
-get_process7 = [3618502788666131213697322783095070105623107215331596699973059256975961087183,7226332434034712610187648289138429597352157756401918758]
-get_process8 = [3618502788666131213697322783095070105623107215331596699833216824194234956751,8681453366187219654156504602948270914253927580289092492730178164518]
-get_process9 = [3618502788666131213697322783095070105623107215331596699973092052190822164855,24250728870542224371403440011046646025606]
-get_process10 = [3618502788666131213697322783095070105623107215331596699973092053763091097225,719754857826395771474544964133992746787295598]
-get_process11 = [- 32302999884,396961771411939227609093435139525806]
-get_process12 = [3618502788666131213697322783095070105623107215331596697461277884358282559945,1898285677759758986129338258729885824979973151922206961853593519407470]
-get_process13 = [3618502788666131213697322783095070105623107215331596699973091894050039732634,2485241126446291140247192738487640780058871]
-get_process14 = [- 6837661594, 1592794196753852641372653235484033004844244927]
-
-_list_1 = [get_material,get_product,get_process1,get_process2,get_process3,get_process4,get_process5,get_process6]
-_list_2 = [get_process7,get_process8,get_process9,get_process10,get_process11,get_process12,get_process13,get_process14]
-
-def parse_num_1(num): # 7之前乘两次，7包括7之后乘三次
-    print(hex(num[0]*num[0] + num[1]))
-    
-def parse_num_2(num): # 7之前乘两次，7包括7之后乘三次
-    print(hex(num[0]*num[0]*num[0] + num[1]))
-
-for i in _list_1:
-    parse_num_1(i)
-
-for i in _list_2:
-    parse_num_2(i)
-</code></pre>
-<p>后尝试patch步过所有工序和判断，结果输出错误怀疑需要完整工序才能转入正解而非暴力突破</p>
-<p>后手动爆破得出工序为原料-&gt;3-&gt;8-&gt;12-&gt;产物，于是将初始化工序执行序列改成如下序列：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/ISCC2023RE-%E7%8B%82%E9%A3%99-pic1.png"></p>
-<p>程序即可自行产出flag</p>
-<h3 id="奇门遁甲"><a href="#奇门遁甲" class="headerlink" title="奇门遁甲"></a>奇门遁甲</h3><p>控制流混淆，核心在switch case结构，破门顺序31284567</p>
-<pre><code>switch ( v41[0] )
-&#123;
-  case 1:
-    if ( v3 == 2 )
-    &#123;
-      sub_401090();
-      goto LABEL_27;
-    &#125;
-    break;
-  case 2:
-    if ( v3 == 3 )
-    &#123;
-      sub_401010(v30);
-      goto LABEL_27;
-    &#125;
-    break;
-    ……
-</code></pre>
-<p>答案为所有显示数据拼接</p>
-<h3 id="Pull-the-Wool-Over-People’s-Eyes"><a href="#Pull-the-Wool-Over-People’s-Eyes" class="headerlink" title="Pull the Wool Over People’s Eyes"></a>Pull the Wool Over People’s Eyes</h3><p>控制流混淆，主要逻辑如下，v35为输入：</p>
-<pre><code>strcpy((char *)v19, &quot;ISCC&#123;&quot;);
-Srca = &#39;&#125;&#39;;
-strcpy(v18, &quot;YouAresoClever&quot;);
-do  //冒泡排序
-  &#123;
-    for ( i = 0; i &lt; v2; ++i )
-    &#123;
-      v4 = v18[i + 1];
-      v5 = v18[i];
-      if ( v5 &gt; v4 )
-      &#123;
-        v18[i] = v4;
-        v18[i + 1] = v5;
-      &#125;
-    &#125;
-    --v2;
-  &#125;
-while ( v2 &gt; -1 ); // get v19 ISCC&#123;ACYeeeloorrsuv&#125;
-sub_401850(Src, v19, strlen((const char *)v19));
-……
-do
-  &#123;
-    v4 = v35;
-    v5 = Src;
-    v7 = (char *)v4 + v3;
-    v8 = (char *)v5 + v3;
-    *((_BYTE *)v6 + v29) = *v8 ^ *v7;
-    v3 = v29 + 1;
-    v29 = v3;
-  &#125;
-  while ( v3 &lt; v28 );
-……
-</code></pre>
-<p>结合下方二进制码，猜测应该是二进制转字节码再作处理，复现算法即可</p>
-<pre><code>key = b&#39;ISCC&#123;ACYeeeloorrsuv&#125;&#39;
-ans = &quot;0000000000000000000000000000000000000000011001110000110100110111000000110100000100001011000011010011100000111111010010100101110100010101000101000000011000000000&quot;
-for i in range(int(len(ans) / 8)):
-    print(chr(int(ans[i * 8:i * 8 + 8], 2) ^ key[i]), end=&quot;&quot;)
-</code></pre>
-<h3 id="Convert"><a href="#Convert" class="headerlink" title="Convert"></a>Convert</h3><p>主要逻辑如下：</p>
-<pre><code>for ( i = 0; ; ++i )
-  &#123;
-    result = i;
-    if ( i &gt;= a3 )
-      break;
-    *(_BYTE *)(i + a1) -= 32;
-    *(_BYTE *)(i + a1) += i;
-  &#125;
-  for ( j = 0; j &lt; 4; ++j )
-  &#123;
-    *(_BYTE *)(j + a1) += j ^ -(__int64)(*(char *)(j + a2) % 4);
-    *(_BYTE *)(j + a1 + 4) += *(char *)(j + a2) % 5;
-    *(_BYTE *)(j + a1 + 8) += 2 * j;
-    *(_BYTE *)(j + a1 + 12) += *(_BYTE *)(j + a1 + 4);
-    *(_BYTE *)(j + a1 + 16) += *(char *)(j + a2) / 5;
-    result = j + 1;
-  &#125;
-</code></pre>
-<p>逆推复现即可</p>
-<pre><code>#include &lt;stdio.h&gt;
-#include &lt;stdlib.h&gt;
-#include &lt;string.h&gt;
-
-int main() &#123;
-    unsigned char flag[]=&#123;&#39;(&#39;, &#39;0&#39;, &#39;$&#39;, &#39;$&#39;, &#39;b&#39;, &#39;(&#39;, &#39;3&#39;, &#39;@&#39;, &#39;=&#39;, &#39;8&#39;, &#39;-&#39;, 22, -104, 80, 70, 85, 55, 74, 60, 70, 69, 24, &#39;s&#39;&#125;;
-    char key[] = &quot;ISCC&quot;;
-    int len = strlen(flag);
-    
-    for(int j=3; j&gt;=0; j--)&#123;
-    	flag[j+16] -= key[j]/5;
-    	flag[j+12] -= flag[j+4];
-    	flag[j+8] -= 2*j;
-    	flag[j+4] -= key[j]%5;
-    	flag[j] -= j ^ -(key[j]%4);
-    &#125;
-    
-    for(int i=0; i&lt;len; ++i)&#123;
-    	flag[i] += 32;
-    	flag[i] -= i;
-    &#125;
-    
-    puts((char *)flag);
-    
-    return 0;
-&#125;
-</code></pre>
-<h3 id="Congraduations"><a href="#Congraduations" class="headerlink" title="Congraduations"></a>Congraduations</h3><blockquote>
-<p>自己骂自己环节：</p>
-</blockquote>
-<blockquote>
-<p>不要急躁，姓■的，不要急躁</p>
-</blockquote>
-<blockquote>
-<p>你管那上课鸟甚，边界条件看清楚再下手，憋急着撞南墙，别死钻牛角尖想着算法，细节，细节</p>
-</blockquote>
-<pre><code>qmemcpy(v5, &quot;abcdefghijklmnopqrstuvwxyz&quot;, 26);
-  qmemcpy(v4, &quot;ABCDEFGHIJKLMNOPQRSTUVWXYZ&quot;, 26);
-  for ( i = 0; ; ++i )
-  &#123;
-    result = i + a1;
-    if ( !*(_BYTE *)(i + a1) )
-      break;
-    if ( *(char *)(i + a1) &lt; 97 || *(char *)(i + a1) &gt; 122 )
-    &#123;
-      if ( *(char *)(i + a1) &gt;= 65 &amp;&amp; *(char *)(i + a1) &lt;= 90 )
-        *(_BYTE *)(i + a1) = v4[(*(char *)(i + a1) - 65 + a2 + 26) % 26];
-    &#125;
-    else
-    &#123;
-      *(_BYTE *)(i + a1) = v5[(*(char *)(i + a1) - 97 + a2 + 26) % 26];
-    &#125;
-  &#125;
-……
-  for ( i = 0; i &lt; a3; ++i )
-    *(_BYTE *)(i + a1) -= 30;
-  for ( j = 0; j &lt; a3 - 1; ++j )
-    *(_BYTE *)(j + a1) -= *(_BYTE *)(j + a1 + 1);
-  for ( k = 0; ; ++k )
-  &#123;
-    result = a3 - 1;
-    if ( k &gt;= a3 - 1 )
-      break;
-    *(_BYTE *)(k + a1) ^= *(_BYTE *)(a2 + 1);
-  &#125;
-</code></pre>
-<p>局部凯撒密码+字符串变换，复现算法即可</p>
-<pre><code>#include &lt;iostream&gt;
-#include &lt;stdio.h&gt;
-#include &lt;stdlib.h&gt;
-#include &lt;string.h&gt;
-using namespace std;
-char c[] = &#123;-91,67,83,-108,68,66,-120,113,64,-87,-77,-89,2,-84,-71,-124,121,85,95,-97,115,-69,-68,23,-9,&#39;_&#39;&#125;;
-char lower[] = &quot;abcdefghijklmnopqrstuvwxyz&quot;;
-char upper[] = &quot;ABCDEFGHIJKLMNOPQRSTUVWXYZ&quot;;
-char key[] = &quot;ISCC&quot;;
-void transfer2()&#123;
-    for(int i=0;i&lt;26;i++)&#123;
-        if(c[i]&gt;=&#39;A&#39; &amp;&amp; c[i]&lt;=&#39;Z&#39;)
-            c[i] = upper[(c[i]-&#39;A&#39;+1)%26];
-        if(c[i]&gt;=&#39;a&#39; &amp;&amp; c[i] &lt;= &#39;z&#39;)
-            c[i] = lower[(c[i]-&#39;a&#39;+1)%26];
-    &#125;
-&#125;
-void transfer1()&#123;
-    for (int k=0;k&lt;25;k++)c[k] ^= key[1];
-    for (int j=25;j&gt;=0;j--) c[j] += c[j+1];
-    for (int i=0;i&lt;26;i++) c[i] += 30;
-&#125;
-int main()
-&#123;
-    transfer1();
-    transfer2();
-    for(int i=0;i&lt;26;i++)cout&lt;&lt;c[i];
-    return 0;
-&#125;
-</code></pre>
-<h3 id="CrackMePlease"><a href="#CrackMePlease" class="headerlink" title="CrackMePlease"></a>CrackMePlease</h3><p>一点反调试没加，直接strcmp下断点，读取str1即可。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/ISCC2023RE-CrackMePlease-pic1.png"></p>
-<h2 id="Misc"><a href="#Misc" class="headerlink" title="Misc"></a>Misc</h2><h3 id="擂台-芝士雪豹"><a href="#擂台-芝士雪豹" class="headerlink" title="擂台-芝士雪豹"></a>擂台-芝士雪豹</h3><p>第一层：rar伪加密，指定加密位改成80即可</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/ISCC2023misc-%E8%8A%9D%E5%A3%AB%E9%9B%AA%E8%B1%B9-pic1.png"></p>
-<p>第二层为zip加密，考虑到内嵌压缩包过长可以使用已知明文攻击，但所有脚本使用攻击均显示加密方式未知。</p>
-<p>archpr显示如下：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/ISCC2023misc-%E8%8A%9D%E5%A3%AB%E9%9B%AA%E8%B1%B9-pic2.png"></p>
-<p>bkcrack显示如下：</p>
-<pre><code>PS F:\带学\CTF\bkcrack-1.5.0-win64\bkcrack-1.5.0-win64&gt; .\bkcrack.exe -C .\zipfiles.zip -c 49183-secret.zip -p plain.txt -o 0x1e
-bkcrack 1.5.0 - 2022-07-07
-Zip error: entry &quot;49183-secret.zip&quot; is encrypted with an unsupported algorithm.
-</code></pre>
-<h3 id="人生之路"><a href="#人生之路" class="headerlink" title="人生之路"></a>人生之路</h3><p>图片要求用windows大图标模式查看，但这样一来，根据提示，在“脚下”的只剩下文件名+后缀，输入，成功解压。</p>
-<p>得到flag.txt为：</p>
-<pre><code>eAbJtAbJeA bAtJeAtJbA bAtAeA bAtAeA bJtJbJeJtJeJ tAxJeJexJtbJteJ xAteJxeJtA bAxAeAtAteJ tAxJeAxJtA bAtJeAtJbA teJxeJtbJtJ teAxeAteAxeA bAtJeAtJbA bAtAeAxJbJ teAxbJxeJtbA xAteAxA tAeAxAbA xAteJxeJtA tAxJeJexJtbJteJ teAxeAteAxeA eJtJeJbJtJbJ 
-</code></pre>
-<p>接下来纯脑洞，因为小写字符仅出现四个且间隔一定，猜想凯撒密码替换字符“wasd”为“xbte”，另外两个字符也可能是字符替换，但规律不明，预计代表线段长短。手动对齐凯撒密码，使用python matplotlib根据字符串画图：</p>
-<pre><code>import string
-import matplotlib.pyplot as plt
-from matplotlib.ticker import MultipleLocator
-
-c = &quot;eAbJtAbJeA bAtJeAtJbA bAtAeA bAtAeA bJtJbJeJtJeJ tAxJeJexJtbJteJ xAteJxeJtA bAxAeAtAteJ tAxJeAxJtA bAtJeAtJbA teJxeJtbJtJ teAxeAteAxeA bAtJeAtJbA bAtAeAxJbJ teAxbJxeJtbA xAteAxA tAeAxAbA xAteJxeJtA tAxJeJexJtbJteJ teAxeAteAxeA eJtJeJbJtJbJ &quot;.strip()
-a = c.split(&quot; &quot;)
-for i in range(len(a)):
-    a[i] = a[i].replace(&quot;x&quot;, &quot;w&quot;)
-    a[i] = a[i].replace(&quot;b&quot;, &quot;a&quot;)
-    a[i] = a[i].replace(&quot;t&quot;, &quot;s&quot;)
-    a[i] = a[i].replace(&quot;e&quot;, &quot;d&quot;)
-
-stloc_x = 0
-stloc_y = 30
-
-for i in range(len(a)):
-    j = 0
-    if a[i][0] == &#39;w&#39;:
-        if a[i][j + 1] == &#39;A&#39; or a[i][j + 2] == &#39;A&#39;:
-            stloc_y = 15
-        else:
-            stloc_y = 22.5
-    while j &lt; len(a):
-        lenadd = 0
-        try:
-            if a[i][j+1] in string.ascii_uppercase:
-                if a[i][j+1] == &#39;J&#39;:
-                    lenadd = 7.5
-                else:
-                    lenadd = 15
-                if a[i][j] == &#39;w&#39;:
-                    x = [stloc_x, stloc_x]
-                    y = [stloc_y, stloc_y + lenadd]
-                    plt.plot(x,y)
-                    stloc_y += lenadd
-                if a[i][j] == &#39;a&#39;:
-                    x = [stloc_x, stloc_x - lenadd]
-                    y = [stloc_y, stloc_y]
-                    plt.plot(x,y)
-                    stloc_x -= lenadd
-                if a[i][j] == &#39;s&#39;:
-                    x = [stloc_x, stloc_x]
-                    y = [stloc_y, stloc_y - lenadd]
-                    plt.plot(x, y)
-                    stloc_y -= lenadd
-                if a[i][j] == &#39;d&#39;:
-                    x = [stloc_x, stloc_x + lenadd]
-                    y = [stloc_y, stloc_y]
-                    plt.plot(x, y)
-                    stloc_x += lenadd
-            else:
-                if a[i][j+2] == &#39;J&#39;:
-                    lenadd = 7.5
-                else:
-                    lenadd = 15
-                org_x = stloc_x
-                org_y = stloc_y
-                if a[i][j] == &#39;w&#39;: stloc_y += lenadd
-                if a[i][j] == &#39;a&#39;: stloc_x -= lenadd
-                if a[i][j] == &#39;s&#39;: stloc_y -= lenadd
-                if a[i][j] == &#39;d&#39;: stloc_x += lenadd
-                if a[i][j+1] == &#39;w&#39;: stloc_y += lenadd
-                if a[i][j+1] == &#39;a&#39;: stloc_x -= lenadd
-                if a[i][j+1] == &#39;s&#39;: stloc_y -= lenadd
-                if a[i][j+1] == &#39;d&#39;: stloc_x += lenadd
-                x = [org_x, stloc_x]
-                y = [org_y, stloc_y]
-                plt.plot(x, y)
-                j += 1
-        except IndexError:
-            print(&quot;Err&quot;)
-        j += 2
-    stloc_x += 50
-    stloc_y = 30
-
-x_major_locator = MultipleLocator(5)
-ax = plt.gca()
-ax.xaxis.set_major_locator(x_major_locator)
-plt.show()
-</code></pre>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="2023/05/26/%E7%97%9B%E8%8B%A6%E9%80%86%E5%90%91%E4%BA%BAISCC%E5%AE%9E%E5%BD%95/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
   
     <nav id="page-nav">
       <span class="page-number current">1</span><a class="page-number" href="page/2/">2</a><a class="page-number" href="page/3/">3</a><a class="page-number" href="page/4/">4</a><a class="extend next" rel="next" href="page/2/">Next &amp;raquo;</a>
@@ -2513,7 +2785,7 @@ plt.show()
   <div class="outer">
     <div id="footer-info">
     	<div class="footer-left">
-    		&copy; 2023 Driven·Cyka·Hank
+    		&copy; 2024 Driven·Cyka·Hank
     	</div>
       	<div class="footer-right">
       		<a href="http://hexo.io/" target="_blank">Hexo</a>  Theme <a href="https://github.com/litten/hexo-theme-yilia" target="_blank">Yilia</a> by Litten
