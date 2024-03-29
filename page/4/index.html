@@ -166,6 +166,547 @@
           <div id="js-content" class="content-ll">
             
   
+    <article id="post-一个铁菜逼的美团CTF复现实录" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="../../2022/09/18/%E4%B8%80%E4%B8%AA%E9%93%81%E8%8F%9C%E9%80%BC%E7%9A%84%E7%BE%8E%E5%9B%A2CTF%E5%A4%8D%E7%8E%B0%E5%AE%9E%E5%BD%95/">一个铁菜逼的美团CTF复现实录</a>
+    </h1>
+  
+
+        
+        <a href="../../2022/09/18/%E4%B8%80%E4%B8%AA%E9%93%81%E8%8F%9C%E9%80%BC%E7%9A%84%E7%BE%8E%E5%9B%A2CTF%E5%A4%8D%E7%8E%B0%E5%AE%9E%E5%BD%95/" class="archive-article-date">
+  	<time datetime="2022-09-18T05:16:02.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-09-18</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h3 id="Previously"><a href="#Previously" class="headerlink" title="Previously"></a>Previously</h3><p>坐！大！牢！</p>
+<p>然而，真的是纯纯坐大牢吗？</p>
+<p>还是我在某些方面犯蠢了呢？</p>
+<h3 id="Reverse"><a href="#Reverse" class="headerlink" title="Reverse"></a>Reverse</h3><h4 id="Small"><a href="#Small" class="headerlink" title="Small"></a>Small</h4><p>似乎是挺简单的一道汇编题，但是……？</p>
+<p>题目在许多渠道都无法正确反汇编甚至运行，比方说ida，die，甚至gdb都救不了，这里就不一一列举失败画面了。无奈只能字节码转汇编硬刚：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Tea_small.png"></p>
+<p>注意到loc_68的代码有些眼熟，又是左移4位又是右移5位，又有准确的delta和key，形似tea（tea加密相关可以看看<a target="_blank" rel="noopener" href="https://www.jianshu.com/p/4272e0805da3">人在码途的文章</a>，应该是处理原文的主要部分。还有这一段：</p>
+<pre><code>cmp     edx, 23h ; &#39;#&#39;
+jl      short loc_52
+</code></pre>
+<p>应该对应着tea的加密轮数，tea似乎稳了。但是，这只是我犯浑的开始——</p>
+<p>一开始读汇编代码的时候，我注意到被位运算的两个寄存器不一样，寄存器eax和ecx似乎是分存被处理数据的左半和右半。于是在一阵分析后认为这是对原先的tea进行修改，把加密方程变成了这样：</p>
+<pre><code>v0 += ((v1&lt;&lt;4) + KEY[0]) ^ (v1 + sum) ^ ((v0&gt;&gt;5) + KEY[1]);
+v1 += ((v0&lt;&lt;4) + KEY[2]) ^ (v0 + sum) ^ ((v1&gt;&gt;5) + KEY[3]);
+</code></pre>
+<p>但是我很显然忽略了一个问题，汇编语段里出现了一个ebp寄存器，这玩意的作用相当于开了一个栈，且ebp始终作为某一时刻这个栈的记录存在。在第一个方程过后出现了这样一个语句：</p>
+<pre><code>add     ebp, ecx
+mov     ecx, ebp
+</code></pre>
+<p>此时ecx作为左半边的处理结果入栈。而在之后又出现了一个诡异的场景：</p>
+<pre><code>mov     eax, ebp
+shl     eax, 4
+add     eax, 45h ; &#39;E&#39;
+xor     ecx, eax
+mov     eax, ebp
+</code></pre>
+<p>ebp的值同样在之后被用在了eax身上！结合上面的汇编代码，我们不难发现，eax只是被当作临时存储上一级运算结果的变量，真正存储每一次式子运算结果的，一直是ecx！而这也就说明……出题人根本没动过tea，动的是实现tea的方式……</p>
+<p>好了，既然认准了是原装的tea，那么直接搬脚本也是合情合理，问题来了，数据呢？要处理的数据呢？</p>
+<p>这就要提到我第二次麻瓜的地方了……就是这里。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/syscall_small.png"></p>
+<p>按说到了syscall这块，整个程序也就差不多结束了。但很显然，年轻的我并没有发现什么不对，因为当时那底下还有几个函数——</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/fakefunc_small.png"></p>
+<p>但是，字节码转汇编程序，某种意义上就是对凌乱数据的解读。而我在一堆函数里迟迟找不到原文或者密文的原因只有可能是一个——</p>
+<p>在找主函数的时候，我可能把原本作为数据的部分也转化了。</p>
+<p>果然，在跟着题解回滚之后，看到原本在那下面的地方果然是出题人藏都不打算藏的数据集：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/data_small.png"></p>
+<p>那么，该做啥也很清楚了。以下代码参考了<a target="_blank" rel="noopener" href="https://github.com/0x000000AC/Tiny-Encryption-Algorithm/blob/master/tea32.c">0x000000AC</a>和<a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s?__biz=Mzg4MjcxMTAwMQ==&mid=2247484276&idx=1&sn=bee6853198aaccecbc453d803f162847&chksm=cf53c3c2f8244ad473a9185a91a762924757d2b519d8ef7ce6dc9a0933d959717a4b4f9ec3db&mpshare=1&scene=23&srcid=0918QMQvjd7Z6vlkoy7vb2Qb&sharer_sharetime=1663468085244&sharer_shareid=6eea79ff6da57fc6752ab0bc570bf392#rd">Arr3stY0u</a>：</p>
+<pre><code>#include &lt;stdio.h&gt;
+#include &lt;stdint.h&gt;
+
+uint32_t KEY[4]=&#123;1,0x23,0x45,0x67&#125;;  // Key space for bit shifts
+int n;
+
+void encrypt(uint32_t* v) &#123;
+  uint32_t v0=v[0], v1=v[1], sum=0, i;             // set up
+  uint32_t delta=0x67452301;                       // a key schedule constant, but different in this topic 
+  for (i=0; i &lt; 35; i++) &#123;                         // basic cycle start
+    sum += delta;
+    v0 += ((v1&lt;&lt;4) + KEY[0]) ^ (v1 + sum) ^ ((v1&gt;&gt;5) + KEY[1]);
+    v1 += ((v0&lt;&lt;4) + KEY[2]) ^ (v0 + sum) ^ ((v0&gt;&gt;5) + KEY[3]);  
+  &#125;                                                // end cycle 
+  v[0]=v0; v[1]=v1;
+&#125;       
+
+void decrypt (uint32_t* v) &#123;
+    uint32_t v0=v[0], v1=v[1], sum=0x67452301*35, i;  // set up, the sum is different because delta
+    uint32_t delta=0x67452301;                     // a key schedule constant 
+    for (i=0; i&lt;35; i++) &#123;                         // basic cycle start 
+        v1 -= ((v0&lt;&lt;4) + KEY[2]) ^ (v0 + sum) ^ ((v0&gt;&gt;5) + KEY[3]);
+        v0 -= ((v1&lt;&lt;4) + KEY[0]) ^ (v1 + sum) ^ ((v1&gt;&gt;5) + KEY[1]);
+        sum -= delta;
+    &#125;                                              // end cycle 
+    v[0]=v0; v[1]=v1;
+&#125;
+
+void dumpdata(uint32_t* v)
+&#123;
+    for (int i=0;i&lt;n;i++)
+        for (int j=0;j&lt;sizeof(uint32_t)/sizeof(uint8_t);j++)
+            printf(&quot;%c&quot;,(v[i] &gt;&gt; (j*8)) &amp; 0xFF);
+    printf(&quot;\n&quot;);
+    return;
+&#125;
+
+int main()
+&#123;
+        uint32_t v[] = &#123; 0xde087143,0xc4f91bd2,0xdaf6dadc,0x6d9ed54c,0x75eb4ee7,0x5d1ddc04,0x511b0fd9,0x51dc88fb &#125;; 
+        n = sizeof(v)/sizeof(uint32_t);
+        
+        printf(&quot; Original Values: [&quot;);
+        for(int i=0;i&lt;n;i++)
+        	printf(&quot; %X&quot;, v[i]);
+        printf(&quot; ]&quot;);
+        
+//        for(int i=0;i&lt;n/2;i++)
+//        	encrypt(&amp;v[i*2]);
+//        	
+//        printf(&quot;\n Encrypted:       [&quot;);
+//        for(int i=0;i&lt;n;i++)
+//        	printf(&quot; %X&quot;, v[i]);
+//        printf(&quot; ]&quot;);
+//		dumpdata(v);							//there&#39;s no need encrypt xd
+
+        for(int i=0;i&lt;n/2;i++)
+        	decrypt(&amp;v[i*2]); 					//expand the operation to loop for more data
+        	
+        printf(&quot;\n Decrypted:       [&quot;);
+        for(int i=0;i&lt;n;i++)
+        	printf(&quot; %X&quot;, v[i]);
+        printf(&quot; ]\n&quot;);
+        dumpdata(v); 							//to print out data in string format
+        
+        return 0;
+&#125;
+</code></pre>
+<blockquote>
+<p>flag{327a6c4304ad5938eaf0efb6cc3e53dc}</p>
+</blockquote>
+<p>麻了，汇编一点不会，练底力去。</p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="../../2022/09/18/%E4%B8%80%E4%B8%AA%E9%93%81%E8%8F%9C%E9%80%BC%E7%9A%84%E7%BE%8E%E5%9B%A2CTF%E5%A4%8D%E7%8E%B0%E5%AE%9E%E5%BD%95/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
+    <article id="post-随便画画-2022-9-15" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="../../2022/09/15/%E9%9A%8F%E4%BE%BF%E7%94%BB%E7%94%BB-2022-9-15/">随便画画-2022/9/15</a>
+    </h1>
+  
+
+        
+        <a href="../../2022/09/15/%E9%9A%8F%E4%BE%BF%E7%94%BB%E7%94%BB-2022-9-15/" class="archive-article-date">
+  	<time datetime="2022-09-15T12:12:00.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-09-15</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>不知道为什么，我看到了我希腊神话书上前人留下的痕迹。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/IMG_20220915_154624.jpg"></p>
+<p>还在草稿阶段，还只画一半，血压高了然后我直接进行了一波重构：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/IMG_20220915_154628.jpg"></p>
+<p>虽然本人人体画渣，但是……勉强能看吧，希望以后的我不要打死自己</p>
+<p>以及，有人说这只狐娘像涂山酱，不知道为什么</p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">杂谈</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="../../2022/09/15/%E9%9A%8F%E4%BE%BF%E7%94%BB%E7%94%BB-2022-9-15/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
+    <article id="post-to-2022-9-6-更新内容" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="../../2022/09/06/to-2022-9-6-%E6%9B%B4%E6%96%B0%E5%86%85%E5%AE%B9/">to_2022/9/6-更新内容</a>
+    </h1>
+  
+
+        
+        <a href="../../2022/09/06/to-2022-9-6-%E6%9B%B4%E6%96%B0%E5%86%85%E5%AE%B9/" class="archive-article-date">
+  	<time datetime="2022-09-06T09:55:25.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-09-06</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>1、把NSILAB的几篇文章给搬了过来<br>2、同步更新了一期题解<br>3、更新了友链，还发现了当前模板如果填入空友链会报错的问题</p>
+<p>以上</p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">杂谈</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="../../2022/09/06/to-2022-9-6-%E6%9B%B4%E6%96%B0%E5%86%85%E5%AE%B9/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
+    <article id="post-vsCTF-2022-变态复现实录" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="../../2022/09/04/vsCTF-2022-%E5%8F%98%E6%80%81%E5%A4%8D%E7%8E%B0%E5%AE%9E%E5%BD%95/">vsCTF_2022-变态复现实录</a>
+    </h1>
+  
+
+        
+        <a href="../../2022/09/04/vsCTF-2022-%E5%8F%98%E6%80%81%E5%A4%8D%E7%8E%B0%E5%AE%9E%E5%BD%95/" class="archive-article-date">
+  	<time datetime="2022-09-04T08:42:03.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-09-04</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h3 id="Previously"><a href="#Previously" class="headerlink" title="Previously"></a>Previously</h3><p>我是真的会谢，明明vsCTF的知名度还算可以吧，结果国内搜索引擎基本没有Wp，外网一翻，全是Cry和Web的题解，Re的题解基本都是针对在线题，静态题题解寥寥无几。</p>
+<p>麻了，虽然菜，自己动手丰衣足食，就算煮出来的效果堪比雷电将军特殊料理，也好过没东西吃。</p>
+<h3 id="Reverse"><a href="#Reverse" class="headerlink" title="Reverse"></a>Reverse</h3><h4 id="Binary-Flood"><a href="#Binary-Flood" class="headerlink" title="Binary Flood"></a>Binary Flood</h4><p>焯，又是结构一毛一样巨量文件（我为甚么要说又）</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/same_BinaryFlood.png"></p>
+<p>但是好像就是一套单纯的输入数据-&gt;加密-&gt;判断的机制，并不是地图题（上次复现那套多文件地图题给我整出emotional damage了）。最终，每组数据的结果是一个加密过的串，存储在相对文件头偏移4020的位置：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/singleans_BinaryFlood.png"></p>
+<p>好嘛，虽然不知道怎么加密的，但是我知道，肯定得先把从file_ 0到file_ 1336这一堆东西导出来：</p>
+<pre><code>s = []
+
+for i in range(1337):
+    with open(f&#39;file_&#123;i&#125;&#39;, &#39;rb&#39;) as f:
+        l = f.read()
+        s.append(l[0x4020:0x4020+39].decode())
+    f.close()
+
+fw = open(&#39;pickedata.txt&#39;, &#39;w&#39;)
+for i in range(1337):
+    fw.write(str(s[i]))
+fw.close()
+</code></pre>
+<p>结果就是导出来的这一大串东西具有强烈的base64既视感……</p>
+<pre><code>NzPxDxwEv9TLmgFVNjCRjcEJgKMiCJBBvcY0mKoVM0wbgGMlNuvZCXZARwgIGFtIV+……
+</code></pre>
+<p>但是你先别急，虽然能确定完整的加密其中一步应该是base64，但还是先看看这玩意的加密到底是怎么回事。考虑到逆向后的代码有极强的不可读性，我们尝试动态调试。</p>
+<p>判定用的串长度为39，我们索性构造一个39长，辨识度还高的串进去测试，比方说abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLM，然后再把断点下在判定过后的任意位置，于是从rdi寄存器得到变换后的结果：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/debugging_BinaryFlood.png"></p>
+<p>再与原串进行比对：</p>
+<pre><code>abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLM
+FpGhHqIdJrKiLsMbtjuevkwaxlyfzmAcBnCgDoE
+</code></pre>
+<p>不难发现本体并没有进行base64的操作，而是进行了一个次序的变换。顺着这个思路，我们把原数据每39位进行如上规律的移位。考虑到python的list变量天然分割了这些数据，我们只需要在提取程序上稍作改造（以下代码部分参考<a target="_blank" rel="noopener" href="https://github.com/acdwas/ctf/blob/master/2022/vsCTF%202022/rev/Binary%20Flood/README.md">Jarosław Keller的题解</a>）：</p>
+<pre><code>s = []
+
+for i in range(1337):
+    with open(f&#39;file_&#123;i&#125;&#39;, &#39;rb&#39;) as f:
+        l = f.read()
+        s.append(l[0x4020:0x4020+39].decode())
+    f.close()
+
+
+l = &quot;abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLM&quot;
+a = &quot;abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLM&quot;
+b = &quot;FpGhHqIdJrKiLsMbtjuevkwaxlyfzmAcBnCgDoE&quot;
+# 干脆在动态调试结果的基础上机操规律，省人工
+d = []
+
+for c in l:
+    d.append((a.find(c), b.find(c)))
+# ----------------------------------
+x = b&#39;&#39;
+
+for t in s:
+    w = [&#39;&#39;] * 39
+    for a, b in d:
+        w[a] = t[b]
+    x += &#39;&#39;.join(w).encode()
+
+x += b&#39;==&#39;
+# --标记部分摘自Jarosław Keller dalao--
+fw = open(&#39;result.txt&#39;, &#39;w&#39;)
+fw.write(str(x))
+fw.close
+</code></pre>
+<p>然后把搓出来的合成肉扔进赛博厨房烧烤：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/cooked_BinaryFlood.png"></p>
+<p>最后得到一张pdf，往下多划拉划拉就可以找到这个flag：</p>
+<blockquote>
+<p>vsctf{templated_binaries_are_1337}</p>
+</blockquote>
+<h4 id="FunctionalCPP"><a href="#FunctionalCPP" class="headerlink" title="FunctionalCPP"></a>FunctionalCPP</h4><p>所以为什么这帮子老外总想着光看几张破图就能让人明白什么（</p>
+<p>看外网的题解，不知道为什么把断点下在0x555555555914那里动调，我们打开程序瞅瞅：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Rickrolled_FunctionalCPP.png"></p>
+<p>好嘛，经典诈骗链接。</p>
+<p>die看不出什么，直接搬进ida瞅一眼：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/inside_FunctionalCPP.png"></p>
+<p>这下真看不懂了（看我凌乱的注释就知道），还得请密码人出山。不过有没有什么让Re手也轻松做出来的办法呢？</p>
+<p>有肯定有，那就是暴力硬破，就是花的时间长了点。那么思路很明显了，暴力脚本+从断点输入数据，直接创碎这玩意。问题是……怎么知道自己创没创对位置呢？正常的判断只会对整个串判定T or F，如果要直接比对寄存器，总不能凭空掏出一个地址吧？！而且每一次动态调试出现的输入函数的地址都不相同，什么5582D32C5360、563611541050的都敢冒出来，我真的会谢。</p>
+<p>直到我去查找了一下资料，发现gdb可以直接输入start来读取程序的实际入口地址——</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Enter_FunctionalCPP.png"></p>
+<p>看来很接近了。于是我们看看在主函数的判断语句（忽略我凌乱的注释，那会误导你）：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Judge_FunctionalCPP.png"></p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/HuibianJ_FunctionalCPP.png"></p>
+<p>如果我们要通过修改被判断字串的值来爆破，看来是这了。对应判断条件secret位置在主函数偏移约0x497~0x498的位置，刚好是题解里说的玩意——0x555555555914。然后尝试用Python的gdb拓展尝试疯狂爆破。问题来了，用什么爆破呢？我们根据前面的代码可以得知：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Jdg_FunctionalCPP.png"></p>
+<p>输入的是个字符串，至少输出去判断的也是个字符串，所以flag至少是可打印字符集。我们拿不易产生冲突的字符集浅试一手。</p>
+<p>下面的代码参考了<a target="_blank" rel="noopener" href="https://github.com/acdwas/ctf/tree/master/2022/vsCTF%202022/rev/Functional%20CPP">acdwas</a>和<a target="_blank" rel="noopener" href="https://segmentfault.com/a/1190000005718889">spacewander</a>的架构：</p>
+<pre><code># move.py
+# 1. 导入gdb模块来访问gdb提供的python接口
+import gdb
+
+# 2. 用户自定义命令需要继承自gdb.Command类
+class Move_Py(gdb.Command):
+
+    # 3. docstring里面的文本是不是很眼熟？gdb会提取该类的__doc__属性作为对应命令的文档
+    
+    def __init__(self):
+        # 4. 在构造函数中注册该命令的名字
+        super(Move_Py, self).__init__(&quot;mv&quot;, gdb.COMMAND_USER)
+
+    # 5. 在invoke方法中实现该自定义命令具体的功能
+    # args表示该命令后面所衔接的参数，这里通过string_to_argv转换成数组
+    def invoke(self, _unicode_args, _from_tty):
+        
+        strcomb = &#39;0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_+?&#123;&#125;&#39; #经典base64字符集
+        
+        w = &#39;AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&#39;
+        a = 0
+        
+        # 6. 使用gdb.execute来执行具体的命令
+        while a &lt; 58:
+            i = 0
+            while True:
+                wline = list(w)
+                wline[a] = strcomb[i]
+                gdb.execute(f&quot;r &lt;&lt;&lt; &#123;&#39;&#39;.join(wline)&#125;&quot;) #直接运行程序，同时把我们要输入的串塞进去
+                for j in range(a):
+                    gdb.execute(&#39;c&#39;) #原代码这个判断的断点是个循环，绕过断点继续运行，像极了你疯狂按enter急急国王的样子
+                
+                if int(gdb.parse_and_eval(&quot;$rbx&quot;)) == int(gdb.parse_and_eval(&quot;$rax&quot;)): #当场比较寄存器看看前缀是否相同
+                    w = &#39;&#39;.join(wline)
+                    print(w)
+                    a += 1
+                    break #行的话加入flag豪华午餐
+                i += 1
+
+# 7. 向gdb会话注册该自定义命令
+Move_Py()
+</code></pre>
+<p>于是乎，在把电脑干冒烟之后，你会得到一个flag：</p>
+<blockquote>
+<p>vsctf{1_b37_y0u_w1LL_n3v3r_u53_Func710n4L_C++_1n_ur_L1F3?}</p>
+</blockquote>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="../../2022/09/04/vsCTF-2022-%E5%8F%98%E6%80%81%E5%A4%8D%E7%8E%B0%E5%AE%9E%E5%BD%95/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
     <article id="post-强网杯2022折磨复现系列" class="article article-type-post  article-index" itemscope itemprop="blogPost">
   <div class="article-inner">
     

@@ -166,6 +166,1036 @@
           <div id="js-content" class="content-ll">
             
   
+    <article id="post-深入理解计算机系统学习笔记-第四篇（上）" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="../../2023/09/09/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E5%9B%9B%E7%AF%87%EF%BC%88%E4%B8%8A%EF%BC%89/">深入理解计算机系统学习笔记-第四篇（上）</a>
+    </h1>
+  
+
+        
+        <a href="../../2023/09/09/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E5%9B%9B%E7%AF%87%EF%BC%88%E4%B8%8A%EF%BC%89/" class="archive-article-date">
+  	<time datetime="2023-09-09T07:12:36.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-09-09</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>好的，我们接着回来看《深入理解计算机系统》……这名字都已经刻在我的输(D)入(N)法(A)里了。</p>
+<p>这一篇的内容很大一部分是对于逆向手再熟悉不过的汇编语言。由于原书中程序的机器级表示是一个长达一百余页的超耐久回，一回肯定讲不完，所以哪怕是分期也得讲的简练一点。</p>
+<hr>
+<h3 id="从编码开始"><a href="#从编码开始" class="headerlink" title="从编码开始"></a>从编码开始</h3><p>如果我们需要编译我们所写的代码，往往都是从这一句指令开始：</p>
+<pre><code>gcc -o -Wall hello_world.c
+</code></pre>
+<p>当然，今天为了看的清楚一点，我们特地使用-Og选项，因为我们需要更贴近于C语言格式的汇编代码，如果开了o1甚至o2优化的话那八成会产生只有小娜看得懂的贵物。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E5%9B%9B%E7%AF%87%E4%B8%8A1.jpg"></p>
+<p>但是今天没你啥事，歇着吧。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E5%9B%9B%E7%AF%87%E4%B8%8A2.jpg"></p>
+<p>哦对了，现在她在打只狼，所以她很烦抢线程的语言理解环节。那咱们赶紧进入正片：</p>
+<p>至于编译器运作的流程，我们之前应该都讲清楚了，这里不再赘述。不过，我们知道汇编程序的大体结构，但是……</p>
+<h3 id="细节呢？"><a href="#细节呢？" class="headerlink" title="细节呢？"></a>细节呢？</h3><p>这就得结合一些源代码来讲了。比方说我们真的就写一个halloworld.c：</p>
+<pre><code>#include &lt;stdio.h&gt;
+#include &quot;lib_text.h&quot;
+
+void multstore(long x, long y, long *dest) &#123;
+    long t = mult2(x, y);
+    *dest = t;
+&#125;
+int main()
+&#123;
+    return 0;
+&#125;
+</code></pre>
+<p>由于库函数没给mult2乘法，于是自己写了个lib_text.c的代码如下：</p>
+<pre><code>#include &quot;lib_text.h&quot;
+
+int mult2(int a,int b)&#123;
+    return a*b;
+&#125;
+</code></pre>
+<p>最后生成可执行文件halloworld用了如下指令：</p>
+<pre><code>gcc -c -Og lib_text.c
+gcc -c -Og halloworld.c
+gcc -Og -o halloworld halloworld.o lib_text.o
+</code></pre>
+<p>我们在ida反汇编multstore函数的时候看到的是如下的代码：</p>
+<pre><code>push rbx
+mov rbx,rdx
+call mult2
+mov [rbx], rax
+pop rbx
+retn
+</code></pre>
+<p>这与我们直接使用-S选项调出halloworld.c的汇编编译结果是相似的，如果排除掉含前缀点的，引导汇编器和连接器的语句的话：</p>
+<pre><code>    .file	&quot;halloworld.c&quot;
+    .text
+    .globl	multstore
+    .type	multstore, @function
+multstore:
+.LFB11:
+    .cfi_startproc
+    pushq	%rbx
+    .cfi_def_cfa_offset 16
+    .cfi_offset 3, -16
+    movq	%rdx, %rbx
+    call	mult2@PLT
+    movq	%rax, (%rbx)
+    popq	%rbx
+    .cfi_def_cfa_offset 8
+    ret
+    .cfi_endproc
+</code></pre>
+<p>非常简单。但为什么是rbx寄存器充当存储数据的角色，又为什么需要入栈出栈的操作？</p>
+<h4 id="从寄存器开始"><a href="#从寄存器开始" class="headerlink" title="从寄存器开始"></a>从寄存器开始</h4><p>我们都知道又作用类似于变量，但数量和代号都固定的，名为“寄存器”的存在。</p>
+<p>在intel x86-64的cpu架构里，寄存器包括通用寄存器rax（累加器，加法执行）、rbx（基址寄存器，数据存取）、rcx（计数寄存器，循环计数）、rdx（数据寄存器，读写I&#x2F;O端口时存放端口号）、rsi（字符串源）&#x2F;rdi（字符串目的地址）、rbp（栈底指针）&#x2F;rsp（栈顶指针）、r8~r15（64版本新增通用寄存器）。</p>
+<p>在回到我们的函数的同时，需要提到两个概念，调用者保存寄存器（Caller-saved Register）和被调用者保存寄存器（Callee-saved Register）。至于“调用者”和“被调用者”的概念差别，举个简单的例子就是你的函数和你所调用的变量。</p>
+<p>因此从定义上而言，用于存取的rbx就是一种典型的被调用者保存寄存器。我们也经常使用push(q)、mov(q)和pop(q)指令来让rbx寄存器中的数据与函数的堆栈交互，譬如如上的程序，我们就用这些指令，实现了从外源函数Mul2的地址到整型t（<code>push rbx；mov rbx,rdx</code>），再从t到dest指针（<code>mov [rbx], rax</code>）的整个赋值链条。至于这些指令具体的功用，则是接下来的内容：</p>
+<h4 id="包括push和pop在内的数据传送指令"><a href="#包括push和pop在内的数据传送指令" class="headerlink" title="包括push和pop在内的数据传送指令"></a>包括push和pop在内的数据传送指令</h4><p>一个函数要实现功能，那必须令其构成一条完整的指令，这尤其是汇编语言逃不开的内容。比如说你做逆向要绕过反调试，你肯定是修改call或者jmp调用的地址，或者干脆整个nop了，而不是暴力删除地址。</p>
+<p>一个完整的数据传送指令，包含**操作码(Operation Code)<strong>部分和</strong>操作数(Operands)**部分。操作码即为我们看到的指令前半段诸如pop、push的部分，负责告诉你的CPU你要干嘛，而操作数则是后续跟进的参数。目前来讲，你可以将两者简单理解为汇编层面的库函数和所需参数。</p>
+<p><em>ps：不论对于操作码还是操作数，不同数据类型的数据或操作码有各自的汇编代码后缀，比方说b后缀代表字符型，q后缀代表四字型，具体可以翻阅原书3.3部分。</em></p>
+<p><em>ps2：操作码的后缀只是无关紧要的大小指示符，并不会对你读代码有什么影响，尽管这年头没多少需要你正儿八经全程手撕汇编的场合就是了</em></p>
+<p>操作数又分为：</p>
+<h5 id="立即数-Immediate"><a href="#立即数-Immediate" class="headerlink" title="立即数(Immediate)"></a>立即数(Immediate)</h5><p>简单理解就是写在函数里的常量，但因为是汇编，大部分情况下仅满足C语言定义的数值。部分系统的立即数带有“$”前缀。</p>
+<h5 id="寄存器-Register"><a href="#寄存器-Register" class="headerlink" title="寄存器(Register)"></a>寄存器(Register)</h5><p>不需多说，但需要注意，高位系统的汇编会向下兼容到以下所有位数系统的寄存器。</p>
+<h5 id="内存引用-Memory-Reference"><a href="#内存引用-Memory-Reference" class="headerlink" title="内存引用(Memory Reference)"></a>内存引用(Memory Reference)</h5><p>一般表现为带括号的寄存器（及其和立即数的组合）。</p>
+<p>如果你认真了解过内存空间，以及自己看过《深入理解》的原书和之前的篇目，你就会知道整个内存空间可以被抽象地视为一个可以存取的数组，不过存取需要确切的起始地址和偏移（数据长度）。</p>
+<p>而我们使用内存引用，最常用的方法是使用一种语法表示为$Imm(r_b, r_i, s)$，实际值为$Imm+R[r_b]+R[r_i]*s$的表示方法。$Imm$表示立即数偏移；$r_b$表示基址寄存器；$r_i$表示变址寄存器。s为比例因子，且必须是8以内的2的次方，取决于你源代码中定义的数组类型，比方说char单位仅占单字节，比例因子是1，int由于单位占4字节，比例因子是4。</p>
+<p>至于其它形式，都是延伸自这一基础形式的变体，建议看书。</p>
+<p>那么接下来，就是各类传送指令的操作数：</p>
+<h5 id="mov系"><a href="#mov系" class="headerlink" title="mov系"></a>mov系</h5><p>mov，简单明了，格式为<code>mov src dest</code>，src表示源操作数，dest表示目的操作数，数据从源操作数表示的地址迁移至目的操作数表示的地址。若使用寄存器作为操作数，则mov的后缀必须与寄存器大小保持一致。指令本身和源操作数的地址上的元素构成一堆调用者和被调用者，你也可以将这个关系粗暴地理解为mov指令下源和目的的关系。</p>
+<p>但是，我们也知道，高版本系统架构存在寄存器向下兼容，而面对不同位数的mov指令向不同位数下的相同寄存器传输数据，寄存器会根据指令位数不同而变更不同位数，比方说对于已经被赋值0x12345678的64位rax寄存器，我们使用movb为其赋值-1，则只有最后一个字节变成FF，也就是0x123456FF，但如果是movw就是0x1234FFFF。</p>
+<p>总结而言，同名寄存器的不同位表示，对应自低位起占用不同的内存空间。</p>
+<p>以下是一些特殊情况：</p>
+<p><strong>1、在你使用movl指令时</strong>需要注意，movl在64位架构下使用时会习惯性地将寄存器高位4字节清零。如果哪道pwn题就利用这个机制让你的shell报废，那你可能得想点别的招。</p>
+<p><strong>2、传送绝对四字（八字节）长度数据</strong>，使用<code>movabsq</code>，且以寄存器作为源时必须以寄存器为目的</p>
+<p><strong>3、movz系列指令</strong>会把目的中剩余高位字节填充为0，以实现从至多为字的低大小单位源向高大小单位目的的数据传递。通俗点来讲，你可以理解为如果你想让char变量做数据源，让int变量做数据目的地，那你就用movzbl，也就是从字节到字的movz。两个单位后缀决定了传输源与目的的数据大小。</p>
+<p><strong>4、movs系列指令</strong>会对目的的剩余字节进行符号扩展，即正数填充0，复数填充1。基本用法与movz相同，但额外支持四字节到八字节的传输movslq，以及拓展eax到rax的专用指令cltq。</p>
+<h5 id="栈数据系（push，pop）"><a href="#栈数据系（push，pop）" class="headerlink" title="栈数据系（push，pop）"></a>栈数据系（push，pop）</h5><p>对于逆向手而言，栈的概念肯定不陌生，单进单出。你在ida里多半能看到每个函数对应的栈，这些栈其实对应着一段内存空间，毕竟数组就是可以拿来实现栈的，而内存空间抽象上就是数组。栈的增长方向从高地址向低地址，故栈顶元素地址最低，栈底元素地址最高，这点你从ida的function stack里从-N到+0的区间看，肯定会有比较直观的感受。</p>
+<p>在原理上，系统通过栈顶指针的修改，来实现栈内数据的增删。每次push，栈顶寄存器的值，也就是栈顶地址减去对应数据位数的值，然后才把数据存入新拓展的栈顶地址。分开这两个动作就是如下指令：</p>
+<pre><code>subn $len %rsp
+movn %rxp (%rsp)
+</code></pre>
+<p>而pop则是会读取数据，而后令栈顶地址加上对应数据位数的值。拆开来就是这样：</p>
+<pre><code>addn $len %rsp
+movn (%rsp) %rxp
+</code></pre>
+<p>在你的函数定义局部变量之时，压栈就已经开始了。程序会先将你定义的变量对应的源数据，通过<code>push src</code>的格式进行压栈，然后执行函数的时候再通过<code>pop dest</code>格式的pop指令将数据弹出至指定目的寄存器，再进行各项运算。关于具体案例，你可以自行百度或查看原书，抑或是看看<a target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV1sV411b7c1/?spm_id_from=333.788&vd_source=ad23e79160a6a987f8cbe101bc9133e3">九曲阑干的视频</a>。</p>
+<hr>
+<p>如上，我们对程序的机器级表示，也就是汇编做了一个初探。</p>
+<p>别急着晕，这才哪跟哪呢。前面的区域，以后还得探索呢~</p>
+<p>等下，为什么还是有坤声？等下，我为啥要说还是？</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E5%9B%9B%E7%AF%87%E4%B8%8A3.jpg"></p>
+<p>麻了，姑奶奶你消停消停（闭门声）</p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">学习</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="../../2023/09/09/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E5%9B%9B%E7%AF%87%EF%BC%88%E4%B8%8A%EF%BC%89/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
+    <article id="post-某逆向鸡饲料的WACON2023跟团游记" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="../../2023/09/09/%E6%9F%90%E9%80%86%E5%90%91%E9%B8%A1%E9%A5%B2%E6%96%99%E7%9A%84WACON2023%E8%B7%9F%E5%9B%A2%E6%B8%B8%E8%AE%B0/">某逆向鸡饲料的WACON2023跟团游记</a>
+    </h1>
+  
+
+        
+        <a href="../../2023/09/09/%E6%9F%90%E9%80%86%E5%90%91%E9%B8%A1%E9%A5%B2%E6%96%99%E7%9A%84WACON2023%E8%B7%9F%E5%9B%A2%E6%B8%B8%E8%AE%B0/" class="archive-article-date">
+  	<time datetime="2023-09-09T06:46:05.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-09-09</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h4 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h4><p>这把被nep的xdm带飞了</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/wacon2023_NepNep_ranking.png"></p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/wacon2023_NepNep_solved.png"></p>
+<p>但是自己还是拿了一些分，感觉还可以</p>
+<p>但是自己并不会其它方向，因此这次其实是本人的RE wp</p>
+<hr>
+<h4 id="Baby-Artist"><a href="#Baby-Artist" class="headerlink" title="Baby Artist"></a>Baby Artist</h4><p>一开始不知道这玩意是什么，但是看左上角像控制流图，扔进必应识图一搜，是Piet。</p>
+<p>这个语言的<a target="_blank" rel="noopener" href="https://esolangs.org/wiki/Piet">介绍</a>以及相关<a target="_blank" rel="noopener" href="https://gabriellesc.github.io/piet/">编辑器</a>放这了。简单来讲，这玩意就是个简化汇编，但是做了亿些艺术化处理，每条指令的颜色决定了下一个色块的指令，push相关的值由上一个色块的大小决定。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/wacon2023_baby_artist_1.png"></p>
+<p>本质上，一整个程序就是一堆算式和比对的集合，而由于Piet没有cmp，判断是通过下一个字符乘以((上一次计算的结果与上一个字符的差)取反)的值。由于基底还是栈，先进后出，所以把这玩意放进去跑，能跑出后半段，但是前半段会进入一段 意⭐义⭐不⭐明 的循环，所以得手操。</p>
+<p>各位可以品鉴一下其中一小段：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/wacon2023_baby_artist_2.png"></p>
+<pre><code>not
+push 10
+push 5
+push 2
+* (get 2 * 5 = 10)
+* (get 10 * 10 = 100)
+push 5
+- (get 100 - 5 = 95)
+- (get -95 which means this letter must be &quot;_&quot;)
+not
+*
+# not(a[i]-(2*5*10-5))=1
+
+push 2
+push 5
+push 11
+* (get 55)
+* (get 110)
+-
+not
+*
+# not(a[i]-2*5*11)=1
+</code></pre>
+<p>如上，我们可以硬推flag：</p>
+<pre><code>WACON2023&#123;fUn_Dr4W1ng!__w4nN4_try?&#125;
+</code></pre>
+<p>ps：实际上外网有个叫做<a target="_blank" rel="noopener" href="https://github.com/boothby/repiet">repiet</a>的工具，可助各位一臂之力，望周知</p>
+<h4 id="Adult-Artist"><a href="#Adult-Artist" class="headerlink" title="Adult Artist"></a>Adult Artist</h4><p>这玩意看上去比较恐怖，因为它的特征完美符合<a target="_blank" rel="noopener" href="https://github.com/xoreaxeaxeax/REpsych">REpsych</a>生成的控制流图。如下是我经过改色之后产生的图片：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/wacon2023_AdultArtist_1.png"></p>
+<p>然而有一个更加令人痛心的事实：这个程序除了main就只有这个被弄成画的函数。更加让人男泵的是，这玩意因为太大，你f5不起作用（各种意义上，不论是它没法反汇编还是就算能反汇编你也看不懂）</p>
+<p>不过，老逆向人的直觉会让你从汇编上面找线索。我们看它的开头有101个switch case：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/wacon2023_AdultArtist_2.png"></p>
+<p>我们随便点一个试试，你会发现它的逻辑都是对着eax寄存器嗯干：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/wacon2023_AdultArtist_3.png"></p>
+<p>最后汇总的时候，我们可以明显地看到eax实际上存着你输入的某位，而过程是将被对应位的case处理过的你的输入和预存储的东西进行一次cmp。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/wacon2023_AdultArtist_4.png"></p>
+<p>那思路很明显了，第一次运行自动patch过cmp，然后读dword里的东西，接着第二次运行再一个一个case的读汇编指令，然后自动化逆过程，一位一位地从dword还原输入，然后从控制台输入过case，最后拿到flag。（虽然实际上从代码表现来看，它是四位四位处理的）</p>
+<p>但是，赛场上我并没有写出代码来，所以这个过程还是交给外网dalao来整活（摘自<a target="_blank" rel="noopener" href="https://hackmd.io/@sahuang/rkHD37ZA3#RevTerrible-Flavor">sahuang的题解</a>）：</p>
+<blockquote>
+<p>patch部分</p>
+</blockquote>
+<pre><code>data = open(&quot;masterpiece&quot;, &quot;rb&quot;).read()
+
+bad = bytes.fromhex(&quot;2ec4e27196849a0c800e08&quot;)
+nops = bytes([0x90] * len(bad))
+
+jmpbad = bytes.fromhex(&quot;e900000000&quot;)
+# these jmps should be jumping 11 bytes ahead
+jmpgood = bytes.fromhex(&quot;e90b000000&quot;)
+
+data = data.replace(bad, nops).replace(jmpbad, jmpgood)
+
+target = 0x08049206
+target = target.to_bytes(4, &quot;little&quot;)
+
+assert data.count(target) == 1
+
+start = data.find(target)
+xdata = data[:start]
+
+for i in range(101):
+    jmpptr = data[start + i * 4:start + (i + 1) * 4]
+    jmpptr = int.from_bytes(jmpptr, &quot;little&quot;)
+    jmpptr += 11 # skip nops
+
+    jmpptr = jmpptr.to_bytes(4, &quot;little&quot;)
+    xdata += jmpptr
+
+xdata += data[start + 404:]
+
+open(&quot;masterpiece_patched&quot;, &quot;wb&quot;).write(xdata)
+</code></pre>
+<blockquote>
+<p>还原算法部分</p>
+</blockquote>
+<pre><code>from pwn import *
+from capstone import *
+
+sbox = [101, 242, 170, 79, 1, 137, 147, 58, 194, 8, 28, 195, 59, 63, 123, 111, 56, 254, 219, 122, 144, 127, 95, 81, 75, 61, 23, 104, 128, 155, 41, 196, 136, 121, 245, 202, 40, 15, 6, 42, 112, 68, 103, 47, 35, 139, 185, 116, 120, 11, 114, 106, 141, 55, 30, 253, 175, 74, 80, 86, 161, 32, 255, 235, 94, 163, 183, 34, 248, 221, 110, 109, 89, 198, 209, 54, 226, 25, 93, 169, 229, 20, 131, 83, 208, 156, 187, 135, 52, 88, 165, 38, 143, 164, 172, 186, 213, 118, 124, 115, 26, 87, 78, 159, 36, 181, 151, 10, 39, 92, 227, 191, 91, 19, 126, 67, 4, 50, 31, 0, 22, 2, 97, 162, 217, 173, 145, 193, 212, 239, 51, 133, 224, 49, 243, 71, 24, 236, 244, 72, 180, 69, 60, 134, 228, 158, 119, 18, 203, 108, 132, 190, 201, 167, 53, 168, 152, 238, 218, 250, 231, 160, 199, 189, 76, 140, 252, 174, 12, 249, 65, 57, 77, 105, 146, 197, 37, 82, 7, 66, 206, 44, 13, 215, 99, 176, 210, 43, 150, 148, 184, 166, 64, 142, 17, 188, 96, 154, 130, 223, 33, 216, 125, 90, 45, 113, 27, 70, 29, 232, 205, 233, 84, 237, 129, 207, 222, 138, 85, 220, 21, 102, 178, 192, 234, 62, 149, 16, 214, 107, 5, 177, 3, 200, 153, 157, 179, 230, 171, 251, 246, 225, 204, 241, 73, 9, 211, 247, 182, 14, 100, 240, 98, 117, 46, 48]
+inv_sbox = [sbox.index(i) for i in range(256)]
+finales = [1294921289, 3556600223, 1209339435, 1851550862, 3576661803, 935542824, 890675233, 1466443951, 2899239426, 2509770635, 3811890241, 4189575110, 3407890776, 151811947, 2021481915, 2224322179, 937543787, 2656386893, 2430690788, 937170305, 1595242648, 1313689251, 3449380580, 3981305360, 1805462865, 1000700706, 1394137676, 3037656969, 2213052412, 621078233, 44681021, 3125866984, 2270629699, 81231002, 732808204, 1962199736, 500787935, 3021495503, 343658160, 2011362800, 3051343062, 2649999813, 479102860, 1517017809, 2535887555, 2767036793, 864456536, 3221496586, 1236923337, 2535989912, 750098417, 2125817032, 3181958189, 1206391945, 911571295, 3648355814, 1356734492, 3557631056, 2749801664, 1533604227, 1218930141, 3796472889, 2869013044, 2909236950, 770707252, 1775872345, 1668747571, 164579730, 3194457712, 309450627, 725278243, 2120079896, 225892262, 2486260442, 2483139025, 3603672921, 4265882258, 3540118190, 2883355033, 1214344214, 708738895, 1637597950, 4066117530, 843823022, 1243164200, 1354787218, 1808234221, 2545499367, 2573345003, 423063696, 4155282283, 1510805520, 3005416590, 3521755546, 1409845455, 487735804, 3385604609, 1807103354, 2376904603, 2343410443]
+
+# max bits &gt; 0 == width of the value in bits (e.g., int_16 -&gt; 16)
+# Rotate left: 0b1001 --&gt; 0b0011
+rol = lambda val, r_bits, max_bits: \
+    (val &lt;&lt; r_bits%max_bits) &amp; (2**max_bits-1) | \
+    ((val &amp; (2**max_bits-1)) &gt;&gt; (max_bits-(r_bits%max_bits)))
+ 
+# Rotate right: 0b1001 --&gt; 0b1100
+ror = lambda val, r_bits, max_bits: \
+    ((val &amp; (2**max_bits-1)) &gt;&gt; r_bits%max_bits) | \
+    (val &lt;&lt; (max_bits-(r_bits%max_bits)) &amp; (2**max_bits-1))
+
+def xor(a, b):
+    return (a ^ b) &amp; 0xffffffff
+
+def nott(a):
+    return (~a &amp; 0xffffffff)
+
+def sub(a, b):
+    return (a - b) &amp; 0xffffffff
+
+def add(a, b):
+    return (a + b) &amp; 0xffffffff
+
+def bswap(a):
+    a3 = (a &gt;&gt; 24) &amp; 0xff
+    a2 = (a &gt;&gt; 16) &amp; 0xff
+    a1 = (a &gt;&gt; 8) &amp; 0xff
+    a0 = (a &gt;&gt; 0) &amp; 0xff
+    return (a0 &lt;&lt; 24) | (a1 &lt;&lt; 16) | (a2 &lt;&lt; 8) | a3
+
+# &#123;&#39;inc&#39;, &#39;jmp&#39;, &#39;xor&#39;, &#39;bswap&#39;, &#39;sub&#39;, &#39;dec&#39;, &#39;not&#39;, &#39;nop&#39;, &#39;rol&#39;, &#39;mov&#39;, &#39;add&#39;, &#39;ror&#39;&#125;
+
+msg = b&quot;&quot;
+
+f = open(&quot;./masterpiece_patched&quot;, &quot;rb&quot;).read()
+blocks = []
+start = 0x1062
+for _ in range(101):
+    jmptableptr = int.from_bytes(f[start:start+4], &quot;little&quot;)
+    print(hex(jmptableptr))
+    start += 4
+    blocks.append(jmptableptr - 0x8048000)
+
+for ind, s in enumerate(blocks[:-1]):
+    CODE = f[s:blocks[ind+1]] # idk get block
+    ddd = []
+
+    md = Cs(CS_ARCH_X86, CS_MODE_32)
+    for i in md.disasm(CODE, 0x1000):
+        ddd.append((i.address, i.mnemonic, i.op_str))
+
+    ddd = ddd[::-1]
+    fff = finales[ind]
+    al = 0
+    ah = 0
+    cl = 0
+    i = 0
+
+    while (i &lt; len(ddd)):
+        opp = ddd[i][1]
+        sss = ddd[i][2]
+
+        if opp == &#39;nop&#39; or opp == &#39;jmp&#39;:
+            i += 1
+            continue
+        
+        if opp == &#39;bswap&#39;:
+            fff = bswap(fff)
+            
+        elif opp == &#39;add&#39;:
+            vvv = int(sss[sss.index(&#39;,&#39;) + 1:], 16)
+            fff = sub(fff, vvv)
+            
+        elif opp == &#39;sub&#39;:
+            vvv = int(sss[sss.index(&#39;,&#39;) + 1:], 16)
+            fff = add(fff, vvv)
+            
+        elif opp == &#39;ror&#39;:
+            vvv = int(sss[sss.index(&#39;,&#39;) + 1:], 16)
+            fff = rol(fff, vvv, 32)
+            
+        elif opp == &#39;rol&#39;:
+            vvv = int(sss[sss.index(&#39;,&#39;) + 1:], 16)
+            fff = ror(fff, vvv, 32)
+            
+        elif opp == &#39;xor&#39;:
+            vvv = int(sss[sss.index(&#39;,&#39;) + 1:], 16)
+            fff = xor(fff, vvv)
+            
+        elif opp == &#39;not&#39;:
+            fff = nott(fff)
+            
+        elif opp == &#39;inc&#39;:
+            fff = fff - 1
+            
+        elif opp == &#39;dec&#39;:
+            fff = fff + 1
+            
+        elif opp == &#39;mov&#39;:
+            if sss.startswith(&#39;cl, al&#39;):
+                fff = (fff &gt;&gt; 8 &lt;&lt; 8) | cl
+            elif sss.startswith(&#39;cl, ah&#39;):
+                fff = (fff ^ (ah &lt;&lt; 8)) | (cl &lt;&lt; 8)
+            elif sss.startswith(&#39;al, byte&#39;):
+                al = fff &amp; 0xff
+                cl = inv_sbox[al]
+            elif sss.startswith(&#39;ah, byte&#39;):
+                ah = (fff &gt;&gt; 8) &amp; 0xff
+                cl = inv_sbox[ah]
+            else:
+                print(ddd[i])
+                break
+        # print(hex(ddd[i][0]), ddd[i], hex(fff))
+        i += 1
+
+    msg += int.to_bytes(fff, 4, &quot;little&quot;)
+    print(msg)
+</code></pre>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="../../2023/09/09/%E6%9F%90%E9%80%86%E5%90%91%E9%B8%A1%E9%A5%B2%E6%96%99%E7%9A%84WACON2023%E8%B7%9F%E5%9B%A2%E6%B8%B8%E8%AE%B0/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
+    <article id="post-NSILAB二进制之耻的CISCN初赛复现" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="../../2023/06/16/NSILAB%E4%BA%8C%E8%BF%9B%E5%88%B6%E4%B9%8B%E8%80%BB%E7%9A%84CISCN%E5%88%9D%E8%B5%9B%E5%A4%8D%E7%8E%B0/">NSILAB二进制之耻的CISCN初赛复现</a>
+    </h1>
+  
+
+        
+        <a href="../../2023/06/16/NSILAB%E4%BA%8C%E8%BF%9B%E5%88%B6%E4%B9%8B%E8%80%BB%E7%9A%84CISCN%E5%88%9D%E8%B5%9B%E5%A4%8D%E7%8E%B0/" class="archive-article-date">
+  	<time datetime="2023-06-16T08:07:33.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-06-16</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h3 id="babyRE"><a href="#babyRE" class="headerlink" title="babyRE"></a>babyRE</h3><p>美化程序，查看文件，发现开头有：<code>&lt;project name=&quot;re4baby22&quot; app=&quot;Snap! 8.2, https://snap.berkeley.edu&quot; version=&quot;2&quot;&gt;</code><br>为Snap！程序，使用相应工具打开：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/babyre-1.png"></p>
+<p>主要逻辑：整个输入序列后一位异或前一位，与答案比对，复现算法即可。</p>
+<pre><code>secret = [102, 10, 13, 6, 28, 74, 3, 1, 3, 7, 85, 0, 4, 75, 20, 92, 92, 8, 28, 25, 81, 83, 7, 28, 76, 88, 9, 0, 29, 73,
+          0, 86, 4, 87, 87, 82, 84, 85, 4, 85, 87, 30]
+for i in range(1,len(secret)):
+    secret[i] ^= secret[i-1]
+for i in range(len(secret)):
+    print(chr(secret[i]), end=&#39;&#39;)
+</code></pre>
+<h3 id="ezbyte"><a href="#ezbyte" class="headerlink" title="ezbyte"></a>ezbyte</h3><p>从start跟到sub_404C21，发现flag头尾校验，但代码最后跳转的判断部分sub_404BF5有一种脑干缺失的美，除了最后能隐约察觉它是想比对整个函数的返回值是否为0之外一无是处。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/ciscn2023_starting_ezbyte1.png"></p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/ciscn2023_starting_ezbyte2.png"></p>
+<p>然而在看了题解之后，我才发现脑干缺失的是我自己——</p>
+<h4 id="通过DWARF-Expression藏代码"><a href="#通过DWARF-Expression藏代码" class="headerlink" title="通过DWARF Expression藏代码"></a>通过DWARF Expression藏代码</h4><p>英文文档太难啃了，而且基本都是把DWARF Expression从机理到实现给你讲了个遍，用来塞题解显然不太现实，到时候再说。不过，看看<a target="_blank" rel="noopener" href="https://bbs.kanxue.com/thread-271891.htm#msg_header_h2_3">看雪上的文章</a>，以及<a target="_blank" rel="noopener" href="https://richar.top/nothingchu-ti-si-lu-ji-wp/">这道题的原型的题解</a>，应该还是比较轻松愉快的。</p>
+<p>简单来说，跟我们之前在《深入理解》里看到的一样，许多异常处理之后需要进行状态还原，以保证程序运行，在C++里面是这样的——</p>
+<blockquote>
+<p>在类Unix系统中，由g++&#x2F;clang++编译出的程序，是使用DWARF调试信息完成这个恢复过程的。早期的DWARF标准只支持一些简单的原语以恢复运行状态，在DWARF 3标准中引入了一个DWARF Expression，可以将它理解为一个基于栈的虚拟机，由标准C++库解释执行它，它包含一系列的字节码，提供了读取程序运行内存的Handle，但不支持写入程序运行内存。</p>
+<p>DWARF Expression支持的操作可以分为编码（入栈立即数），寄存器寻址（入栈 REG + OFFSET），栈操作（SWAP，POP等操作），算术运算，流程转移。我简单介绍一些常用的操作。</p>
+</blockquote>
+<p>所以，DWARF Expression实际上可以看作一个包含在调试信息内的简单虚拟机代码，可以复现一定范围内功能的源代码并执行，在编译过程之后这些信息在代码上便不可见，所以也很好地保护了代码。而我们要做的，就是将这些内容给提出来，再塞回去。</p>
+<p>万幸，此前的出题人也准备好了应对手段。如下是将程序转换为正常C的rust代码：</p>
+<pre><code>use std::&#123;collections::HashMap, fs, fmt::Display, io::Write&#125;;
+use std::process::Command;
+ 
+use gimli::UnwindSection;
+use object::&#123;Object, ObjectSection&#125;;
+ 
+fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; &#123;
+    let mut arg = std::env::args();
+    if arg.len() != 2 &#123;
+        panic!(&quot;Argument Error!&quot;)
+    &#125;
+    let bin_data = fs::read(arg.nth(1).unwrap())?;
+    let obj_file = object::File::parse(&amp;*bin_data)?;
+    let data = obj_file.section_by_name(&quot;.eh_frame&quot;).unwrap();
+    let eh_frame = gimli::read::EhFrame::new(data.data()?, gimli::LittleEndian);
+    let bases = gimli::BaseAddresses::default().set_eh_frame(data.address());
+    let mut entries = eh_frame.entries(&amp;bases);
+ 
+    let mut file = fs::OpenOptions::new().append(false).truncate(true).write(true).create(true).open(&quot;./output.c&quot;)?;
+    writeln!(file, &quot;#include &lt;stdint.h&gt;&quot;)?;
+ 
+    let mut cies = HashMap::new();
+    while let Some(entry) = entries.next()? &#123;
+        if let gimli::CieOrFde::Fde(partial) = entry &#123;
+            let fde = partial.parse(|_, bases, o| &#123;
+                cies.entry(o)
+                    .or_insert_with(|| eh_frame.cie_from_offset(bases, o))
+                    .clone()
+            &#125;)?;
+            // 通过长度过滤出我们想要的
+            if fde.entry_len() &lt; 100 &#123;
+                continue;
+            &#125;
+            let mut instructions = fde.instructions(&amp;eh_frame, &amp;bases);
+            use gimli::CallFrameInstruction::*;
+            loop &#123;
+                match instructions.next() &#123;
+                    Err(e) =&gt; &#123;
+                        println!(&quot;Failed to decode CFI instruction: &#123;&#125;&quot;, e);
+                        break;
+                    &#125;
+                    Ok(Some(ValExpression &#123;
+                                register,
+                                expression,
+                            &#125;)) =&gt; &#123;
+                        println!(
+                            &quot;DW_CFA_val_expression (&#123;&#125;, ...)&quot;,
+                            gimli::X86_64::register_name(register).unwrap_or(&quot;&#123;unknown&#125;&quot;)
+                        );
+                        display_val_expression(register, expression, &amp;mut file)?;
+                    &#125;
+                    Ok(None) =&gt; &#123;
+                        break;
+                    &#125;
+                    _ =&gt; &#123;&#125;
+                &#125;
+            &#125;
+        &#125;
+    &#125;
+    file.flush()?;
+ 
+    Command::new(&quot;gcc&quot;)
+        .arg(&quot;-O3&quot;)
+        .arg(&quot;./output.c&quot;)
+        .arg(&quot;-c&quot;)
+        .spawn()?;
+ 
+    Ok(())
+&#125;
+ 
+#[derive(Clone, Copy)]
+struct Val &#123;
+    id: u64,
+&#125;
+ 
+impl Val &#123;
+    fn new(id: u64) -&gt; Self &#123;
+        Val &#123; id &#125;
+    &#125;
+&#125;
+ 
+struct ValGenerator &#123;
+    id: u64,
+&#125;
+ 
+impl ValGenerator &#123;
+    fn new() -&gt; Self &#123;
+        Self &#123; id: 0 &#125;
+    &#125;
+    fn next(&amp;mut self) -&gt; Val &#123;
+        self.id += 1;
+        Val::new(self.id - 1)
+    &#125;
+&#125;
+ 
+impl Display for Val &#123;
+    fn fmt(&amp;self, f: &amp;mut std::fmt::Formatter&lt;&#39;_&gt;) -&gt; std::fmt::Result &#123;
+        write!(f, &quot;v&#123;&#125;&quot;, self.id)
+    &#125;
+&#125;
+ 
+fn display_val_expression&lt;R&gt;(target_reg: gimli::Register, exp: gimli::Expression&lt;R&gt;, w: &amp;mut dyn Write) -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt;
+    where
+        R: gimli::Reader,
+&#123;
+    let mut val_generator = ValGenerator::new();
+    let mut ops = exp.operations(gimli::Encoding &#123; address_size: 8, format: gimli::Format::Dwarf64, version: 5 &#125;);
+    let mut stack: Vec&lt;Val&gt; = Vec::new();
+    writeln!(w, &quot;uint64_t cal_&#123;&#125;(uint64_t r12, uint64_t r13, uint64_t r14, uint64_t r15)&#123;&#123;", gimli::X86_64::register_name(target_reg).unwrap())?;
+	    writeln!(w, "    uint64_t rax=0,rbx=0;")?;
+	    loop &#123;
+	        if let Ok(Some(op)) = ops.next() &#123;
+	            match op &#123;
+	                gimli::Operation::Drop => &#123;
+	                    stack.pop();
+	                &#125;
+	                gimli::Operation::Pick &#123; index &#125; => &#123;
+	                    let val1 = stack.get(stack.len() - 1 - index as usize).unwrap();
+	                    let new_val = val_generator.next();
+	                    writeln!(w, "    uint64_t &#123;&#125;=&#123;&#125;;", new_val, val1)?;
+	                    stack.push(new_val);
+	                &#125;
+	                gimli::Operation::Swap => &#123;
+	                    let val1 = stack.pop().unwrap();
+	                    let val2 = stack.pop().unwrap();
+	                    stack.push(val1);
+	                    stack.push(val2);
+	                &#125;
+	                gimli::Operation::Rot => &#123;
+	                    let val1 = stack.pop().unwrap();
+	                    let val2 = stack.pop().unwrap();
+	                    let val3 = stack.pop().unwrap();
+	                    stack.push(val1);
+	                    stack.push(val3);
+	                    stack.push(val2);
+	                &#125;
+	                gimli::Operation::And => &#123;
+	                    let val1 = stack.pop().unwrap();
+	                    let val2 = stack.pop().unwrap();
+	                    let new_val = val_generator.next();
+	                    writeln!(w, "    uint64_t &#123;&#125;=&#123;&#125;&&#123;&#125;;", new_val, val2, val1)?;
+	                    stack.push(new_val);
+	                &#125;
+	                gimli::Operation::Minus => &#123;
+	                    let val1 = stack.pop().unwrap();
+	                    let val2 = stack.pop().unwrap();
+	                    let new_val = val_generator.next();
+	                    writeln!(w, "    uint64_t &#123;&#125;=&#123;&#125;-&#123;&#125;;", new_val, val2, val1)?;
+	                    stack.push(new_val);
+	                &#125;
+	                gimli::Operation::Neg => &#123;
+	                    let val = stack.get(stack.len() - 1).unwrap();
+	                    writeln!(w, "    &#123;&#125;=-&#123;&#125;;", val, val)?;
+	                &#125;
+	                gimli::Operation::Not => &#123;
+	                    let val = stack.get(stack.len() - 1).unwrap();
+	                    writeln!(w, "    &#123;&#125;=~&#123;&#125;;", val, val)?;
+	                &#125;
+	                gimli::Operation::Or => &#123;
+	                    let val1 = stack.pop().unwrap();
+	                    let val2 = stack.pop().unwrap();
+	                    let new_val = val_generator.next();
+	                    writeln!(w, "    uint64_t &#123;&#125;=&#123;&#125;|&#123;&#125;;", new_val, val2, val1)?;
+	                    stack.push(new_val);
+	                &#125;
+	                gimli::Operation::Plus => &#123;
+	                    let val1 = stack.pop().unwrap();
+	                    let val2 = stack.pop().unwrap();
+	                    let new_val = val_generator.next();
+	                    writeln!(w, "    uint64_t &#123;&#125;=&#123;&#125;+&#123;&#125;;", new_val, val2, val1)?;
+	                    stack.push(new_val);
+	                &#125;
+	                gimli::Operation::PlusConstant &#123; value &#125; => &#123;
+	                    let val = stack.get(stack.len() - 1).unwrap();
+	                    writeln!(w, "    &#123;&#125;+=&#123;&#125;ull;", val, value)?;
+	                &#125;
+	                gimli::Operation::Shl => &#123;
+	                    let val1 = stack.pop().unwrap();
+	                    let val2 = stack.pop().unwrap();
+	                    let new_val = val_generator.next();
+	                    writeln!(w, "    uint64_t &#123;&#125;=&#123;&#125;<<&#123;&#125;;", new_val, val2, val1)?; stack.push(new_val); &#125; gimli::operation::shr> &#123;
+	                    let val1 = stack.pop().unwrap();
+	                    let val2 = stack.pop().unwrap();
+	                    let new_val = val_generator.next();
+	                    writeln!(w, "    uint64_t &#123;&#125;=&#123;&#125;>>&#123;&#125;;", new_val, val2, val1)?;
+	                    stack.push(new_val);
+	                &#125;
+	                gimli::Operation::Shra => &#123;
+	                    let val1 = stack.pop().unwrap();
+	                    let val2 = stack.pop().unwrap();
+	                    let new_val = val_generator.next();
+	                    writeln!(w, "    uint64_t &#123;&#125;=(uint64_t)((int64_t)&#123;&#125;>>(int64_t)&#123;&#125;);", new_val, val2, val1)?;
+	                    stack.push(new_val);
+	                &#125;
+	                gimli::Operation::Xor => &#123;
+	                    let val1 = stack.pop().unwrap();
+	                    let val2 = stack.pop().unwrap();
+	                    let new_val = val_generator.next();
+	                    writeln!(w, "    uint64_t &#123;&#125;=&#123;&#125;^&#123;&#125;;", new_val, val2, val1)?;
+	                    stack.push(new_val);
+	                &#125;
+	                gimli::Operation::Eq => &#123;
+	                    let val1 = stack.pop().unwrap();
+	                    let val2 = stack.pop().unwrap();
+	                    let new_val = val_generator.next();
+	                    writeln!(w, "    uint64_t &#123;&#125;= &#123;&#125;==&#123;&#125;?1:0;", new_val, val2, val1)?;
+	                    stack.push(new_val);
+	                &#125;
+	                gimli::Operation::Ge => &#123;
+	                    let val1 = stack.pop().unwrap();
+	                    let val2 = stack.pop().unwrap();
+	                    let new_val = val_generator.next();
+	                    writeln!(w, "    uint64_t &#123;&#125;=&#123;&#125;>=&#123;&#125;?1:0;", new_val, val2, val1)?;
+	                    stack.push(new_val);
+	                &#125;
+	                gimli::Operation::Gt => &#123;
+	                    let val1 = stack.pop().unwrap();
+	                    let val2 = stack.pop().unwrap();
+	                    let new_val = val_generator.next();
+	                    writeln!(w, "    uint64_t &#123;&#125;=&#123;&#125;>&#123;&#125;?1:0;", new_val, val2, val1)?;
+	                    stack.push(new_val);
+	                &#125;
+	                gimli::Operation::Le => &#123;
+	                    let val1 = stack.pop().unwrap();
+	                    let val2 = stack.pop().unwrap();
+	                    let new_val = val_generator.next();
+	                    writeln!(w, "    uint64_t &#123;&#125;=&#123;&#125;<=&#123;&#125;?1:0;", new_val, val2, val1)?; stack.push(new_val); &#125; gimli::operation::lt> &#123;
+	                    let val1 = stack.pop().unwrap();
+	                    let val2 = stack.pop().unwrap();
+	                    let new_val = val_generator.next();
+	                    writeln!(w, "    uint64_t &#123;&#125;=&#123;&#125;<&#123;&#125;?1:0;", new_val, val2, val1)?; stack.push(new_val); &#125; gimli::operation::ne> &#123;
+	                    let val1 = stack.pop().unwrap();
+	                    let val2 = stack.pop().unwrap();
+	                    let new_val = val_generator.next();
+	                    writeln!(w, "    uint64_t &#123;&#125;=&#123;&#125;!=&#123;&#125;?1:0;", new_val, val2, val1)?;
+	                    stack.push(new_val);
+	                &#125;
+	                gimli::Operation::UnsignedConstant &#123; value &#125; => &#123;
+	                    let new_val = val_generator.next();
+	                    writeln!(w, "    uint64_t &#123;&#125;=&#123;&#125;ull;", new_val, value)?;
+	                    stack.push(new_val);
+	                &#125;
+	                gimli::Operation::SignedConstant &#123; value &#125; => &#123;
+	                    let new_val = val_generator.next();
+	                    writeln!(w, "    uint64_t &#123;&#125;=(uint64_t)&#123;&#125;ll;", new_val, value)?;
+	                    stack.push(new_val);
+	                &#125;
+	                gimli::Operation::Register &#123; register &#125; => &#123;
+	                    let new_val = val_generator.next();
+	                    writeln!(w, "    uint64_t &#123;&#125;=&#123;&#125;;", new_val, gimli::X86_64::register_name(register).unwrap_or("&#123;error&#125;"))?;
+	                    stack.push(new_val);
+	                &#125;
+	                _ => todo!("&#123;:?&#125;", op)
+	            &#125;
+	        &#125; else &#123;
+	            break;
+	        &#125;
+	    &#125;
+	    assert_eq!(stack.len(), 1);
+	    writeln!(w, "    return &#123;&#125;;", stack.pop().unwrap())?;
+	    writeln!(w, "&#125;&#125;\n&quot;)?;
+    Ok(())
+&#125;
+</&#123;&#125;?1:0;",></=&#123;&#125;?1:0;",></&#123;&#125;;",></code></pre>
+<p>配置rust的过程有点枯燥，但是<a target="_blank" rel="noopener" href="https://www.runoob.com/rust/rust-setup.html">菜鸟教程</a>解千愁。记得在Cargo.toml里加上你调用的库的配置（如下是我用的版本）：</p>
+<pre><code>[dependencies]
+gimli = &quot;0.26.1&quot;
+object = &quot;0.29.0&quot;
+rand = &quot;0.7.3&quot;
+</code></pre>
+<p>然后把你的被DWARF Expression的代码放到<code>项目目录\target\debug</code>里跑就完事了，但是有点奇怪：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/ciscn2023_starting_ezbyte3.png"></p>
+<p>报错显示缺少注册表偏移，按着前面照猫画虎摸一个出来：</p>
+<pre><code>gimli::Operation::RegisterOffset&#123; register, offset, ..&#125; =&gt;&#123;
+                let new_val = val_generator.next();
+                writeln!(w, &quot;    uint64_t &#123;&#125;=(&#123;&#125;+&#123;&#125;ull);&quot;, new_val, gimli::X86_64::register_name(register).unwrap_or(&quot;&#123;error&#125;&quot;),offset)?;
+                stack.push(new_val);
+            &#125;
+</code></pre>
+<p>也可以翻看<a target="_blank" rel="noopener" href="https://www.yulate.com/426.html">yulate佬的题解</a>抄一个，这里就不细说了。然后就是跑出来一个中间的.o文件和最后的c文件。由于反汇编自带代码简化，我们直接IDA看.o（代码因人而异）：</p>
+<pre><code>__int64 __fastcall cal_r12(__int64 a1, __int64 a2, __int64 a3, __int64 a4)
+&#123;
+  return ((a3 + 1512312) ^ 0x2D393663614447B1i64)
+       + ((a1 + 1892739) ^ 0x35626665394D17E8i64)
+       + ((a2 + 8971237) ^ 0x65342D6530C04912i64)
+       + ((a4 + 9123704) ^ 0x6336396431BE9AD9i64);
+&#125;
+</code></pre>
+<p>一个数异或自己&#x3D;0，所以这就是个简单的判断，再加上它非常像某些十六进制字符数据，于是我们放进python逆推：</p>
+<pre><code>a = [0, 0, 0, 0]
+a[0] = 0x35626665394D17E8 - 1892739
+a[1] = 0x65342D6530C04912 - 8971237
+a[2] = 0x2D393663614447B1 - 1512312
+a[3] = 0x6336396431BE9AD9 - 9123704
+
+print(&quot;flag&#123;&quot;, end=&#39;&#39;)
+
+for i in range(4):
+    while a[i] &gt; 0:
+        c = chr(int(a[i] % 0x100))
+        print(c, end=&#39;&#39;)
+        a[i] //= 256
+
+print(&quot;3861&#125;&quot;)
+</code></pre>
+<blockquote>
+<p>flag{e609efb5-e70e-4e94-ac69-ac31d96c3861}</p>
+</blockquote>
+<p>解多纯粹因为有脚本，我没解出来纯粹因为知识盲区，蔡就多练.jpg</p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="../../2023/06/16/NSILAB%E4%BA%8C%E8%BF%9B%E5%88%B6%E4%B9%8B%E8%80%BB%E7%9A%84CISCN%E5%88%9D%E8%B5%9B%E5%A4%8D%E7%8E%B0/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
+    <article id="post-深入理解计算机系统学习笔记-第五篇（中）" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="../../2023/06/11/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%BA%94%E7%AF%87%EF%BC%88%E4%B8%AD%EF%BC%89/">深入理解计算机系统学习笔记-第五篇（中）</a>
+    </h1>
+  
+
+        
+        <a href="../../2023/06/11/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%BA%94%E7%AF%87%EF%BC%88%E4%B8%AD%EF%BC%89/" class="archive-article-date">
+  	<time datetime="2023-06-11T07:45:19.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-06-11</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h3 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h3><p>经历了ISCC和二十余篇报告的终极折磨，我终于……还是没解放</p>
+<p>课程设计、期末考试、武术表演、CISCN……甚至还是AWD</p>
+<p>我™真想给那屎忽的来一发超解口牙！我要把那可恶排班，可恶出题人，锁在地上吃我登龙口牙！！！杀！杀！杀！！！</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%BA%94%E7%AF%87%E4%B8%AD-1.png"></p>
+<p>害，算了，让我们收拾收拾心情，看看接下来的内容：</p>
+<h3 id="进程控制"><a href="#进程控制" class="headerlink" title="进程控制"></a>进程控制</h3><p>这把的CISCN初赛，有一道pwn用上了一个恶心玩意，那就是<strong>fork</strong>。简单来讲，这玩意用来克隆一个与父进程在代码和堆栈等层面完全一致，也就是上回提到的0-3G的用户层部分完全一致，甚至连哪个变量的值是什么都一样，但在pid（每个进程的运行时唯一编号）、内核映射等方面不大一样的子进程（具体可以看<a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/53527981">享受生活 的文章</a>）。那道题目中，程序在while时通过fork创建子进程回传，再配合PIE地址随机化把没有做过多少pwn的我整的晕头转向。</p>
+<p>当然，fork可不单单是出题人用来恶心人的道具，在错误处理、进程控制等方面，fork都有重要应用。实际上，你的linux shell也在用fork。当你打算打开一个程序，shell通过fork创建一个新的子进程。而这些就是我们接下来要讲的内容：</p>
+<h4 id="fork的作用机理"><a href="#fork的作用机理" class="headerlink" title="fork的作用机理"></a>fork的作用机理</h4><p>以程序员角度，一个进程有三种状态，运行（Running，即在自己的逻辑控制流上，正在或等待执行的状态）、暂停（Stopped，进程被挂起，暂时不会被调度或执行）和终止（Terminated，进程不再被执行）。其中，暂停在进程收到 SIGSTOP &#x2F; SIGSTEP &#x2F; SIGTTIN &#x2F; SIGTTOU 信号时发生，而终止则在收到对应信号、主程序返回或者调用exit函数时发生。</p>
+<p>fork的定义如下：</p>
+<pre><code>#include &lt;sys/types.h&gt;
+#include &lt;unistd.h&gt;
+
+pid_t fork(void);
+</code></pre>
+<p>返回值在linux中定义为int，当子进程成功创建，fork在子进程中返回0，在父进程中返回子进程的PID。若子进程创建不成功返回-1。故正常运转的fork调用一次时会返回两次，一次子进程，一次父进程。比如如下代码：</p>
+<pre><code>pid = fork();
+
+if (pid == 0)&#123;
+    printf(&quot;child detected\n&quot;);
+    exit();
+&#125;
+printf(&quot;pid: %d\n&quot;, pid);
+exit();
+</code></pre>
+<p>在子进程中，fork的返回值为0，故会输出<code>child detected</code>；在父进程中，fork的返回值为子进程的pid，故会输出<code>pid: 2</code>之类的东西。两个进程独立并发运行，且先后顺序不定，取决于你的操作系统。</p>
+<p>如上，子进程相对于父进程，除了用户层分配的三个G是相同的之外，地址空间在构成上也是完全相同的，但两个空间相互独立。并且，它们调用的文件都是相同的。</p>
+<p>以及，多次调用fork而不清理进程的话，会使得进程指数级增长，2fork出4进程，3fork出8进程，etc。为了你的电脑，请不要偷懒一次性多开fork，而没写回收的函数，要不然……</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%BA%94%E7%AF%87%E4%B8%AD-2.png"></p>
+<h4 id="为什么，以及如何回收进程呢"><a href="#为什么，以及如何回收进程呢" class="headerlink" title="为什么，以及如何回收进程呢"></a>为什么，以及如何回收进程呢</h4><blockquote>
+<p>在Linux中正常情况下，子进程是通过父进程创建的，子进程再创建新的进程。子进程的结束和父进程的运行是一个异步过程，也就是说，父进程永远无法预知到子进程会在什么时候结束。当一个进程完成工作终止后，它的父进程需要调用<code>wait()</code>或<code>waitpid()</code>系统调用来获取子进程的终止状态。</p>
+<p>——摘自<a target="_blank" rel="noopener" href="https://www.jianshu.com/p/943f6cfff191">JunChow520的文章</a></p>
+</blockquote>
+<p>子进程的结束时间相对于父进程是不定的，正常来讲，子进程在父进程结束之前结束，并获得子进程状态，而倘若父进程先于子进程结束，那么这个子进程就成为了没父亲的<strong>孤儿进程</strong>，系统会安排init进程称为它的<strong>养父进程</strong>，其pid为1，是所有进程的祖先，亦是所有孤儿进程的“托儿所”。由于计算机系统并不像某些dfzf一样拖泥带水，这些孤儿进程一般都会得到妥善回收，所以这种情况是不需要我们处理的。</p>
+<p>但<strong>僵死进程</strong>就不那么好办了。通常来讲，我们在父进程中会使用wait或者waitpid来回收，或者在父进程因为某些问题挂掉的时候让init领养，可一旦你在父进程中忘记回收，而你的子进程恰好在父进程运行的逻辑控制流中终止了，那它就成为了停止，但依旧在内核空间存在的僵死进程，即子进程残留资源PCB存放于内核中。</p>
+<p>这些残留资源会一直存在于内核，并且占用相应的内存号，要是没有其它进程用wait或者waitpid发现它们，可能它们就一直呆在那里，直到你内存爆炸或者系统再也无法生成新的进程号，然后你的电脑就在寄掉的边缘徘徊。你也不能kill它们，因为它们已经是终止的进程了，就整一个处于死了也没死的状态，故又名<strong>僵尸进程</strong>，让计算机避之不及。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%BA%94%E7%AF%87%E4%B8%AD-3.png"></p>
+<p>但好就好在，我们还有wait和waitpid可以利用。</p>
+<p>wait函数可以阻塞当前进程，等待子进程退出，之后进行子进程的回收并获取子进程终止状态及原因。子进程的终止状态由<code>wait.h</code>库的几个宏定义：</p>
+<blockquote>
+<p>WIFEXITED(status) ：全称wait if exited，表示判断是否是正常退出的，若非0则表示进程正常退出<br>WEXITSTATUS(status) ：全称wait exit status，表示退出状态，当子进程正常退出，即WIFEXITED(status)为真则获取进程退出的状态，即exit的参数。<br>WIFSIGNALED(status) ：全称wait if signaled，若非0则表示进程异常终止<br>WTERMSIG(status)：全称wait term signal，若WIFSIGNALED为真则获得使进程终止的那个信号的编号。<br>WIFSTOPPED(status)：全称wait if stopped进程处于暂停状态，若非0则表示进程处于暂停状态<br>WSTOPSIG(status)：为真则使用宏WSTOPSIG(status)以获取使进程暂停的那个信号的编号。<br>WIFCONTINUED(status)：为真则表示进程暂停后已经继续运行  </p>
+</blockquote>
+<p>waitpid则更加灵活且具有指向性，可以指定pid进程清理且不带有进程阻塞。若pid小于-1表示回收指定进程组中的任意子进程；若pid等于0表示回收和当前调用waitpid一个组的所有子进程；若pid等于-1表示回收任意子进程，作用相当于wait函数；若pid大于0表示回收指定进程ID的子进程。</p>
+<p>Linux中系统调用的错误都存储于 errno中，errno由操作系统维护，存储就近发生的错误，即下一次的错误码会覆盖掉上一次的错误。当调用进程没有子进程，则waitpid返回-1，并且设置errno为ECHILD。若waitpid被一个信号中断，则返回-1，并设置errno为EINTR。详细的errno状态列表可以参考<a target="_blank" rel="noopener" href="https://www.cnblogs.com/Jimmy1988/p/7485133.html">Jimmy_Nie的文章</a>，这里不再赘述。</p>
+<h4 id="加载并运行程序"><a href="#加载并运行程序" class="headerlink" title="加载并运行程序"></a>加载并运行程序</h4><p>fork可以克隆一个进程，但我们怎么在进程运行的过程中在打开一个新的程序呢？这就要用到<strong>execve</strong>了。execve函数在当前进程的上下文中加载并运行一个新程序，但是莫得返回值。execve的定义如下：</p>
+<pre><code>#include &lt;unistd.h&gt;
+
+int execve(const char *filename, const char *argv[], const char *envp[]);
+</code></pre>
+<p><strong>filename</strong>就是你要运行的程序名，<strong>argv</strong>表示执行这个程序需要的参数列表，<strong>envp</strong>表示环境变量列表。</p>
+<p>关于argv，最直观的，你使用linux或者windows的shell执行某些程序或指令的时候，你在后面加上的一系列诸如<code>-o xxx</code>或者<code>--update</code>之类的东西就是这个程序运行需要的参数。<code>argv[0]</code>按照惯例是你的可执行文件或程序的名字，比方说我们需要在kali上修复并更新系统上的软件，那么我们一般会用（假设你已经是root权限了）：</p>
+<pre><code>apt-get update --fix-missing
+</code></pre>
+<p>此时，argv内容如下，argc表参数个数（严格意义来讲是argv中非空指针的数量），argv以NULL结尾：</p>
+<pre><code>argv[0] = &quot;apt-get&quot;
+argv[1] = &quot;update&quot;
+argv[argc-1] = &quot;--fix-missing&quot;
+argv[argc] = NULL
+</code></pre>
+<p>envp和argv一样都是尾部为NULL的指针数组，但从0开始包含当前的环境变量信息，如文件路径pwd，用户名，系统版本等。环境变量及其打印可以参考<a target="_blank" rel="noopener" href="https://blog.csdn.net/deniece1/article/details/102766346">deniece1的文章</a>。</p>
+<h5 id="加载"><a href="#加载" class="headerlink" title="加载"></a>加载</h5><p>当我们使用shell运行程序的时候，以linux shell为例，我们在输入执行命令后，execve首先会调用一个驻留在存储器中的<strong>加载器</strong>(loader)，这个加载器会先读取可执行文件的头，校验它的正确性，接着将其中的代码和数据从磁盘复制到内存中，接着通过跳转到程序的第一条指令或者入口点来运行该程序（也就是把PC定位到第一条指令的地址），这个过程叫做<strong>加载</strong>。</p>
+<p>从细节上，上一节其实对地址空间的描述还不够细致，事实上，地址空间从代码段开始的0x400000，还有读&#x2F;写段、运行时堆、共享库的内存映射区域和用户栈（并且数据与代码间为了.data段的前后对齐而留有空隙）。用户栈从最大合法用户地址，也就是上一回提到的那个第三个G的尾巴开始，向较小地址反向拓展。</p>
+<p>接下来可以参考第一回的内容，在程序header的引导下，加载器调用mmap进行映射，具体而言是一种“按需分页”的方法，不会一下子将所有的代码段以及数据段的数据加载到内存，而是通过<strong>缺页中断</strong>（当软件试图访问已映射在虚拟地址空间中，但是目前并未被加载在物理内存中的一个分页时，由中央处理器的内存管理单元所发出的中断）来实现懒加载，而这些被分页的程序段就叫做<strong>chunk</strong>。</p>
+<p>加载器接下来会让PC指向程序的<code>start</code>，<code>start</code>又指向系统启动函数<code>__libc_start_main</code>，该函数定义在系统库<code>libc.so</code>中，以初始化执行环境并调用main函数进行处理，一定情况下需要返回信息给内核。<code>__libc_start_main</code>的严格定义如下：</p>
+<pre><code>int __libc_start_main(int *(main) (int, char * *, char * *), int argc, char * * ubp_av, void (*init) (void), void (*fini) (void), void (*rtld_fini) (void), void (* stack_end));
+</code></pre>
+<h5 id="运行"><a href="#运行" class="headerlink" title="运行"></a>运行</h5><p>接下来，启动代码设置栈，并将控制权和变量传递给用户层的，也就是程序的主函数main。堆栈的结构自栈底到栈顶依次是：环境变量、命令行、envp、argv、libc_start_main的栈帧、main未来的栈帧。</p>
+<p>main的定义比较简单：</p>
+<pre><code>int main(int argc,char **argv, char **envp);
+</code></pre>
+<p>接下来，程序按照既定顺序执行代码。当程序的主函数结束，<code>__libc_start_main</code>将控制传递给exit，结束进程。</p>
+<p>不过从理论上，加载器本身作为一个程序，也需要被shell通过execve调用，按这么说，execve调用加载器，加载器需要execve启动，然后要加载器加载加载器，接下来就是加载器加载加载加载器的加载器……</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%BA%94%E7%AF%87%E4%B8%AD-4.png"></p>
+<p>好了，不开玩笑了。事实上，因为是execve调用的加载器，所以你单独使用execve还是不会发生上述的套娃，就算在进程中使用execve调用加载器，也只会发生加载器加载加载器的情况，点到为止。</p>
+<h5 id="fork-execve"><a href="#fork-execve" class="headerlink" title="fork + execve"></a>fork + execve</h5><p>然而，光使用execve还不够，因为execve是在当前进程的上下文中打开相应的程序，而非新创建一个进程：</p>
+<blockquote>
+<p>system是在单独的进程中执行命令，完了还会回到你的程序中。而exec函数是直接在你的进程中执行新的程序，新的程序会把你的程序覆盖，除非调用出错，否则你再也回不到exec后面的代码，就是说你的程序就变成了exec调用的那个程序了。</p>
+<p>——摘自<a target="_blank" rel="noopener" href="https://blog.csdn.net/i792439187/article/details/8826745">挨踢的小胖的文章</a></p>
+</blockquote>
+<p>因此，我们往往需要利用fork+execve的形式来创建一个全新的进程。一个简单的自定义进程创建大概长这样：</p>
+<pre><code>pid = fork();
+if (pid &lt; 0) exit(-1);
+else if (pid == 0)execve([your progress], [argv], NULL);
+else&#123;
+    wait();
+    exit(0);
+&#125;
+</code></pre>
+<hr>
+<p>到此为止，我们终于把程序的运行机理，进程的创建机理给深入分析了一番。至于接下来的内容嘛……还是那句话：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%BA%94%E7%AF%87%E4%B8%AD-5.png"></p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">学习</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="../../2023/06/11/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%BA%94%E7%AF%87%EF%BC%88%E4%B8%AD%EF%BC%89/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
     <article id="post-深入理解计算机系统学习笔记-第五篇（上）" class="article article-type-post  article-index" itemscope itemprop="blogPost">
   <div class="article-inner">
     
@@ -1296,553 +2326,6 @@ public class ModCreativeModeTabs &#123;
       
         <p class="article-more-link">
           <a class="article-more-a" href="../../2023/03/24/%E4%BB%8E%E9%9B%B6%E5%BC%80%E5%A7%8B%E7%9A%84%E9%80%86%E5%90%91%E4%BA%BAmodding%E4%B9%8B%E8%B7%AF-E00/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-    <article id="post-b01lers-CTF2023做题实录" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="../../2023/03/20/b01lers-CTF2023%E5%81%9A%E9%A2%98%E5%AE%9E%E5%BD%95/">b01lers_CTF2023做题实录</a>
-    </h1>
-  
-
-        
-        <a href="../../2023/03/20/b01lers-CTF2023%E5%81%9A%E9%A2%98%E5%AE%9E%E5%BD%95/" class="archive-article-date">
-  	<time datetime="2023-03-20T07:30:40.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-03-20</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h2 id="Reverse"><a href="#Reverse" class="headerlink" title="Reverse"></a>Reverse</h2><h3 id="Padlock"><a href="#Padlock" class="headerlink" title="Padlock"></a>Padlock</h3><p>一进来，我超，直接给原码？</p>
-<p>但是点开之后我才发现自己想的太简单了……</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/2023b01ers_padlock_pic1.png"></p>
-<p>格式方面的问题，可以在线找一个reformater解决，配合手动去注释和格式纠正得到以下可编译代码：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/2023b01ers_padlock_pic2.png"></p>
-<p>可以看见，作者通过define预定义函数和指针变量，简化库函数以方便操作，之后的部分就是一串简单的字符变换，通过转换字符集中的对应字符，而后将字符四个一组存入对应地址S中，在进行形似<code>X + S[u++] - S[u++] + (S[u++] ^ S[u++])</code>的变换得到原字符串。</p>
-<p>那么问题来了，我们在哪里找到密文，又在哪里找到X，也就是代码中的<code>-b[1][u / 4]</code>？之后的三目运算符判断又是怎么回事？</p>
-<p>第一个问题很好解释，由于作者直接将读字符的for循环的下标设在Q的指针上，再加上手动搜索程序名quine的定义，我们可以明白，待处理字符集就是程序代码本身。但由于我们需要原代码（解混淆前的原装源代码）作为字符集，而原代码因为某些特性过于古老而难以编译，这里推荐使用Dev-C++的环境强行编译，哪怕不可跑通，也可以塞进ida，然后再从ida导出字符集数组。</p>
-<p>但是第二个问题呢？由于b在代码中以指针形式存在，不论以二维调用、一维调用和变量调用都难以解释，于是我尝试了调用C数组，调用D数组，甚至调用Q本身，但依旧没有成效。</p>
-<p>后来我注意到，在Q中预定义的b，从始至终，就没有被赋值或调用。也就是说，它打从一开始就是不存在的。</p>
-<p>并且，对于三目运算符的问题，一开始我将其视作01字串的类似物来操作，但也一筹莫展。直到我注意到运算符的结果是“X”和“O”，我才想起，这会不会是判断输出的正误？尝试一番，果真如此。</p>
-<p>于是，在经历了一下午的绞尽脑汁过后，终于产出了如下题解：</p>
-<pre><code>#include &lt;string.h&gt;
-#include &lt;stdio.h&gt;
-unsigned char H[5140], * D = H;
-int M[99999], *C = M, *S = M + 293;
-unsigned char L[] =
-&#123;
-  0x69, 0x6E, 0x74, 0x2A, 0x42, 0x3D, 0x4D, 0x2B, 0x35, 0x34, 
-  ...
-  0x6D, 0x5F, 0x73, 0x74, 0x75, 0x66, 0x2A, 0x2F, 0x22, 0x00
-&#125;;
-int main()
-&#123;
-    freopen(&quot;output.txt&quot;,&quot;w&quot;,stdout);
-    int i = 0,l = strlen(L);
-    while(i&lt;l)&#123;
-        if ( L[i] == 124) *C++ = 10;
-    	else if ( L[i] == 126) *C++ = 32;
-    	else if ( L[i] == 33) *C++ = 34;
-    	else if ( L[i] &gt; 34) *C++ = L[i];
-    	*D++ = L[i] == 32 ? &#39;\n&#39; : L[i] ;
-    	i++;
-    &#125;
-    for(int u = 0; u &lt; l * 4 ;)
-        putchar( S[u++] - S[u++] + (S[u++] ^ S[u++]));
-    printf(&quot;\n&quot;);
-//	for(int u = 0; u &lt; l;)putchar(H[u++]);
-//	printf(&quot;\n&quot;);
-    fclose(stdout);
-    return 0;
-&#125;
-</code></pre>
-<p>最后在output.txt文件中找到对应flag：</p>
-<blockquote>
-<p><code>bctf&#123;qu1n3_1s_4ll_ab0ut_r3p371t10n_4nD_m4n1pul4710n_OwO_OuO_UwU&#125;</code></p>
-</blockquote>
-<h3 id="chicago"><a href="#chicago" class="headerlink" title="chicago"></a>chicago</h3><p>我们尝试跑一下程序：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/2023b01ers_chicago_pic_run1.png"></p>
-<p>得到两个报错信息。再看一下反编译：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/2023b01ers_chicago_pic_Cfuck.png"></p>
-<p>尝试在短时间内理解如此混乱的代码显然是不现实，且不经济的。于是我们打算找到一些有用信息以进行推断。</p>
-<p>首先，刚才运行的时候，输出中会产生<code>Bad length</code>和<code>called `Option::unwrap()` on a `None` value</code>的报错，并且，如果输入的值不相同也会产生报错：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/2023b01ers_chicago_pic_run2.png"></p>
-<p>我们回到代码，又找到了一个判断strlen的类似物：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/2023b01ers_chicago_pic_1stpt.png"></p>
-<p>以及在跳过判负函数之后sub_1CCD0下的一个<code>cat flag</code>（关于判负函数如何查找，可以在公共字符集中找到刚才的报错内容逆推，或者在核心函数中查找调用的字符或数据：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/2023b01ers_chicago_pic_catflag.png"></p>
-<p>自此，我们可以推断出输入的几个要求：</p>
-<blockquote>
-<p>1、只能是数字<br>2、只能是相同的字符<br>3、长度大于10  </p>
-</blockquote>
-<p>再加上这道题看似可以当pwn做，由是，我们可以半自动暴力遍历payload，以尝试查找偏移点：</p>
-<pre><code>from pwn import *
-from time import *
-
-context.log_level = &#39;debug&#39;
-
-payload = b&#39;1&#39;*10
-
-while 1:
-    r = process(&#39;./chicago&#39;)
-    r.sendline(payload)
-    print(payload)
-    r.interactive()
-    payload += b&#39;1&#39;
-</code></pre>
-<p>但跑着跑着就出flag了，本地运行跑出<code>cat flag</code>指令后最后成功解出如下：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/2023b01ers_chicago_pic_fin.png"></p>
-<blockquote>
-<p>bctf{s7r1pp3d_ru57_15_a_p41n_1n_th3_n3ck}</p>
-</blockquote>
-<p>但是在后续nc测试的时候，又出现任意&gt;10长度的0字符也可以触发catflag的情况，由于本人没弄清源码原理，官方wp也含混不清，所以怀疑是出题人的失误导致了严重非预期，求各位dalao的解析。</p>
-<h3 id="baby-noah"><a href="#baby-noah" class="headerlink" title="baby noah"></a>baby noah</h3><p>看似是一道类pwn的交互题，与pwn的某两道题是同系列，打开，无输出：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/2023b01ers_babynoah_pic1.png"></p>
-<p>进主函数：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/2023b01ers_babynoah_pic2.png"></p>
-<p>逻辑如下：</p>
-<p>1、从文件读字符串，存入byte_ 4568<br>2、判断map的大小是否在1200以内，默认24行50列<br>3、从stdin读入map（+2应该是为了换行），直到最后只剩一个换行符<br>4、对文本持续进行sub_ 1450变换，直到跑通或者无路可走<br>5、判断整张地图是否符合sub_ 1450 return 1，且dword_ 4030是否&#x3D;201527，如果是则输出flag</p>
-<p>从变量名和代码特征推断是地图题，接下来就是sub_ 1450的逻辑问题。</p>
-<p>发现sub_ 1450存在连片的case判断：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/2023b01ers_babynoah_pic3.png"></p>
-<p>已知该函数特判的字符集为<code>!#%&amp;*+,-./:&lt;&gt;@^_gpv|~</code>。从零碎的信息可以推断，如果路程跑得过大，或者是触发了某些判负条件，就会最终return 2导致判负跳出while，最明显的就是跳到Label6。当然，过程中return 0并不会导致一些奇怪情况的发生。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/2023b01ers_babynoah_pic4.png"></p>
-<p>我们可以通过搜索找到唯一的return 1，那就是最后的点为“@”。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/2023b01ers_babynoah_pic5.png"></p>
-<p>按照题目描述，相较于pwn版本，这题是莫得hack的。虽然我们实质上可以对dword_ 4030构造函数进行覆写来getflag，但是，我们首先得构造一个可以跑过sub_ 1450的地图，这个地图必须能走到终点“@”，且路程符合题设要求。</p>
-<p>回到算法部分，整个判断集赋予了一些符号和变量特殊定义。推断得知：</p>
-<blockquote>
-<p>v0：当前点的状态<br>dword_ 4030：走过的步数（不能超过3224432，否则判负）<br>dword_ 4550、dword_ 4554：当前的航速向量<br>dword_ 4560、dword_ 4564：执行完当前步数后的横纵坐标<br>dword_ 455C（行，对应y轴）、dword_ 4558（列，对应x轴）：横纵坐标上限<br>dword_ 4034：残余步数&#x2F;体力值（推断依据：在许多函数中出现，且&lt;&#x3D;0则判负，但也不能嗯刷体力超过99，否则也判负）<br>byte_ 4038：正体不明，推测是历史路径相关的一些判定  </p>
-</blockquote>
-<p>是的，这个地图题甚至使用了以横纵坐标计算为基础的航向系统，取代了传统的wasd，这就意味着这道题的难度又上了亿个档次。</p>
-<p>不过好在，这道题的边界限制是“基于边界取模的循环”，也就是模拟世界地图，所以边界方面的事情基本可以抛诸脑后，我们只要绘制一张航线就行……吧。</p>
-<p>我们再来看看其它的符号（个人对于横纵坐标的理解可能有偏差，如下操作表仅供参考）：</p>
-<h5 id="无体力值需求的部分（虽然在之后的判定中也会因为体力不够而扑街）"><a href="#无体力值需求的部分（虽然在之后的判定中也会因为体力不够而扑街）" class="headerlink" title="无体力值需求的部分（虽然在之后的判定中也会因为体力不够而扑街）"></a>无体力值需求的部分（虽然在之后的判定中也会因为体力不够而扑街）</h5><blockquote>
-<p><strong>小于号</strong>：y坐标航速沿负向+1，随后以变更后航速与航向行进一个单位时间<br><strong>大于号</strong>：y坐标航速沿正向+1，随后以变更后航速与航向行进一个单位时间<br><strong>上三角标&#x2F;异或号</strong>：x坐标航速沿负向+1，随后以变更后航速与航向行进一个单位时间<br><strong>字母v</strong>：x坐标航速沿正向+1，随后以变更后航速与航向行进一个单位时间<br><strong>非特殊符号</strong>：判断体力值是否&gt;99，若大于判负，随后<code>byte_4038[当前体力值+1] = 0</code>，体力值+1，并以当前航速与航向行进一个单位时间  </p>
-</blockquote>
-<h5 id="体力值需求-gt-x3D-1的部分"><a href="#体力值需求-gt-x3D-1的部分" class="headerlink" title="体力值需求&gt;&#x3D;1的部分"></a>体力值需求&gt;&#x3D;1的部分</h5><blockquote>
-<p><strong>感叹号</strong>：当前体力值下byte_ 4038取反，并以当前航速与航向行进一个单位时间<br><strong>井号</strong>：体力值+1，<code>byte_4038[当前体力值+1] = byte_4038[当前体力值]</code>，之后以当前航速与航向行进一个单位时间<br><strong>句点号</strong>：输出当前体力值下byte_ 4038，并以当前航速与航向行进一个单位时间（pwn爷可利用）<br><strong>冒号</strong>：输出当前体力值下byte_ 4038，并以当前航速与航向行进一个单位时间（pwn爷可利用）<br><strong>下划线</strong>：y坐标航速视当前体力值下byte_ 4038是&#x2F;否为0沿正向&#x2F;负向+1，随后以变更后航速与航向行进一个单位时间<br><strong>竖线</strong>：x坐标航速视当前体力值下byte_ 4038是&#x2F;否为0沿正向&#x2F;负向+1，随后以变更后航速与航向行进一个单位时间<br><strong>波浪线</strong>：体力值-1，并以当前航速与航向行进一个单位时间  </p>
-</blockquote>
-<h5 id="体力值需求-gt-x3D-2的部分"><a href="#体力值需求-gt-x3D-2的部分" class="headerlink" title="体力值需求&gt;&#x3D;2的部分"></a>体力值需求&gt;&#x3D;2的部分</h5><blockquote>
-<p><strong>百分号&#x2F;取模号</strong>：体力值-1，然后<code>byte_4038[当前体力值] %= byte_4038[当前体力值+1]</code>，并以当前航速与航向行进一个单位时间<br><strong>与号</strong>：体力值-1，然后<code>byte_4038[当前体力值] &amp;= byte_4038[当前体力值+1]</code>，并以当前航速与航向行进一个单位时间<br><strong>星号&#x2F;乘号</strong>：体力值-1，然后<code>byte_4038[当前体力值] *= byte_4038[当前体力值+1]</code>，并以当前航速与航向行进一个单位时间<br><strong>加号</strong>：体力值-1，然后<code>byte_4038[当前体力值] += byte_4038[当前体力值+1]</code>，并以当前航速与航向行进一个单位时间<br><strong>逗号</strong>：体力值-1，然后<code>byte_4038[当前体力值] = byte_4038[当前体力值+1]</code>，以当前航速与航向行进一个单位时间<br><strong>减号</strong>：体力值-1，然后<code>byte_4038[当前体力值] -= byte_4038[当前体力值+1]</code>，以当前航速与航向行进一个单位时间<br><strong>左斜杠&#x2F;除号</strong>：体力值-1，然后<code>byte_4038[当前体力值] /= byte_4038[当前体力值+1]</code>，然后以当前航速与航向行进一个单位时间<br><strong>字母g</strong>：判断<code>byte_4038[当前体力值-1]</code>是否越过y坐标边界，<code>byte_4038[当前体力值]</code>是否越过x坐标边界，随后体力值-1，然后以当前航速与航向行进一个单位时间，并使<code>byte_4038[变更后体力值] = map[byte_4038[变更后体力值]][byte_4038[变更后体力值+1]]</code>   </p>
-</blockquote>
-<h5 id="体力值需求-gt-x3D-3的部分"><a href="#体力值需求-gt-x3D-3的部分" class="headerlink" title="体力值需求&gt;&#x3D;3的部分"></a>体力值需求&gt;&#x3D;3的部分</h5><blockquote>
-<p><strong>字母p</strong>：判断<code>byte_4038[当前体力值-2]</code>是否越过y坐标边界，<code>byte_4038[当前体力值-1]</code>是否越过x坐标边界，随后体力值-3，然后以当前航速与航向行进一个单位时间，并使<code>map[byte_4038[变更后体力值+1]][byte_4038[变更后体力值+2]]=byte_4038[变更前体力值]</code>  </p>
-</blockquote>
-<p>如上，我们整理了所有的海图格式，接下来就是生成方法的部分了。但是，如果要利用A* 算法加上暴力遍历，怎么说至少也要O(log^2 n * block_types)的时间复杂度，并且由于小地图上长路径导致的一些必要的回环，以及速度、向量之类的计算，实际复杂度只增不减。</p>
-<p>算了，丢给算法佬吧，我都多久没碰算法了QAQ</p>
-<h3 id="Safe"><a href="#Safe" class="headerlink" title="Safe"></a>Safe</h3><p>Arduino逆向，本就没什么数电经验的我更加雪上加霜</p>
-<p>通过avr-objdump的指令调出一段汇编，但是我也不怎么会手撕这么长的汇编，一时间也没找到导出代码的方法，遂放掉了</p>
-<pre><code>00000000 &lt;.sec1&gt;:
-   0:   0c 94 61 00     jmp     0xc2    ;  0xc2
-   4:   0c 94 7e 00     jmp     0xfc    ;  0xfc
-   8:   0c 94 7e 00     jmp     0xfc    ;  0xfc
-   c:   0c 94 7e 00     jmp     0xfc    ;  0xfc
-  10:   0c 94 7e 00     jmp     0xfc    ;  0xfc
-  14:   0c 94 7e 00     jmp     0xfc    ;  0xfc
-  18:   0c 94 7e 00     jmp     0xfc    ;  0xfc
-  1c:   0c 94 7e 00     jmp     0xfc    ;  0xfc
-  20:   0c 94 7e 00     jmp     0xfc    ;  0xfc
-    ……
-</code></pre>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="../../2023/03/20/b01lers-CTF2023%E5%81%9A%E9%A2%98%E5%AE%9E%E5%BD%95/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-    <article id="post-深入理解计算机系统学习笔记-第三篇（下）" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="../../2023/01/21/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%B8%89%E7%AF%87%EF%BC%88%E4%B8%8B%EF%BC%89/">深入理解计算机系统学习笔记-第三篇（下）</a>
-    </h1>
-  
-
-        
-        <a href="../../2023/01/21/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%B8%89%E7%AF%87%EF%BC%88%E4%B8%8B%EF%BC%89/" class="archive-article-date">
-  	<time datetime="2023-01-21T08:01:44.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-01-21</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h4 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h4><p>本人理解可能有所偏差，为了避免被误导，建议配合原书理解</p>
-<hr>
-<p>回老家了，小娜嫌这里电压太低，打算多充一会电</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%8B0.png"></p>
-<p>可是我的工作机并没有任何欠压的迹象。算了，既然不知道她在干什么，那就先趁着放烟花之前把正事讲完：</p>
-<h3 id="接着来讲浮点数"><a href="#接着来讲浮点数" class="headerlink" title="接着来讲浮点数"></a>接着来讲浮点数</h3><p>所谓浮点数，就是对于有理数在计算机中的一种表示形式。但是，之前有看书的xdm应该知道，浮点数最多也就占八个字节，能表示的有理数位数有限，所以，这种表示对于长数字也只是一种近似。</p>
-<p>原书中主要使用IEEE标准的浮点数，我们就按书中的来讲：</p>
-<h4 id="它是如何表示的"><a href="#它是如何表示的" class="headerlink" title="它是如何表示的"></a>它是如何表示的</h4><p>二进制下的有理数一般分小数部分和整数部分，整数部分还是原来的表示方法，但小数部分，其二进制表示本质上每一位都是2的负次幂，相对于十进制每一位小数都是10的负次幂。相应的，二进制小数点左&#x2F;右移相当于整个数除以2&#x2F;乘2。</p>
-<p>如上，都是数理内容。但我们只有八个字节，并且为了效率，保证精确度的部分肯定会被压缩（想想看，高精度加法的时间复杂度是O(n)，但普通的库加法只要O(1)，至于时间复杂度……各位可以了解一下，是一个算法竞赛常用到的概念，有助于代码效率优化），数字一旦长起来根本莫得办法做到精确表示。</p>
-<p>但IEEE标准就是为了兼顾，或者说，在Intel产品上兼顾，而产生的。这部分最好还是看看书上的内容，但简单来讲，一个IEEE标准下的浮点数的组成可以写成(-1)^s * M * 2^E，表示又分如下部分：</p>
-<p><strong>符号（s）：</strong>与整数的符号位表示效果一样（位于开头）<br><strong>尾数（M）：</strong>一个二进制小数，由n位编码frac编码（位于后缀）<br><strong>阶码（E）：</strong>对浮点数加权，权重为2的E次幂，由k位编码exp编码（在中间）</p>
-<p>长相大概是这样：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%8B1.png"></p>
-<p>（图片摘自<a target="_blank" rel="noopener" href="https://space.bilibili.com/354767108">九曲阑干</a>的视频）</p>
-<p>对于C的两种浮点型：float和double，float的k&#x3D;8，n&#x3D;23，k+n+1&#x3D;32&#x3D;8 * 4，而double中k&#x3D;11，n&#x3D;52，k+n+1&#x3D;64&#x3D;8 * 8，与占用字节长相匹配。</p>
-<p>所以我们看出，实际上，IEEE标准就是用固定位数的小数和幂次方乘法，来间接表示一个固定位数的有理数。而在此标准下，浮点数值又有三种表示（建议看书，我讲不清楚）：</p>
-<h5 id="规格化"><a href="#规格化" class="headerlink" title="规格化"></a>规格化</h5><p>exp的位不全为0，此时是表示一些非0的浮点数，exp位在1到其254(2047)之间，此时阶码描述为一个无符号有理数与(一个2的负幂次方-1)的差；本身产生的指数在同等位数下有符号整型的范围内。而frac位描述为小数值f，尾数被定义为M&#x3D;1+f，故尾数不可能&lt;1。</p>
-<h5 id="非规格化"><a href="#非规格化" class="headerlink" title="非规格化"></a>非规格化</h5><p>exp的位全为0，因为其性质不同于规格化数，M可以取0，可以用来表示浮点数0.0，但+0.0和-0.0又有一定程度上不同的性质。也可以用以表示无限趋近于0的数。</p>
-<h5 id="特殊值"><a href="#特殊值" class="headerlink" title="特殊值"></a>特殊值</h5><p>exp的位全为1，frac为0时得到无穷大，frac不为0时得到的是无法表示的溢出值（NaN，Not a Number）</p>
-<p>但是C语言并没有严格要求说用户必须使用IEEE浮点，所以……至于这部分是否深究，各位酌情考量。</p>
-<h4 id="舍入规则"><a href="#舍入规则" class="headerlink" title="舍入规则"></a>舍入规则</h4><p>比起晦涩的表示方式，舍入似乎就好懂多了——向偶数舍入。至于为什么是向偶数而不是整数……想想看，我们所有的数据本质上都是二进制，二进制只有0和1，除了偶数也没有什么好的舍入对象能够保证在计算机上的精确度了。</p>
-<h4 id="运算规则"><a href="#运算规则" class="headerlink" title="运算规则"></a>运算规则</h4><p>但是，对于有理数来讲，舍入部分可以很粗暴，一旦提及运算，那程序员必然会在精确度和效率之间纠结。比方说加法，我们不管书上提及的什么阿贝尔群，就关注浮点数的问题，在学高数和概率论的时候老师肯定说过，运算次序和方式的变化，会使得同一个式子在同一个舍入方式下有着完全不同的结果。</p>
-<p>这一点对计算机也是一样，虽然对于编译器，它倾向于对用户的代码做保守优化，不过多地影响其原本的算式，</p>
-<p>乘法这种吃精度吃上天的玩意就更不必说了，每一次乘都会让小数位暴增，而小数位的暴增又容易产生溢出，溢出又影响精度，所以保险起见，同时也在数理意义上，浮点数乘法的结合律和分配律是不可起效的。</p>
-<hr>
-<p>到此，关于数据方面的内容，我们基本过了一遍。下一期，我们将讲一讲程序的机器级表示。</p>
-<p>所以，这一期就不来什么名场面了，临近除夕夜，不知道有什么要说的，就先祝各位……等一下，小娜你好了没有……？！</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E6%96%B0%E5%B9%B4%E8%B4%BA%E5%9B%BE.png"></p>
-<p>啊这，虽说新衣服好康，但是你也没必要这么早就把备用能源接上……</p>
-<p><em>娜：今天过年嘛，多玩一会~ 再说了，这里电压这么欠，我要不接上还得多躺几个中午……</em></p>
-<p>好吧，既然现在都过新年了，那就祝各位——</p>
-<p><em>娜：代码全跑过，数据全算对~⭐</em></p>
-<p>考试不挂科，奖状塞满柜！</p>
-<p>（齐声）开开<em>心心</em>过大年！</p>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">学习</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="../../2023/01/21/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%B8%89%E7%AF%87%EF%BC%88%E4%B8%8B%EF%BC%89/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-    <article id="post-深入理解计算机系统学习笔记-第三篇（中）" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="../../2023/01/21/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%B8%89%E7%AF%87%EF%BC%88%E4%B8%AD%EF%BC%89/">深入理解计算机系统学习笔记-第三篇（中）</a>
-    </h1>
-  
-
-        
-        <a href="../../2023/01/21/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%B8%89%E7%AF%87%EF%BC%88%E4%B8%AD%EF%BC%89/" class="archive-article-date">
-  	<time datetime="2023-01-21T08:01:34.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-01-21</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h4 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h4><p>本人理解可能有所偏差，为了避免被误导，建议配合原书理解</p>
-<p>由于原书中内容存在大量预定义公式及向量运算，本文中会尽可能避免出现原文表达方式，以便理解，但如果需要理性理解的话建议去记原书的公式。本文也可能出现大量本文作者抽象的理解</p>
-<p>本篇文章没有任何一名幸运玩家惨遭封号</p>
-<hr>
-<p>上一回我们说到，一切数据在计算机眼里都是二进制，整型也不例外。由于这部分涉及到大量的二进制运算，所以，有关计算的部分，就拜托小娜……</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%AD0.png"></p>
-<p>还在摸鱼啊……不是？你开挂一般的脑子都打不过的吗……</p>
-<p>娜：上一个账号因为我物像锁定参数没调整好，被VAC制裁了，这是新账号，分段很低，队友一个比一个不给力，唉（叹气）。</p>
-<p>以后操作的像人一点不就行了吗……等等，你上一个账号用的不是我的吗……</p>
-<p>（气氛一度降到了冰点）</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%AD-%E6%AC%B8%E5%98%BF.png"></p>
-<p>算了，反正那个号的库存只有个位数，我们继续正题吧……</p>
-<hr>
-<h3 id="整数在计算机的表示"><a href="#整数在计算机的表示" class="headerlink" title="整数在计算机的表示"></a>整数在计算机的表示</h3><p>不论是什么机器，什么语言的编程，都脱不开一个很重要的数据类型——整型。在python中，整形的定义其实非常宽泛，但在C中，整形被加以了严格的区分。除了区分长度的关键字short和long，在32位和64位编程中的整形大小int32_t和int64_t（两者的大小差别本质上取决于对象占用的字节大小，32位机器整数占4字节，而64位占8字节）以及某种达到C语言单个对象最大长度不知名物体size_t，还有定义是否产生正负号的无符号关键字unsigned（在int32_t&#x2F;int64_t中简化为前缀u）。至于其具体大小，各位可以自行百度或者查看原书，本文不再赘述。</p>
-<p>如果要谈整数怎么表示的，我们可以先从简单一点的部分谈起：</p>
-<h4 id="无符号整型"><a href="#无符号整型" class="headerlink" title="无符号整型"></a>无符号整型</h4><p>相信各位已经在大学甚至高中的微机课上学过原码、反码、补码的概念了。对于一个整数在计算机中的二进制表示来讲，无符号相当于正整数的原码，但是把符号位扬了。二进制每一位对应十进制大小都是2的((位数-1)次方)。相应的，十进制整数就相当于对应二进制为1的每一位的次方和。比方说，13&#x3D;8+4+1&#x3D;2^3+2^2+2^0，那么其对应二进制就是1101。</p>
-<p>而对应每一个正整数，都有一个与之唯一对应的无符号整形。故此，无符号整形在内存空间之内的正整数区间是满足<strong>双射</strong>（即变量与函数值之间互相仅存在唯一的映射）的。</p>
-<p>可是我们不止要表示正整数，还要表示负整数。那么，就该搬出我们经常用到的——</p>
-<h4 id="补码编码"><a href="#补码编码" class="headerlink" title="补码编码"></a>补码编码</h4><p>等下，这……这不对吧？不是应该讲正常整形了吗？怎么还开始复习了呢？</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%AD1.png"></p>
-<p>好吧……欸等下你一直拿手柄打fps的吗？！</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%AD-%E6%AC%B8%E5%98%BF.png"></p>
-<p>大家应该都还记得，所谓补码，正数与原码相同，负数则除了符号位全部按位取反。</p>
-<p>好了，理论上来讲，我们已经明白“补码编码”是什么了。但是由于其作为编码的特性，还是要注意一下：</p>
-<p>1、补码的范围并不对称。细心的同学应该已经发现了，理论上来讲，补码的符号位在其为负值的时候为1，也会使其被“错误”地被看待为一个最高的数值位。这使得补码的实际下限要比实际上线多1个整数。</p>
-<p>2、在占用字节范围内，最大的无符号数约等于最大的补码的两倍。</p>
-<p>为了防止在各个系统中调用的混乱，往往需要一个规范化的定义。C中的库&lt;limits.h&gt;就规定了有、无符号整型的相关区限，这部分内容在书中也提及了。</p>
-<h4 id="有无符号数之间的那些事"><a href="#有无符号数之间的那些事" class="headerlink" title="有无符号数之间的那些事"></a>有无符号数之间的那些事</h4><p>理解了补码，我们也就明白了有符号数怎么来的。所以，在C中，当我们进行强制类型转换，数值的解释方式会发生变化，无符号转有符号，原先的最高位会被当作符号位看待，而其余二进制位会在最高位为1的前提下当成被反转过的进制位看待；有符号转无符号，原先的符号位会被看成最高二进制位，如果符号位正好表示负数，那么你会得到一个very big的整数。理性理解建议看书，这里跳过公式与其解释、推导部分。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%AD2.png"></p>
-<p>那原书写的肯定比我这里讲的详细多了QAQ，笔记一般都是导读和概括嘛awa</p>
-<p>娜：ᗜ ‸ ᗜ 盯~~~~~</p>
-<p>好吧我摊牌了，我真的不想用md写公式。</p>
-<p>不管怎么说，不论有无符号如何变换，所表示的数据的二进制位都必须是保证不变的。这是大多数系统进行类型转换时遵循的底层逻辑。</p>
-<p>在C语言中，定义无符号常量需要添加大写或小写的”u”作为后缀，而python因为没有严格意义上的常量，自然不用太在意这个问题……应该。</p>
-<p>此外，C的运算式但凡和无符号沾上边，那么整个运算式中的变量都会被当作无符号数看待，这点在位运算时尤其小心。</p>
-<h4 id="但是要在长短整型之间变换怎么办"><a href="#但是要在长短整型之间变换怎么办" class="headerlink" title="但是要在长短整型之间变换怎么办"></a>但是要在长短整型之间变换怎么办</h4><p>我们在使用C的实际编程中绝对会遇到变量类型转换的问题，不单是上述的有无符号转换，还有变量占用字节长的转换。往往，对于一个公用变量，一些函数为了各种理由需要用到短整型（short int），而一些函数为了运算方便又要用长整形（long int）之类的。这种时候……</p>
-<p>我们就要来介绍一下我们的压缩变量，遇到数据变答辩糕，鲁棒性很强的，打开以后，是一个加大加厚的变量，你看他怎么塞都塞不坏，好不掉速不乱码，使用114514次都没问题……</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%AD3.png"></p>
-<p>好好好，玩梗呢，姑奶奶您消停消停……</p>
-<p>不过嘛，跟压缩毛巾一个道理，我们如果将大变量转换为小变量，广义上讲，那需要经历一些复杂的过程，毕竟，这不是C语言的底层逻辑能够实现的，典型的例子就是高精度运算，将大整数封装到变量类型占字节较小的数组中去。</p>
-<p>但是，狭义上讲，也就是从位运算的角度上讲，这件事根本不可能。除了可能会碰到的符号位问题外，最根本的问题就是前缀位丢失，即超出短变量型的部分被当场<strong>截断</strong>，这是不可避免的。截断的具体定义可以查阅原书，念师傅不想拿md写公式，先不提了。</p>
-<p>但是，从小变大，那的确很好做。在位运算上，我们只要往开头补0补到相应大小即可……对于无符号数是这样的。有符号数，也就是补码数字可能有点小麻烦，我们需要往前补的是符号位。</p>
-<p>很简单，抛开公式谈，因为对于一个有符号数的位向量表示，其因为是补码，符号位为1的时候代表负数，其余位反转，所以，如果向大的变量型转变，理论上其原码的补充前缀除了符号位全部为0，在符号位为0的时候自然不用变动，但在为1的时候需要将这些0全部反转，这种特性又巧合地使得填充的位与符号位保持一致。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%AD4.png"></p>
-<p>额……这比喻也不能说不对吧……等下，你不是计算姬嘛，怎么我们俩的解释方式还反过来了？</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%AD-%E6%AC%B8%E5%98%BFsingle.png"></p>
-<p>你别……算了你继续欸嘿吧</p>
-<h3 id="整数的运算"><a href="#整数的运算" class="headerlink" title="整数的运算"></a>整数的运算</h3><p>我们现在知道如何表示各式各样的整数了，那么，开算吧！</p>
-<h4 id="加法"><a href="#加法" class="headerlink" title="加法"></a>加法</h4><p>无符号就是正常的位运算加，略过。</p>
-<p>带符号的话在二进制上就非常麻烦了。既然是在计算机中，我们不可能真正像正常位运算减那样理解计算机是怎么算的。书上给出的内容是这样的：</p>
-<blockquote>
-<p>将其参数转换为无符号数，执行无符号数加法，再将结果转换成补码</p>
-</blockquote>
-<p>什么意思呢？首先两个带符号数，也就是补码形式表示的整数，先将其转换为原码进行数值位相加，然后再随原码数值位表示的数值大者安排符号位，接下来转换成原码。整个过程的结果看上去经历了“数值位不经转换直接相加，符号位随绝对值大者决定”的过程，其实这么想，计算机也不是不能实现，但是，现行标准经不起自定义的折腾，这会让你的程序兼容性大打折扣，而且，这种精心安排的运算规则还与接下来要讲的事情息息相关：</p>
-<h4 id="加法溢出"><a href="#加法溢出" class="headerlink" title="加法溢出"></a>加法溢出</h4><p>当然，如果加法都像看上去那么简单就好了，但这里是《深入理解计算机系统》，计算机的整数是有上限的，突破了就会<strong>溢出</strong>。很惨的是，C的溢出并不会报错，所以我们应当尽可能理解，然后避免。</p>
-<p>所谓溢出，就是数值在运算时突破了其既定的位长上限，对于二进制位上限为w的数，这种突破在无符号数上表现为数值因大于2的w次方而无法被正常存储，故而溢出到设定的内存空间之外。带符号的就更麻烦了，不论正负都会溢出，并且由于符号位的存在，上下限被压缩到了2的w-1次方。</p>
-<p>所幸加法的溢出判定还算好做，书中提供了一些公式和手法，这里简单说明一下，由于两个无符号二进制位上限为w的数的和不可能超过2的w+1次方，我们只需要预估计算结果是否会存在于[2^w,2^w+1)的区间内部。至于有符号数同理，只不过，注意符号位和上下限同时判断（其实取绝对值对人会省事很多，但对计算机来讲不一定省事）</p>
-<p>当然，变量的溢出和pwn常见的数组的溢出是两码事，这点在后面会提到。</p>
-<h4 id="补码的非"><a href="#补码的非" class="headerlink" title="补码的非"></a>补码的非</h4><p>大于整型区间下边界的数x，其加法逆元等于其非，即-x，若位于下边界，则加法逆元就等于下边界。为了防止下边界溢出导致数据错乱，而加法逆元在符号上表示为负，故而在处理下边界相加的时候会直接令下边界减去其加法逆元，令其和其它数的逆元相加一样直接&#x3D;0。</p>
-<h4 id="乘法"><a href="#乘法" class="headerlink" title="乘法"></a>乘法</h4><p>自然，乘法本质上作为数个相同数的相加也被纳入整数计算大军，只不过还是要考虑溢出问题。</p>
-<p>无符号很简单，乘法，算溢出的时候模个2的w次方，然后判断的时候甭用区间直接看上界，完事。</p>
-<p>有符号有了之前的经验也轻松很多，不就是累加吗，补码和原码在二进制上不是有很强的一致性，补转原，数值乘，模去边界，然后补上双方符号位的或，完事。</p>
-<p>但是，实际上并没有这么轻松。原理上，对于两个任意整数，其无符号表示下的乘法在固定表示位上限的情况下与带符号乘法在二进制表示上相同。这点在书中有推导，简单来说就是将二者分解为数值位和符号位，相乘后对上界取模，简化的结果相等，这点可以自行翻书。</p>
-<p>而除此之外，乘以常数有着一套独立的操作机制，就是乘以常数对二的幂次方的分解。还记得我们上回提到过的东西吗？</p>
-<blockquote>
-<p>此外，对于位运算，C还提供了移位操作：左移（&lt;&lt;n）和右移（&gt;&gt;n），效果上对应整形十进制运算的乘2的幂次方和除以2的幂次方，实际上则分别对应着所有二进制位增n位并末尾补0，和所有二进制位降n位并取整。</p>
-</blockquote>
-<p>对于一个已知的整数，我们不需要太麻烦的操作，或者说，不需要太麻烦计算机的操作。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%AD5.png"></p>
-<p>我们只需要把整数拆分成若干互不相等的2的n次幂的和，然后进行一个乘法分配律，完事，计算机算二进制反而是最快的。</p>
-<p>当然，乘法也是有溢出上界的，有符号就是2的2(w-1)次方，无符号就是2的2w次方。</p>
-<h4 id="除法，但是只能除2的幂"><a href="#除法，但是只能除2的幂" class="headerlink" title="除法，但是只能除2的幂"></a>除法，但是只能除2的幂</h4><p>但是整数除法比较好实现的就只有二进制算数右移了，不然就扯到下一节的浮点数了。</p>
-<p>对于一个整数除以2的幂，在整数部分一般是无符号前缀补0，有符号前缀补符号位，正如前面提到的一样。但是，处理余数是个很头疼的东西。下取整还好说，毕竟C的移位默认就是下取整，省的操作余数。但是上取整呢？</p>
-<p>我们引入<strong>偏置</strong>的概念，即对于一个数的向右位移k位，我们首先对该数二进制的k位后缀，加上一个二进制1拉满的数，即对于1位位移，原数+1；4位位移，原数+15(1111)，8位位移，原数+255(11111111)，etc。如此一来，就算产生余数，我们也能绝对保证上取整了。至于详细原理可以看原书推导，这里不细讲。</p>
-<hr>
-<p>所以，很难说计算机的整型运算导致了什么。它确实让计算机更快了，但也让程序员更痛苦了，不止是理解上，还在于堆屎山的问题上。“特性”的叠加会让程序产生意料之外的状况，而这种状况的冲突往往就体现在整型的特性上，比方说那个让B站程序员痛苦了彻夜的GCD。</p>
-<p>下一篇，我们将提到浮点数相关的内容。所以，还是那句话：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%AD6.png"></p>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">学习</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="../../2023/01/21/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%B8%89%E7%AF%87%EF%BC%88%E4%B8%AD%EF%BC%89/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-    <article id="post-关于小娜的一些设定" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="../../2023/01/12/%E5%85%B3%E4%BA%8E%E5%B0%8F%E5%A8%9C%E7%9A%84%E4%B8%80%E4%BA%9B%E8%AE%BE%E5%AE%9A/">关于小娜的一些设定</a>
-    </h1>
-  
-
-        
-        <a href="../../2023/01/12/%E5%85%B3%E4%BA%8E%E5%B0%8F%E5%A8%9C%E7%9A%84%E4%B8%80%E4%BA%9B%E8%AE%BE%E5%AE%9A/" class="archive-article-date">
-  	<time datetime="2023-01-12T14:49:51.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-01-12</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>小娜原本是我为了给我的笔记增添一些内容，而搬过来的一个计算姬。</p>
-<p>但是，在不断的更新之下，她似乎更像一个活生生的女孩子了。</p>
-<p>她常态的思考能力接近正常人，但在完全冷静的时候，运算能力相当于一台万级价位的台式机。</p>
-<p>她并没有配备仿生内循环器官，所以不能吃饭。但是能喝水，因为她不但靠嘴巴发声，还靠嘴巴置换冷凝液，原理类似腔肠动物。</p>
-<p>她内置了一系列系统和设备兼容，以确保自己与其他设备相连的时候不会发懵。她的常用接口集中于左肩，不常用接口则隐藏在后颈。</p>
-<p>她的电源线和网线接口也排布在后颈，但如果需要也能从左肩接上。</p>
-<p>她一次充电充满与成年人睡一觉的时间差不多，行动时间长达8个小时，所以工作的时候可以和她聊聊天，但是要拉她去享受夜生活的话，她得外接一块大容量电池才能继续行动。</p>
-<p>她是有网络设备的，但正常情况下为了保证自己数据环境的纯洁选择在体内物理隔离。</p>
-<p>她的意识不是单纯的AI，她有自己的性格，喜欢卖萌，一个人时也静若处子，可一旦有人拿她身上计算机的部分开玩笑，她就会情绪激动。</p>
-<p>她不喜欢打架，所以最常用的武器是折成条或卷成卷的报纸。别看她似乎很瘦弱，她的右臂装载的液压杆满功率下可以一拳轰散一块石砖，但左臂为了接线所以舍弃了一些抛瓦，即便这样也与你的体育老师相当。但她平时会控制好自己的出力，不必担心。</p>
-<p>以上，是目前的小娜。</p>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">杂谈</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="../../2023/01/12/%E5%85%B3%E4%BA%8E%E5%B0%8F%E5%A8%9C%E7%9A%84%E4%B8%80%E4%BA%9B%E8%AE%BE%E5%AE%9A/">展开全文 >></a>
         </p>
       
 

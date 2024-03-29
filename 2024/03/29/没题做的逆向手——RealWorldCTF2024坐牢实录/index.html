@@ -6,17 +6,27 @@
   <meta name="renderer" content="webkit">
   <meta http-equiv="X-UA-Compatible" content="IE=edge" >
   <link rel="dns-prefetch" href="http://cykahankxd.github.io">
-  <title>Archives | DrivenHank的Cyka小博客</title>
+  <title>没题做的逆向手——RealWorldCTF2024坐牢实录 | DrivenHank的Cyka小博客</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta name="description" content="一个不论OI还是CTF都很菜，三批聚顶成分复杂的铁菜逼">
-<meta property="og:type" content="website">
-<meta property="og:title" content="DrivenHank的Cyka小博客">
-<meta property="og:url" content="http://cykahankxd.github.io/archives/page/4/index.html">
+  <meta name="description" content="写在前面比赛前：来了来了它来了，RWCTF它来了比赛后：看我看我，我宣布个事，我是个（） 所以为什么这场比赛一道逆向都没？什么？体验赛也没有？算了，拣点简单的题复现一下，也算是拓宽眼界了 （所以大概还是不定期更新）  体验赛-pwn-vision可谓是这次RealWorld在做法上最简单的一道题，不得不尝。 一上来先把脚本都给你了让你去拆解sha256——  跟着到github上扒下源码直接用，它">
+<meta property="og:type" content="article">
+<meta property="og:title" content="没题做的逆向手——RealWorldCTF2024坐牢实录">
+<meta property="og:url" content="http://cykahankxd.github.io/2024/03/29/%E6%B2%A1%E9%A2%98%E5%81%9A%E7%9A%84%E9%80%86%E5%90%91%E6%89%8B%E2%80%94%E2%80%94RealWorldCTF2024%E5%9D%90%E7%89%A2%E5%AE%9E%E5%BD%95/index.html">
 <meta property="og:site_name" content="DrivenHank的Cyka小博客">
-<meta property="og:description" content="一个不论OI还是CTF都很菜，三批聚顶成分复杂的铁菜逼">
+<meta property="og:description" content="写在前面比赛前：来了来了它来了，RWCTF它来了比赛后：看我看我，我宣布个事，我是个（） 所以为什么这场比赛一道逆向都没？什么？体验赛也没有？算了，拣点简单的题复现一下，也算是拓宽眼界了 （所以大概还是不定期更新）  体验赛-pwn-vision可谓是这次RealWorld在做法上最简单的一道题，不得不尝。 一上来先把脚本都给你了让你去拆解sha256——  跟着到github上扒下源码直接用，它">
 <meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/RealWorld2024_nonoffial_vision_pic1.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/RealWorld2024_nonoffial_vision_pic2.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/RealWorld2024_nonoffial_vision_pic3.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/RealWorld2024_nonoffial_vision_pic4.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/RealWorld2024_nonoffial_vision_pic5.png">
+<meta property="og:image" content="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/RealWorld2024_nonoffial_vision_pic6.png">
+<meta property="article:published_time" content="2024-03-29T12:50:30.000Z">
+<meta property="article:modified_time" content="2024-03-29T12:52:31.008Z">
 <meta property="article:author" content="Driven·Cyka·Hank">
+<meta property="article:tag" content="CTF">
 <meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/RealWorld2024_nonoffial_vision_pic1.png">
   
     <link rel="alternative" href="/atom.xml" title="DrivenHank的Cyka小博客" type="application/atom+xml">
   
@@ -55,13 +65,13 @@
 		<nav class="header-menu">
 			<ul>
 			
-				<li><a href="../../../index.html">主页</a></li>
+				<li><a href="../../../../index.html">主页</a></li>
 	        
-				<li><a href="../../../tags/%E6%9D%82%E8%B0%88/">杂谈</a></li>
+				<li><a href="../../../../tags/%E6%9D%82%E8%B0%88/">杂谈</a></li>
 	        
-				<li><a href="../../../tags/CTF/">CTF</a></li>
+				<li><a href="../../../../tags/CTF/">CTF</a></li>
 	        
-				<li><a href="../../../tags/%E5%AD%A6%E4%B9%A0">学习</a></li>
+				<li><a href="../../../../tags/%E5%AD%A6%E4%B9%A0">学习</a></li>
 	        
 			</ul>
 		</nav>
@@ -89,7 +99,7 @@
 		        
 					<a class="bilibili" target="_blank" href="https://space.bilibili.com/110049824?spm_id_from=333.1007.0.0" title="bilibili"><i class="icon-bilibili"></i></a>
 		        
-					<a class="mail" target="_blank" href="../../../mailto:1670497988@qq.com" title="mail"><i class="icon-mail"></i></a>
+					<a class="mail" target="_blank" href="../../../../mailto:1670497988@qq.com" title="mail"><i class="icon-mail"></i></a>
 		        
 			</div>
 		</nav>
@@ -134,7 +144,7 @@
 			        
 						<a class="bilibili" target="_blank" href="https://space.bilibili.com/110049824?spm_id_from=333.1007.0.0" title="bilibili"><i class="icon-bilibili"></i></a>
 			        
-						<a class="mail" target="_blank" href="../../../mailto:1670497988@qq.com" title="mail"><i class="icon-mail"></i></a>
+						<a class="mail" target="_blank" href="../../../../mailto:1670497988@qq.com" title="mail"><i class="icon-mail"></i></a>
 			        
 				</div>
 			</nav>
@@ -143,13 +153,13 @@
 				<ul style="width: 70%">
 				
 				
-					<li style="width: 25%"><a href="../../../index.html">主页</a></li>
+					<li style="width: 25%"><a href="../../../../index.html">主页</a></li>
 		        
-					<li style="width: 25%"><a href="../../../tags/%E6%9D%82%E8%B0%88/">杂谈</a></li>
+					<li style="width: 25%"><a href="../../../../tags/%E6%9D%82%E8%B0%88/">杂谈</a></li>
 		        
-					<li style="width: 25%"><a href="../../../tags/CTF/">CTF</a></li>
+					<li style="width: 25%"><a href="../../../../tags/CTF/">CTF</a></li>
 		        
-					<li style="width: 25%"><a href="../../../tags/%E5%AD%A6%E4%B9%A0">学习</a></li>
+					<li style="width: 25%"><a href="../../../../tags/%E5%AD%A6%E4%B9%A0">学习</a></li>
 		        
 				</ul>
 			</nav>
@@ -164,36 +174,53 @@
             <canvas data-colors="#eaeaea" data-sectionHeight="100" data-contentId="js-content" id="myCanvas1" class="anm-canvas"></canvas>
           </div>
           <div id="js-content" class="content-ll">
-            
-  
-  
+            <article id="post-没题做的逆向手——RealWorldCTF2024坐牢实录" class="article article-type-post " itemscope itemprop="blogPost">
+  <div class="article-inner">
     
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      没题做的逆向手——RealWorldCTF2024坐牢实录
+    </h1>
+  
+
+        
+        <a href="" class="archive-article-date">
+  	<time datetime="2024-03-29T12:50:30.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-03-29</time>
+</a>
+        
+      </header>
     
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h4 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h4><p><em>比赛前：来了来了它来了，RWCTF它来了</em><br><em>比赛后：看我看我，我宣布个事，我是个（）</em></p>
+<p>所以为什么这场比赛一道逆向都没？什么？体验赛也没有？算了，拣点简单的题复现一下，也算是拓宽眼界了</p>
+<p>（所以大概还是不定期更新）</p>
+<hr>
+<h3 id="体验赛-pwn-vision"><a href="#体验赛-pwn-vision" class="headerlink" title="体验赛-pwn-vision"></a>体验赛-pwn-vision</h3><p>可谓是这次RealWorld在做法上最简单的一道题，不得不尝。</p>
+<p>一上来先把脚本都给你了让你去拆解sha256——</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/RealWorld2024_nonoffial_vision_pic1.png"></p>
+<p>跟着到github上扒下源码直接用，它会让你连上另一个端口——</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/RealWorld2024_nonoffial_vision_pic2.png"></p>
+<p>那连都连上去了，试几个常用指令呗——</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/RealWorld2024_nonoffial_vision_pic3.png"></p>
+<p>啊？我cat flag都还没打呢？可这道题明摆着又是pwn标签，看来问题只能出在程序里头了，我们解包出来看看——</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/RealWorld2024_nonoffial_vision_pic4.png"></p>
+<p>开头就是一个简单的字符过滤。问题出在接下来的一段——</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/RealWorld2024_nonoffial_vision_pic5.png"></p>
+<p>我们输入的其它指令过不了这个宽松的判定，是它容许的指令集里面并没有相应的子串，但sh在前面可是确实有个<code>showKey</code>包含的。而也正因如此，在<code>sh</code>前面加空格反而会弄巧成拙导致判定出空指令。</p>
+<p>而下面有一段popen可以触发sh，所以当你输入<code>sh flag</code>的时候，它会直接识别到sh然后把flag拱手让人。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/RealWorld2024_nonoffial_vision_pic6.png"></p>
+<p>当然，还有一种理论可行的办法，就是用卡随机数种子的办法强行把<code>openthedoor</code>指令过了，但是这玩意，nep那边有两位老哥扫了半天还是Fail to get shell，所以基本可以pass了。</p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
       
       
-      <section class="archives-wrap">
-        <div class="archive-year-wrap">
-          <a href="../../2022" class="archive-year">2022</a>
-        </div>
-        <div class="archives">
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="../../../2022/09/18/%E4%B8%80%E4%B8%AA%E9%93%81%E8%8F%9C%E9%80%BC%E7%9A%84%E7%BE%8E%E5%9B%A2CTF%E5%A4%8D%E7%8E%B0%E5%AE%9E%E5%BD%95/" class="archive-article-date">
-  	<time datetime="2022-09-18T05:16:02.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-09-18</time>
-</a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="../../../2022/09/18/%E4%B8%80%E4%B8%AA%E9%93%81%E8%8F%9C%E9%80%BC%E7%9A%84%E7%BE%8E%E5%9B%A2CTF%E5%A4%8D%E7%8E%B0%E5%AE%9E%E5%BD%95/">一个铁菜逼的美团CTF复现实录</a>
-    </h1>
-  
-
-        <div class="article-info info-on-right">
-          
 	<div class="article-tag tagcloud">
 		<i class="icon-price-tags icon"></i>
 		<ul class="article-tag-list">
@@ -205,288 +232,114 @@
 		</ul>
 	</div>
 
-          
+      
 
+      
+
+      
+        
+<div class="share-btn share-icons tooltip-left">
+  <div class="tooltip tooltip-east">
+    <span class="tooltip-item">
+      <a href="javascript:;" class="share-sns share-outer">
+        <i class="icon icon-share"></i>
+      </a>
+    </span>
+    <span class="tooltip-content">
+      <div class="share-wrap">
+        <div class="share-icons">
+          <a class="weibo share-sns" href="javascript:;" data-type="weibo">
+            <i class="icon icon-weibo"></i>
+          </a>
+          <a class="weixin share-sns wxFab" href="javascript:;" data-type="weixin">
+            <i class="icon icon-weixin"></i>
+          </a>
+          <a class="qq share-sns" href="javascript:;" data-type="qq">
+            <i class="icon icon-qq"></i>
+          </a>
+          <a class="douban share-sns" href="javascript:;" data-type="douban">
+            <i class="icon icon-douban"></i>
+          </a>
+          <a class="qzone share-sns" href="javascript:;" data-type="qzone">
+            <i class="icon icon-qzone"></i>
+          </a>
+          <a class="facebook share-sns" href="javascript:;" data-type="facebook">
+            <i class="icon icon-facebook"></i>
+          </a>
+          <a class="twitter share-sns" href="javascript:;" data-type="twitter">
+            <i class="icon icon-twitter"></i>
+          </a>
+          <a class="google share-sns" href="javascript:;" data-type="google">
+            <i class="icon icon-google"></i>
+          </a>
         </div>
-        <div class="clearfix"></div>
-    </header>
+      </div>
+    </span>
+  </div>
+</div>
+
+<div class="page-modal wx-share js-wx-box">
+    <a class="close js-modal-close" href="javascript:;"><i class="icon icon-close"></i></a>
+    <p>扫一扫，分享到微信</p>
+    <div class="wx-qrcode">
+      <img src="//pan.baidu.com/share/qrcode?url=http://cykahankxd.github.io/2024/03/29/%E6%B2%A1%E9%A2%98%E5%81%9A%E7%9A%84%E9%80%86%E5%90%91%E6%89%8B%E2%80%94%E2%80%94RealWorldCTF2024%E5%9D%90%E7%89%A2%E5%AE%9E%E5%BD%95/" alt="微信分享二维码">
+    </div>
+</div>
+
+<div class="mask js-mask"></div>
+      
+      <div class="clearfix"></div>
+    </div>
   </div>
 </article>
+
   
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="../../../2022/09/15/%E9%9A%8F%E4%BE%BF%E7%94%BB%E7%94%BB-2022-9-15/" class="archive-article-date">
-  	<time datetime="2022-09-15T12:12:00.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-09-15</time>
-</a>
+<nav id="article-nav">
+  
+    <a href="../%E7%8E%B0%E5%9C%BA%E8%A7%82%E6%88%98L3HCTF%E7%A5%9E%E4%BB%99%E6%89%93%E6%9E%B6%E5%B8%AE%E4%B8%8D%E4%B8%8A%E5%BF%99%E7%9A%84Hank%E6%9D%A5%E5%8F%91%E8%B5%9B%E5%90%8E%E5%A4%8D%E7%8E%B0%E4%BA%86/" id="article-nav-newer" class="article-nav-link-wrap">
+      <i class="icon-circle-left"></i>
+      <div class="article-nav-title">
+        
+          现场观战L3HCTF神仙打架帮不上忙的Hank来发赛后复现了
+        
+      </div>
+    </a>
+  
+  
+    <a href="../%E8%92%BB%E9%9B%89%E9%80%86%E5%90%91%E4%BA%BA%E7%9A%84NSSCTF-Round17%E9%A2%98%E8%A7%A3%E9%9B%86%E4%B8%AD%E5%9C%B0/" id="article-nav-older" class="article-nav-link-wrap">
+      <div class="article-nav-title">蒻雉逆向人的NSSCTF#Round17题解集中地</div>
+      <i class="icon-circle-right"></i>
+    </a>
+  
+</nav>
+
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
         </div>
-    	 
+        
+        
+    </div>
+</aside>
+
+
+
   
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="../../../2022/09/15/%E9%9A%8F%E4%BE%BF%E7%94%BB%E7%94%BB-2022-9-15/">随便画画-2022/9/15</a>
-    </h1>
+  
   
 
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">杂谈</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="../../../2022/09/06/to-2022-9-6-%E6%9B%B4%E6%96%B0%E5%86%85%E5%AE%B9/" class="archive-article-date">
-  	<time datetime="2022-09-06T09:55:25.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-09-06</time>
-</a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="../../../2022/09/06/to-2022-9-6-%E6%9B%B4%E6%96%B0%E5%86%85%E5%AE%B9/">to_2022/9/6-更新内容</a>
-    </h1>
   
 
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">杂谈</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="../../../2022/09/04/vsCTF-2022-%E5%8F%98%E6%80%81%E5%A4%8D%E7%8E%B0%E5%AE%9E%E5%BD%95/" class="archive-article-date">
-  	<time datetime="2022-09-04T08:42:03.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-09-04</time>
-</a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="../../../2022/09/04/vsCTF-2022-%E5%8F%98%E6%80%81%E5%A4%8D%E7%8E%B0%E5%AE%9E%E5%BD%95/">vsCTF_2022-变态复现实录</a>
-    </h1>
   
 
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="../../../2022/09/02/%E5%BC%BA%E7%BD%91%E6%9D%AF2022%E6%8A%98%E7%A3%A8%E5%A4%8D%E7%8E%B0%E7%B3%BB%E5%88%97/" class="archive-article-date">
-  	<time datetime="2022-09-02T11:13:25.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-09-02</time>
-</a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="../../../2022/09/02/%E5%BC%BA%E7%BD%91%E6%9D%AF2022%E6%8A%98%E7%A3%A8%E5%A4%8D%E7%8E%B0%E7%B3%BB%E5%88%97/">强网杯2022折磨复现系列</a>
-    </h1>
-  
-
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="../../../2022/08/31/%E8%BF%99%E4%B8%AA%E5%8D%9A%E5%AE%A2%E7%9A%84%E7%AC%AC%E4%B8%80%E7%AF%87%E6%96%87%E7%AB%A0/" class="archive-article-date">
-  	<time datetime="2022-08-31T12:41:19.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-08-31</time>
-</a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="../../../2022/08/31/%E8%BF%99%E4%B8%AA%E5%8D%9A%E5%AE%A2%E7%9A%84%E7%AC%AC%E4%B8%80%E7%AF%87%E6%96%87%E7%AB%A0/">这个博客的第一篇文章</a>
-    </h1>
-  
-
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">杂谈</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="../../../2022/08/02/DASCTF2022-07%E8%B5%8B%E8%83%BD%E8%B5%9B%E5%A4%8D%E7%8E%B0/" class="archive-article-date">
-  	<time datetime="2022-08-02T14:46:00.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-08-02</time>
-</a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="../../../2022/08/02/DASCTF2022-07%E8%B5%8B%E8%83%BD%E8%B5%9B%E5%A4%8D%E7%8E%B0/">DASCTF2022.07赋能赛复现</a>
-    </h1>
-  
-
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="../../../2022/07/17/%E6%8D%8F%20%E6%B5%A6%20%E5%90%B8%20%E8%B8%A2%20%E8%89%BE%20%E9%87%9C%20%E8%B4%B0%20%E9%9B%B6%20%E8%B4%B0%20%E8%B4%B0%20%E8%A7%A3%20%E9%A2%98%20%E4%B8%8E%20%E5%A4%8D%20%E7%8E%B0/" class="archive-article-date">
-  	<time datetime="2022-07-17T02:09:00.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-07-17</time>
-</a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="../../../2022/07/17/%E6%8D%8F%20%E6%B5%A6%20%E5%90%B8%20%E8%B8%A2%20%E8%89%BE%20%E9%87%9C%20%E8%B4%B0%20%E9%9B%B6%20%E8%B4%B0%20%E8%B4%B0%20%E8%A7%A3%20%E9%A2%98%20%E4%B8%8E%20%E5%A4%8D%20%E7%8E%B0/">捏 浦 吸 踢 艾 釜 贰 零 贰 贰 解 题 与 复 现</a>
-    </h1>
-  
-
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-  
-    </div></section>
-  
-
-    
-    <nav id="page-nav">
-      <a class="extend prev" rel="prev" href="../3/">&amp;laquo; Prev</a><a class="page-number" href="../../">1</a><a class="page-number" href="../2/">2</a><a class="page-number" href="../3/">3</a><span class="page-number current">4</span>
-    </nav>
   
 
 
@@ -510,8 +363,8 @@
 	var yiliaConfig = {
 		mathjax: false,
 		isHome: false,
-		isPost: false,
-		isArchive: true,
+		isPost: true,
+		isArchive: false,
 		isTag: false,
 		isCategory: false,
 		open_in_new: false,

@@ -166,6 +166,553 @@
           <div id="js-content" class="content-ll">
             
   
+    <article id="post-b01lers-CTF2023做题实录" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="../../2023/03/20/b01lers-CTF2023%E5%81%9A%E9%A2%98%E5%AE%9E%E5%BD%95/">b01lers_CTF2023做题实录</a>
+    </h1>
+  
+
+        
+        <a href="../../2023/03/20/b01lers-CTF2023%E5%81%9A%E9%A2%98%E5%AE%9E%E5%BD%95/" class="archive-article-date">
+  	<time datetime="2023-03-20T07:30:40.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-03-20</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="Reverse"><a href="#Reverse" class="headerlink" title="Reverse"></a>Reverse</h2><h3 id="Padlock"><a href="#Padlock" class="headerlink" title="Padlock"></a>Padlock</h3><p>一进来，我超，直接给原码？</p>
+<p>但是点开之后我才发现自己想的太简单了……</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/2023b01ers_padlock_pic1.png"></p>
+<p>格式方面的问题，可以在线找一个reformater解决，配合手动去注释和格式纠正得到以下可编译代码：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/2023b01ers_padlock_pic2.png"></p>
+<p>可以看见，作者通过define预定义函数和指针变量，简化库函数以方便操作，之后的部分就是一串简单的字符变换，通过转换字符集中的对应字符，而后将字符四个一组存入对应地址S中，在进行形似<code>X + S[u++] - S[u++] + (S[u++] ^ S[u++])</code>的变换得到原字符串。</p>
+<p>那么问题来了，我们在哪里找到密文，又在哪里找到X，也就是代码中的<code>-b[1][u / 4]</code>？之后的三目运算符判断又是怎么回事？</p>
+<p>第一个问题很好解释，由于作者直接将读字符的for循环的下标设在Q的指针上，再加上手动搜索程序名quine的定义，我们可以明白，待处理字符集就是程序代码本身。但由于我们需要原代码（解混淆前的原装源代码）作为字符集，而原代码因为某些特性过于古老而难以编译，这里推荐使用Dev-C++的环境强行编译，哪怕不可跑通，也可以塞进ida，然后再从ida导出字符集数组。</p>
+<p>但是第二个问题呢？由于b在代码中以指针形式存在，不论以二维调用、一维调用和变量调用都难以解释，于是我尝试了调用C数组，调用D数组，甚至调用Q本身，但依旧没有成效。</p>
+<p>后来我注意到，在Q中预定义的b，从始至终，就没有被赋值或调用。也就是说，它打从一开始就是不存在的。</p>
+<p>并且，对于三目运算符的问题，一开始我将其视作01字串的类似物来操作，但也一筹莫展。直到我注意到运算符的结果是“X”和“O”，我才想起，这会不会是判断输出的正误？尝试一番，果真如此。</p>
+<p>于是，在经历了一下午的绞尽脑汁过后，终于产出了如下题解：</p>
+<pre><code>#include &lt;string.h&gt;
+#include &lt;stdio.h&gt;
+unsigned char H[5140], * D = H;
+int M[99999], *C = M, *S = M + 293;
+unsigned char L[] =
+&#123;
+  0x69, 0x6E, 0x74, 0x2A, 0x42, 0x3D, 0x4D, 0x2B, 0x35, 0x34, 
+  ...
+  0x6D, 0x5F, 0x73, 0x74, 0x75, 0x66, 0x2A, 0x2F, 0x22, 0x00
+&#125;;
+int main()
+&#123;
+    freopen(&quot;output.txt&quot;,&quot;w&quot;,stdout);
+    int i = 0,l = strlen(L);
+    while(i&lt;l)&#123;
+        if ( L[i] == 124) *C++ = 10;
+    	else if ( L[i] == 126) *C++ = 32;
+    	else if ( L[i] == 33) *C++ = 34;
+    	else if ( L[i] &gt; 34) *C++ = L[i];
+    	*D++ = L[i] == 32 ? &#39;\n&#39; : L[i] ;
+    	i++;
+    &#125;
+    for(int u = 0; u &lt; l * 4 ;)
+        putchar( S[u++] - S[u++] + (S[u++] ^ S[u++]));
+    printf(&quot;\n&quot;);
+//	for(int u = 0; u &lt; l;)putchar(H[u++]);
+//	printf(&quot;\n&quot;);
+    fclose(stdout);
+    return 0;
+&#125;
+</code></pre>
+<p>最后在output.txt文件中找到对应flag：</p>
+<blockquote>
+<p><code>bctf&#123;qu1n3_1s_4ll_ab0ut_r3p371t10n_4nD_m4n1pul4710n_OwO_OuO_UwU&#125;</code></p>
+</blockquote>
+<h3 id="chicago"><a href="#chicago" class="headerlink" title="chicago"></a>chicago</h3><p>我们尝试跑一下程序：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/2023b01ers_chicago_pic_run1.png"></p>
+<p>得到两个报错信息。再看一下反编译：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/2023b01ers_chicago_pic_Cfuck.png"></p>
+<p>尝试在短时间内理解如此混乱的代码显然是不现实，且不经济的。于是我们打算找到一些有用信息以进行推断。</p>
+<p>首先，刚才运行的时候，输出中会产生<code>Bad length</code>和<code>called `Option::unwrap()` on a `None` value</code>的报错，并且，如果输入的值不相同也会产生报错：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/2023b01ers_chicago_pic_run2.png"></p>
+<p>我们回到代码，又找到了一个判断strlen的类似物：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/2023b01ers_chicago_pic_1stpt.png"></p>
+<p>以及在跳过判负函数之后sub_1CCD0下的一个<code>cat flag</code>（关于判负函数如何查找，可以在公共字符集中找到刚才的报错内容逆推，或者在核心函数中查找调用的字符或数据：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/2023b01ers_chicago_pic_catflag.png"></p>
+<p>自此，我们可以推断出输入的几个要求：</p>
+<blockquote>
+<p>1、只能是数字<br>2、只能是相同的字符<br>3、长度大于10  </p>
+</blockquote>
+<p>再加上这道题看似可以当pwn做，由是，我们可以半自动暴力遍历payload，以尝试查找偏移点：</p>
+<pre><code>from pwn import *
+from time import *
+
+context.log_level = &#39;debug&#39;
+
+payload = b&#39;1&#39;*10
+
+while 1:
+    r = process(&#39;./chicago&#39;)
+    r.sendline(payload)
+    print(payload)
+    r.interactive()
+    payload += b&#39;1&#39;
+</code></pre>
+<p>但跑着跑着就出flag了，本地运行跑出<code>cat flag</code>指令后最后成功解出如下：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/2023b01ers_chicago_pic_fin.png"></p>
+<blockquote>
+<p>bctf{s7r1pp3d_ru57_15_a_p41n_1n_th3_n3ck}</p>
+</blockquote>
+<p>但是在后续nc测试的时候，又出现任意&gt;10长度的0字符也可以触发catflag的情况，由于本人没弄清源码原理，官方wp也含混不清，所以怀疑是出题人的失误导致了严重非预期，求各位dalao的解析。</p>
+<h3 id="baby-noah"><a href="#baby-noah" class="headerlink" title="baby noah"></a>baby noah</h3><p>看似是一道类pwn的交互题，与pwn的某两道题是同系列，打开，无输出：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/2023b01ers_babynoah_pic1.png"></p>
+<p>进主函数：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/2023b01ers_babynoah_pic2.png"></p>
+<p>逻辑如下：</p>
+<p>1、从文件读字符串，存入byte_ 4568<br>2、判断map的大小是否在1200以内，默认24行50列<br>3、从stdin读入map（+2应该是为了换行），直到最后只剩一个换行符<br>4、对文本持续进行sub_ 1450变换，直到跑通或者无路可走<br>5、判断整张地图是否符合sub_ 1450 return 1，且dword_ 4030是否&#x3D;201527，如果是则输出flag</p>
+<p>从变量名和代码特征推断是地图题，接下来就是sub_ 1450的逻辑问题。</p>
+<p>发现sub_ 1450存在连片的case判断：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/2023b01ers_babynoah_pic3.png"></p>
+<p>已知该函数特判的字符集为<code>!#%&amp;*+,-./:&lt;&gt;@^_gpv|~</code>。从零碎的信息可以推断，如果路程跑得过大，或者是触发了某些判负条件，就会最终return 2导致判负跳出while，最明显的就是跳到Label6。当然，过程中return 0并不会导致一些奇怪情况的发生。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/2023b01ers_babynoah_pic4.png"></p>
+<p>我们可以通过搜索找到唯一的return 1，那就是最后的点为“@”。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/2023b01ers_babynoah_pic5.png"></p>
+<p>按照题目描述，相较于pwn版本，这题是莫得hack的。虽然我们实质上可以对dword_ 4030构造函数进行覆写来getflag，但是，我们首先得构造一个可以跑过sub_ 1450的地图，这个地图必须能走到终点“@”，且路程符合题设要求。</p>
+<p>回到算法部分，整个判断集赋予了一些符号和变量特殊定义。推断得知：</p>
+<blockquote>
+<p>v0：当前点的状态<br>dword_ 4030：走过的步数（不能超过3224432，否则判负）<br>dword_ 4550、dword_ 4554：当前的航速向量<br>dword_ 4560、dword_ 4564：执行完当前步数后的横纵坐标<br>dword_ 455C（行，对应y轴）、dword_ 4558（列，对应x轴）：横纵坐标上限<br>dword_ 4034：残余步数&#x2F;体力值（推断依据：在许多函数中出现，且&lt;&#x3D;0则判负，但也不能嗯刷体力超过99，否则也判负）<br>byte_ 4038：正体不明，推测是历史路径相关的一些判定  </p>
+</blockquote>
+<p>是的，这个地图题甚至使用了以横纵坐标计算为基础的航向系统，取代了传统的wasd，这就意味着这道题的难度又上了亿个档次。</p>
+<p>不过好在，这道题的边界限制是“基于边界取模的循环”，也就是模拟世界地图，所以边界方面的事情基本可以抛诸脑后，我们只要绘制一张航线就行……吧。</p>
+<p>我们再来看看其它的符号（个人对于横纵坐标的理解可能有偏差，如下操作表仅供参考）：</p>
+<h5 id="无体力值需求的部分（虽然在之后的判定中也会因为体力不够而扑街）"><a href="#无体力值需求的部分（虽然在之后的判定中也会因为体力不够而扑街）" class="headerlink" title="无体力值需求的部分（虽然在之后的判定中也会因为体力不够而扑街）"></a>无体力值需求的部分（虽然在之后的判定中也会因为体力不够而扑街）</h5><blockquote>
+<p><strong>小于号</strong>：y坐标航速沿负向+1，随后以变更后航速与航向行进一个单位时间<br><strong>大于号</strong>：y坐标航速沿正向+1，随后以变更后航速与航向行进一个单位时间<br><strong>上三角标&#x2F;异或号</strong>：x坐标航速沿负向+1，随后以变更后航速与航向行进一个单位时间<br><strong>字母v</strong>：x坐标航速沿正向+1，随后以变更后航速与航向行进一个单位时间<br><strong>非特殊符号</strong>：判断体力值是否&gt;99，若大于判负，随后<code>byte_4038[当前体力值+1] = 0</code>，体力值+1，并以当前航速与航向行进一个单位时间  </p>
+</blockquote>
+<h5 id="体力值需求-gt-x3D-1的部分"><a href="#体力值需求-gt-x3D-1的部分" class="headerlink" title="体力值需求&gt;&#x3D;1的部分"></a>体力值需求&gt;&#x3D;1的部分</h5><blockquote>
+<p><strong>感叹号</strong>：当前体力值下byte_ 4038取反，并以当前航速与航向行进一个单位时间<br><strong>井号</strong>：体力值+1，<code>byte_4038[当前体力值+1] = byte_4038[当前体力值]</code>，之后以当前航速与航向行进一个单位时间<br><strong>句点号</strong>：输出当前体力值下byte_ 4038，并以当前航速与航向行进一个单位时间（pwn爷可利用）<br><strong>冒号</strong>：输出当前体力值下byte_ 4038，并以当前航速与航向行进一个单位时间（pwn爷可利用）<br><strong>下划线</strong>：y坐标航速视当前体力值下byte_ 4038是&#x2F;否为0沿正向&#x2F;负向+1，随后以变更后航速与航向行进一个单位时间<br><strong>竖线</strong>：x坐标航速视当前体力值下byte_ 4038是&#x2F;否为0沿正向&#x2F;负向+1，随后以变更后航速与航向行进一个单位时间<br><strong>波浪线</strong>：体力值-1，并以当前航速与航向行进一个单位时间  </p>
+</blockquote>
+<h5 id="体力值需求-gt-x3D-2的部分"><a href="#体力值需求-gt-x3D-2的部分" class="headerlink" title="体力值需求&gt;&#x3D;2的部分"></a>体力值需求&gt;&#x3D;2的部分</h5><blockquote>
+<p><strong>百分号&#x2F;取模号</strong>：体力值-1，然后<code>byte_4038[当前体力值] %= byte_4038[当前体力值+1]</code>，并以当前航速与航向行进一个单位时间<br><strong>与号</strong>：体力值-1，然后<code>byte_4038[当前体力值] &amp;= byte_4038[当前体力值+1]</code>，并以当前航速与航向行进一个单位时间<br><strong>星号&#x2F;乘号</strong>：体力值-1，然后<code>byte_4038[当前体力值] *= byte_4038[当前体力值+1]</code>，并以当前航速与航向行进一个单位时间<br><strong>加号</strong>：体力值-1，然后<code>byte_4038[当前体力值] += byte_4038[当前体力值+1]</code>，并以当前航速与航向行进一个单位时间<br><strong>逗号</strong>：体力值-1，然后<code>byte_4038[当前体力值] = byte_4038[当前体力值+1]</code>，以当前航速与航向行进一个单位时间<br><strong>减号</strong>：体力值-1，然后<code>byte_4038[当前体力值] -= byte_4038[当前体力值+1]</code>，以当前航速与航向行进一个单位时间<br><strong>左斜杠&#x2F;除号</strong>：体力值-1，然后<code>byte_4038[当前体力值] /= byte_4038[当前体力值+1]</code>，然后以当前航速与航向行进一个单位时间<br><strong>字母g</strong>：判断<code>byte_4038[当前体力值-1]</code>是否越过y坐标边界，<code>byte_4038[当前体力值]</code>是否越过x坐标边界，随后体力值-1，然后以当前航速与航向行进一个单位时间，并使<code>byte_4038[变更后体力值] = map[byte_4038[变更后体力值]][byte_4038[变更后体力值+1]]</code>   </p>
+</blockquote>
+<h5 id="体力值需求-gt-x3D-3的部分"><a href="#体力值需求-gt-x3D-3的部分" class="headerlink" title="体力值需求&gt;&#x3D;3的部分"></a>体力值需求&gt;&#x3D;3的部分</h5><blockquote>
+<p><strong>字母p</strong>：判断<code>byte_4038[当前体力值-2]</code>是否越过y坐标边界，<code>byte_4038[当前体力值-1]</code>是否越过x坐标边界，随后体力值-3，然后以当前航速与航向行进一个单位时间，并使<code>map[byte_4038[变更后体力值+1]][byte_4038[变更后体力值+2]]=byte_4038[变更前体力值]</code>  </p>
+</blockquote>
+<p>如上，我们整理了所有的海图格式，接下来就是生成方法的部分了。但是，如果要利用A* 算法加上暴力遍历，怎么说至少也要O(log^2 n * block_types)的时间复杂度，并且由于小地图上长路径导致的一些必要的回环，以及速度、向量之类的计算，实际复杂度只增不减。</p>
+<p>算了，丢给算法佬吧，我都多久没碰算法了QAQ</p>
+<h3 id="Safe"><a href="#Safe" class="headerlink" title="Safe"></a>Safe</h3><p>Arduino逆向，本就没什么数电经验的我更加雪上加霜</p>
+<p>通过avr-objdump的指令调出一段汇编，但是我也不怎么会手撕这么长的汇编，一时间也没找到导出代码的方法，遂放掉了</p>
+<pre><code>00000000 &lt;.sec1&gt;:
+   0:   0c 94 61 00     jmp     0xc2    ;  0xc2
+   4:   0c 94 7e 00     jmp     0xfc    ;  0xfc
+   8:   0c 94 7e 00     jmp     0xfc    ;  0xfc
+   c:   0c 94 7e 00     jmp     0xfc    ;  0xfc
+  10:   0c 94 7e 00     jmp     0xfc    ;  0xfc
+  14:   0c 94 7e 00     jmp     0xfc    ;  0xfc
+  18:   0c 94 7e 00     jmp     0xfc    ;  0xfc
+  1c:   0c 94 7e 00     jmp     0xfc    ;  0xfc
+  20:   0c 94 7e 00     jmp     0xfc    ;  0xfc
+    ……
+</code></pre>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="../../2023/03/20/b01lers-CTF2023%E5%81%9A%E9%A2%98%E5%AE%9E%E5%BD%95/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
+    <article id="post-深入理解计算机系统学习笔记-第三篇（下）" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="../../2023/01/21/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%B8%89%E7%AF%87%EF%BC%88%E4%B8%8B%EF%BC%89/">深入理解计算机系统学习笔记-第三篇（下）</a>
+    </h1>
+  
+
+        
+        <a href="../../2023/01/21/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%B8%89%E7%AF%87%EF%BC%88%E4%B8%8B%EF%BC%89/" class="archive-article-date">
+  	<time datetime="2023-01-21T08:01:44.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-01-21</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h4 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h4><p>本人理解可能有所偏差，为了避免被误导，建议配合原书理解</p>
+<hr>
+<p>回老家了，小娜嫌这里电压太低，打算多充一会电</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%8B0.png"></p>
+<p>可是我的工作机并没有任何欠压的迹象。算了，既然不知道她在干什么，那就先趁着放烟花之前把正事讲完：</p>
+<h3 id="接着来讲浮点数"><a href="#接着来讲浮点数" class="headerlink" title="接着来讲浮点数"></a>接着来讲浮点数</h3><p>所谓浮点数，就是对于有理数在计算机中的一种表示形式。但是，之前有看书的xdm应该知道，浮点数最多也就占八个字节，能表示的有理数位数有限，所以，这种表示对于长数字也只是一种近似。</p>
+<p>原书中主要使用IEEE标准的浮点数，我们就按书中的来讲：</p>
+<h4 id="它是如何表示的"><a href="#它是如何表示的" class="headerlink" title="它是如何表示的"></a>它是如何表示的</h4><p>二进制下的有理数一般分小数部分和整数部分，整数部分还是原来的表示方法，但小数部分，其二进制表示本质上每一位都是2的负次幂，相对于十进制每一位小数都是10的负次幂。相应的，二进制小数点左&#x2F;右移相当于整个数除以2&#x2F;乘2。</p>
+<p>如上，都是数理内容。但我们只有八个字节，并且为了效率，保证精确度的部分肯定会被压缩（想想看，高精度加法的时间复杂度是O(n)，但普通的库加法只要O(1)，至于时间复杂度……各位可以了解一下，是一个算法竞赛常用到的概念，有助于代码效率优化），数字一旦长起来根本莫得办法做到精确表示。</p>
+<p>但IEEE标准就是为了兼顾，或者说，在Intel产品上兼顾，而产生的。这部分最好还是看看书上的内容，但简单来讲，一个IEEE标准下的浮点数的组成可以写成(-1)^s * M * 2^E，表示又分如下部分：</p>
+<p><strong>符号（s）：</strong>与整数的符号位表示效果一样（位于开头）<br><strong>尾数（M）：</strong>一个二进制小数，由n位编码frac编码（位于后缀）<br><strong>阶码（E）：</strong>对浮点数加权，权重为2的E次幂，由k位编码exp编码（在中间）</p>
+<p>长相大概是这样：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%8B1.png"></p>
+<p>（图片摘自<a target="_blank" rel="noopener" href="https://space.bilibili.com/354767108">九曲阑干</a>的视频）</p>
+<p>对于C的两种浮点型：float和double，float的k&#x3D;8，n&#x3D;23，k+n+1&#x3D;32&#x3D;8 * 4，而double中k&#x3D;11，n&#x3D;52，k+n+1&#x3D;64&#x3D;8 * 8，与占用字节长相匹配。</p>
+<p>所以我们看出，实际上，IEEE标准就是用固定位数的小数和幂次方乘法，来间接表示一个固定位数的有理数。而在此标准下，浮点数值又有三种表示（建议看书，我讲不清楚）：</p>
+<h5 id="规格化"><a href="#规格化" class="headerlink" title="规格化"></a>规格化</h5><p>exp的位不全为0，此时是表示一些非0的浮点数，exp位在1到其254(2047)之间，此时阶码描述为一个无符号有理数与(一个2的负幂次方-1)的差；本身产生的指数在同等位数下有符号整型的范围内。而frac位描述为小数值f，尾数被定义为M&#x3D;1+f，故尾数不可能&lt;1。</p>
+<h5 id="非规格化"><a href="#非规格化" class="headerlink" title="非规格化"></a>非规格化</h5><p>exp的位全为0，因为其性质不同于规格化数，M可以取0，可以用来表示浮点数0.0，但+0.0和-0.0又有一定程度上不同的性质。也可以用以表示无限趋近于0的数。</p>
+<h5 id="特殊值"><a href="#特殊值" class="headerlink" title="特殊值"></a>特殊值</h5><p>exp的位全为1，frac为0时得到无穷大，frac不为0时得到的是无法表示的溢出值（NaN，Not a Number）</p>
+<p>但是C语言并没有严格要求说用户必须使用IEEE浮点，所以……至于这部分是否深究，各位酌情考量。</p>
+<h4 id="舍入规则"><a href="#舍入规则" class="headerlink" title="舍入规则"></a>舍入规则</h4><p>比起晦涩的表示方式，舍入似乎就好懂多了——向偶数舍入。至于为什么是向偶数而不是整数……想想看，我们所有的数据本质上都是二进制，二进制只有0和1，除了偶数也没有什么好的舍入对象能够保证在计算机上的精确度了。</p>
+<h4 id="运算规则"><a href="#运算规则" class="headerlink" title="运算规则"></a>运算规则</h4><p>但是，对于有理数来讲，舍入部分可以很粗暴，一旦提及运算，那程序员必然会在精确度和效率之间纠结。比方说加法，我们不管书上提及的什么阿贝尔群，就关注浮点数的问题，在学高数和概率论的时候老师肯定说过，运算次序和方式的变化，会使得同一个式子在同一个舍入方式下有着完全不同的结果。</p>
+<p>这一点对计算机也是一样，虽然对于编译器，它倾向于对用户的代码做保守优化，不过多地影响其原本的算式，</p>
+<p>乘法这种吃精度吃上天的玩意就更不必说了，每一次乘都会让小数位暴增，而小数位的暴增又容易产生溢出，溢出又影响精度，所以保险起见，同时也在数理意义上，浮点数乘法的结合律和分配律是不可起效的。</p>
+<hr>
+<p>到此，关于数据方面的内容，我们基本过了一遍。下一期，我们将讲一讲程序的机器级表示。</p>
+<p>所以，这一期就不来什么名场面了，临近除夕夜，不知道有什么要说的，就先祝各位……等一下，小娜你好了没有……？！</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E6%96%B0%E5%B9%B4%E8%B4%BA%E5%9B%BE.png"></p>
+<p>啊这，虽说新衣服好康，但是你也没必要这么早就把备用能源接上……</p>
+<p><em>娜：今天过年嘛，多玩一会~ 再说了，这里电压这么欠，我要不接上还得多躺几个中午……</em></p>
+<p>好吧，既然现在都过新年了，那就祝各位——</p>
+<p><em>娜：代码全跑过，数据全算对~⭐</em></p>
+<p>考试不挂科，奖状塞满柜！</p>
+<p>（齐声）开开<em>心心</em>过大年！</p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">学习</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="../../2023/01/21/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%B8%89%E7%AF%87%EF%BC%88%E4%B8%8B%EF%BC%89/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
+    <article id="post-深入理解计算机系统学习笔记-第三篇（中）" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="../../2023/01/21/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%B8%89%E7%AF%87%EF%BC%88%E4%B8%AD%EF%BC%89/">深入理解计算机系统学习笔记-第三篇（中）</a>
+    </h1>
+  
+
+        
+        <a href="../../2023/01/21/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%B8%89%E7%AF%87%EF%BC%88%E4%B8%AD%EF%BC%89/" class="archive-article-date">
+  	<time datetime="2023-01-21T08:01:34.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-01-21</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h4 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h4><p>本人理解可能有所偏差，为了避免被误导，建议配合原书理解</p>
+<p>由于原书中内容存在大量预定义公式及向量运算，本文中会尽可能避免出现原文表达方式，以便理解，但如果需要理性理解的话建议去记原书的公式。本文也可能出现大量本文作者抽象的理解</p>
+<p>本篇文章没有任何一名幸运玩家惨遭封号</p>
+<hr>
+<p>上一回我们说到，一切数据在计算机眼里都是二进制，整型也不例外。由于这部分涉及到大量的二进制运算，所以，有关计算的部分，就拜托小娜……</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%AD0.png"></p>
+<p>还在摸鱼啊……不是？你开挂一般的脑子都打不过的吗……</p>
+<p>娜：上一个账号因为我物像锁定参数没调整好，被VAC制裁了，这是新账号，分段很低，队友一个比一个不给力，唉（叹气）。</p>
+<p>以后操作的像人一点不就行了吗……等等，你上一个账号用的不是我的吗……</p>
+<p>（气氛一度降到了冰点）</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%AD-%E6%AC%B8%E5%98%BF.png"></p>
+<p>算了，反正那个号的库存只有个位数，我们继续正题吧……</p>
+<hr>
+<h3 id="整数在计算机的表示"><a href="#整数在计算机的表示" class="headerlink" title="整数在计算机的表示"></a>整数在计算机的表示</h3><p>不论是什么机器，什么语言的编程，都脱不开一个很重要的数据类型——整型。在python中，整形的定义其实非常宽泛，但在C中，整形被加以了严格的区分。除了区分长度的关键字short和long，在32位和64位编程中的整形大小int32_t和int64_t（两者的大小差别本质上取决于对象占用的字节大小，32位机器整数占4字节，而64位占8字节）以及某种达到C语言单个对象最大长度不知名物体size_t，还有定义是否产生正负号的无符号关键字unsigned（在int32_t&#x2F;int64_t中简化为前缀u）。至于其具体大小，各位可以自行百度或者查看原书，本文不再赘述。</p>
+<p>如果要谈整数怎么表示的，我们可以先从简单一点的部分谈起：</p>
+<h4 id="无符号整型"><a href="#无符号整型" class="headerlink" title="无符号整型"></a>无符号整型</h4><p>相信各位已经在大学甚至高中的微机课上学过原码、反码、补码的概念了。对于一个整数在计算机中的二进制表示来讲，无符号相当于正整数的原码，但是把符号位扬了。二进制每一位对应十进制大小都是2的((位数-1)次方)。相应的，十进制整数就相当于对应二进制为1的每一位的次方和。比方说，13&#x3D;8+4+1&#x3D;2^3+2^2+2^0，那么其对应二进制就是1101。</p>
+<p>而对应每一个正整数，都有一个与之唯一对应的无符号整形。故此，无符号整形在内存空间之内的正整数区间是满足<strong>双射</strong>（即变量与函数值之间互相仅存在唯一的映射）的。</p>
+<p>可是我们不止要表示正整数，还要表示负整数。那么，就该搬出我们经常用到的——</p>
+<h4 id="补码编码"><a href="#补码编码" class="headerlink" title="补码编码"></a>补码编码</h4><p>等下，这……这不对吧？不是应该讲正常整形了吗？怎么还开始复习了呢？</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%AD1.png"></p>
+<p>好吧……欸等下你一直拿手柄打fps的吗？！</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%AD-%E6%AC%B8%E5%98%BF.png"></p>
+<p>大家应该都还记得，所谓补码，正数与原码相同，负数则除了符号位全部按位取反。</p>
+<p>好了，理论上来讲，我们已经明白“补码编码”是什么了。但是由于其作为编码的特性，还是要注意一下：</p>
+<p>1、补码的范围并不对称。细心的同学应该已经发现了，理论上来讲，补码的符号位在其为负值的时候为1，也会使其被“错误”地被看待为一个最高的数值位。这使得补码的实际下限要比实际上线多1个整数。</p>
+<p>2、在占用字节范围内，最大的无符号数约等于最大的补码的两倍。</p>
+<p>为了防止在各个系统中调用的混乱，往往需要一个规范化的定义。C中的库&lt;limits.h&gt;就规定了有、无符号整型的相关区限，这部分内容在书中也提及了。</p>
+<h4 id="有无符号数之间的那些事"><a href="#有无符号数之间的那些事" class="headerlink" title="有无符号数之间的那些事"></a>有无符号数之间的那些事</h4><p>理解了补码，我们也就明白了有符号数怎么来的。所以，在C中，当我们进行强制类型转换，数值的解释方式会发生变化，无符号转有符号，原先的最高位会被当作符号位看待，而其余二进制位会在最高位为1的前提下当成被反转过的进制位看待；有符号转无符号，原先的符号位会被看成最高二进制位，如果符号位正好表示负数，那么你会得到一个very big的整数。理性理解建议看书，这里跳过公式与其解释、推导部分。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%AD2.png"></p>
+<p>那原书写的肯定比我这里讲的详细多了QAQ，笔记一般都是导读和概括嘛awa</p>
+<p>娜：ᗜ ‸ ᗜ 盯~~~~~</p>
+<p>好吧我摊牌了，我真的不想用md写公式。</p>
+<p>不管怎么说，不论有无符号如何变换，所表示的数据的二进制位都必须是保证不变的。这是大多数系统进行类型转换时遵循的底层逻辑。</p>
+<p>在C语言中，定义无符号常量需要添加大写或小写的”u”作为后缀，而python因为没有严格意义上的常量，自然不用太在意这个问题……应该。</p>
+<p>此外，C的运算式但凡和无符号沾上边，那么整个运算式中的变量都会被当作无符号数看待，这点在位运算时尤其小心。</p>
+<h4 id="但是要在长短整型之间变换怎么办"><a href="#但是要在长短整型之间变换怎么办" class="headerlink" title="但是要在长短整型之间变换怎么办"></a>但是要在长短整型之间变换怎么办</h4><p>我们在使用C的实际编程中绝对会遇到变量类型转换的问题，不单是上述的有无符号转换，还有变量占用字节长的转换。往往，对于一个公用变量，一些函数为了各种理由需要用到短整型（short int），而一些函数为了运算方便又要用长整形（long int）之类的。这种时候……</p>
+<p>我们就要来介绍一下我们的压缩变量，遇到数据变答辩糕，鲁棒性很强的，打开以后，是一个加大加厚的变量，你看他怎么塞都塞不坏，好不掉速不乱码，使用114514次都没问题……</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%AD3.png"></p>
+<p>好好好，玩梗呢，姑奶奶您消停消停……</p>
+<p>不过嘛，跟压缩毛巾一个道理，我们如果将大变量转换为小变量，广义上讲，那需要经历一些复杂的过程，毕竟，这不是C语言的底层逻辑能够实现的，典型的例子就是高精度运算，将大整数封装到变量类型占字节较小的数组中去。</p>
+<p>但是，狭义上讲，也就是从位运算的角度上讲，这件事根本不可能。除了可能会碰到的符号位问题外，最根本的问题就是前缀位丢失，即超出短变量型的部分被当场<strong>截断</strong>，这是不可避免的。截断的具体定义可以查阅原书，念师傅不想拿md写公式，先不提了。</p>
+<p>但是，从小变大，那的确很好做。在位运算上，我们只要往开头补0补到相应大小即可……对于无符号数是这样的。有符号数，也就是补码数字可能有点小麻烦，我们需要往前补的是符号位。</p>
+<p>很简单，抛开公式谈，因为对于一个有符号数的位向量表示，其因为是补码，符号位为1的时候代表负数，其余位反转，所以，如果向大的变量型转变，理论上其原码的补充前缀除了符号位全部为0，在符号位为0的时候自然不用变动，但在为1的时候需要将这些0全部反转，这种特性又巧合地使得填充的位与符号位保持一致。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%AD4.png"></p>
+<p>额……这比喻也不能说不对吧……等下，你不是计算姬嘛，怎么我们俩的解释方式还反过来了？</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%AD-%E6%AC%B8%E5%98%BFsingle.png"></p>
+<p>你别……算了你继续欸嘿吧</p>
+<h3 id="整数的运算"><a href="#整数的运算" class="headerlink" title="整数的运算"></a>整数的运算</h3><p>我们现在知道如何表示各式各样的整数了，那么，开算吧！</p>
+<h4 id="加法"><a href="#加法" class="headerlink" title="加法"></a>加法</h4><p>无符号就是正常的位运算加，略过。</p>
+<p>带符号的话在二进制上就非常麻烦了。既然是在计算机中，我们不可能真正像正常位运算减那样理解计算机是怎么算的。书上给出的内容是这样的：</p>
+<blockquote>
+<p>将其参数转换为无符号数，执行无符号数加法，再将结果转换成补码</p>
+</blockquote>
+<p>什么意思呢？首先两个带符号数，也就是补码形式表示的整数，先将其转换为原码进行数值位相加，然后再随原码数值位表示的数值大者安排符号位，接下来转换成原码。整个过程的结果看上去经历了“数值位不经转换直接相加，符号位随绝对值大者决定”的过程，其实这么想，计算机也不是不能实现，但是，现行标准经不起自定义的折腾，这会让你的程序兼容性大打折扣，而且，这种精心安排的运算规则还与接下来要讲的事情息息相关：</p>
+<h4 id="加法溢出"><a href="#加法溢出" class="headerlink" title="加法溢出"></a>加法溢出</h4><p>当然，如果加法都像看上去那么简单就好了，但这里是《深入理解计算机系统》，计算机的整数是有上限的，突破了就会<strong>溢出</strong>。很惨的是，C的溢出并不会报错，所以我们应当尽可能理解，然后避免。</p>
+<p>所谓溢出，就是数值在运算时突破了其既定的位长上限，对于二进制位上限为w的数，这种突破在无符号数上表现为数值因大于2的w次方而无法被正常存储，故而溢出到设定的内存空间之外。带符号的就更麻烦了，不论正负都会溢出，并且由于符号位的存在，上下限被压缩到了2的w-1次方。</p>
+<p>所幸加法的溢出判定还算好做，书中提供了一些公式和手法，这里简单说明一下，由于两个无符号二进制位上限为w的数的和不可能超过2的w+1次方，我们只需要预估计算结果是否会存在于[2^w,2^w+1)的区间内部。至于有符号数同理，只不过，注意符号位和上下限同时判断（其实取绝对值对人会省事很多，但对计算机来讲不一定省事）</p>
+<p>当然，变量的溢出和pwn常见的数组的溢出是两码事，这点在后面会提到。</p>
+<h4 id="补码的非"><a href="#补码的非" class="headerlink" title="补码的非"></a>补码的非</h4><p>大于整型区间下边界的数x，其加法逆元等于其非，即-x，若位于下边界，则加法逆元就等于下边界。为了防止下边界溢出导致数据错乱，而加法逆元在符号上表示为负，故而在处理下边界相加的时候会直接令下边界减去其加法逆元，令其和其它数的逆元相加一样直接&#x3D;0。</p>
+<h4 id="乘法"><a href="#乘法" class="headerlink" title="乘法"></a>乘法</h4><p>自然，乘法本质上作为数个相同数的相加也被纳入整数计算大军，只不过还是要考虑溢出问题。</p>
+<p>无符号很简单，乘法，算溢出的时候模个2的w次方，然后判断的时候甭用区间直接看上界，完事。</p>
+<p>有符号有了之前的经验也轻松很多，不就是累加吗，补码和原码在二进制上不是有很强的一致性，补转原，数值乘，模去边界，然后补上双方符号位的或，完事。</p>
+<p>但是，实际上并没有这么轻松。原理上，对于两个任意整数，其无符号表示下的乘法在固定表示位上限的情况下与带符号乘法在二进制表示上相同。这点在书中有推导，简单来说就是将二者分解为数值位和符号位，相乘后对上界取模，简化的结果相等，这点可以自行翻书。</p>
+<p>而除此之外，乘以常数有着一套独立的操作机制，就是乘以常数对二的幂次方的分解。还记得我们上回提到过的东西吗？</p>
+<blockquote>
+<p>此外，对于位运算，C还提供了移位操作：左移（&lt;&lt;n）和右移（&gt;&gt;n），效果上对应整形十进制运算的乘2的幂次方和除以2的幂次方，实际上则分别对应着所有二进制位增n位并末尾补0，和所有二进制位降n位并取整。</p>
+</blockquote>
+<p>对于一个已知的整数，我们不需要太麻烦的操作，或者说，不需要太麻烦计算机的操作。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%AD5.png"></p>
+<p>我们只需要把整数拆分成若干互不相等的2的n次幂的和，然后进行一个乘法分配律，完事，计算机算二进制反而是最快的。</p>
+<p>当然，乘法也是有溢出上界的，有符号就是2的2(w-1)次方，无符号就是2的2w次方。</p>
+<h4 id="除法，但是只能除2的幂"><a href="#除法，但是只能除2的幂" class="headerlink" title="除法，但是只能除2的幂"></a>除法，但是只能除2的幂</h4><p>但是整数除法比较好实现的就只有二进制算数右移了，不然就扯到下一节的浮点数了。</p>
+<p>对于一个整数除以2的幂，在整数部分一般是无符号前缀补0，有符号前缀补符号位，正如前面提到的一样。但是，处理余数是个很头疼的东西。下取整还好说，毕竟C的移位默认就是下取整，省的操作余数。但是上取整呢？</p>
+<p>我们引入<strong>偏置</strong>的概念，即对于一个数的向右位移k位，我们首先对该数二进制的k位后缀，加上一个二进制1拉满的数，即对于1位位移，原数+1；4位位移，原数+15(1111)，8位位移，原数+255(11111111)，etc。如此一来，就算产生余数，我们也能绝对保证上取整了。至于详细原理可以看原书推导，这里不细讲。</p>
+<hr>
+<p>所以，很难说计算机的整型运算导致了什么。它确实让计算机更快了，但也让程序员更痛苦了，不止是理解上，还在于堆屎山的问题上。“特性”的叠加会让程序产生意料之外的状况，而这种状况的冲突往往就体现在整型的特性上，比方说那个让B站程序员痛苦了彻夜的GCD。</p>
+<p>下一篇，我们将提到浮点数相关的内容。所以，还是那句话：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E4%B8%89%E7%AF%87%E4%B8%AD6.png"></p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">学习</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="../../2023/01/21/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%B8%89%E7%AF%87%EF%BC%88%E4%B8%AD%EF%BC%89/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
+    <article id="post-关于小娜的一些设定" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="../../2023/01/12/%E5%85%B3%E4%BA%8E%E5%B0%8F%E5%A8%9C%E7%9A%84%E4%B8%80%E4%BA%9B%E8%AE%BE%E5%AE%9A/">关于小娜的一些设定</a>
+    </h1>
+  
+
+        
+        <a href="../../2023/01/12/%E5%85%B3%E4%BA%8E%E5%B0%8F%E5%A8%9C%E7%9A%84%E4%B8%80%E4%BA%9B%E8%AE%BE%E5%AE%9A/" class="archive-article-date">
+  	<time datetime="2023-01-12T14:49:51.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-01-12</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>小娜原本是我为了给我的笔记增添一些内容，而搬过来的一个计算姬。</p>
+<p>但是，在不断的更新之下，她似乎更像一个活生生的女孩子了。</p>
+<p>她常态的思考能力接近正常人，但在完全冷静的时候，运算能力相当于一台万级价位的台式机。</p>
+<p>她并没有配备仿生内循环器官，所以不能吃饭。但是能喝水，因为她不但靠嘴巴发声，还靠嘴巴置换冷凝液，原理类似腔肠动物。</p>
+<p>她内置了一系列系统和设备兼容，以确保自己与其他设备相连的时候不会发懵。她的常用接口集中于左肩，不常用接口则隐藏在后颈。</p>
+<p>她的电源线和网线接口也排布在后颈，但如果需要也能从左肩接上。</p>
+<p>她一次充电充满与成年人睡一觉的时间差不多，行动时间长达8个小时，所以工作的时候可以和她聊聊天，但是要拉她去享受夜生活的话，她得外接一块大容量电池才能继续行动。</p>
+<p>她是有网络设备的，但正常情况下为了保证自己数据环境的纯洁选择在体内物理隔离。</p>
+<p>她的意识不是单纯的AI，她有自己的性格，喜欢卖萌，一个人时也静若处子，可一旦有人拿她身上计算机的部分开玩笑，她就会情绪激动。</p>
+<p>她不喜欢打架，所以最常用的武器是折成条或卷成卷的报纸。别看她似乎很瘦弱，她的右臂装载的液压杆满功率下可以一拳轰散一块石砖，但左臂为了接线所以舍弃了一些抛瓦，即便这样也与你的体育老师相当。但她平时会控制好自己的出力，不必担心。</p>
+<p>以上，是目前的小娜。</p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">杂谈</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="../../2023/01/12/%E5%85%B3%E4%BA%8E%E5%B0%8F%E5%A8%9C%E7%9A%84%E4%B8%80%E4%BA%9B%E8%AE%BE%E5%AE%9A/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
     <article id="post-深入理解计算机系统学习笔记-第三篇（上）" class="article article-type-post  article-index" itemscope itemprop="blogPost">
   <div class="article-inner">
     
@@ -1089,547 +1636,6 @@ for i in range(5, 6):    # 假装不知道答案有几位，想爆几位手动�
       
         <p class="article-more-link">
           <a class="article-more-a" href="../../2022/10/27/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%B8%80%E7%AF%87/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-    <article id="post-一个铁菜逼的美团CTF复现实录" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="../../2022/09/18/%E4%B8%80%E4%B8%AA%E9%93%81%E8%8F%9C%E9%80%BC%E7%9A%84%E7%BE%8E%E5%9B%A2CTF%E5%A4%8D%E7%8E%B0%E5%AE%9E%E5%BD%95/">一个铁菜逼的美团CTF复现实录</a>
-    </h1>
-  
-
-        
-        <a href="../../2022/09/18/%E4%B8%80%E4%B8%AA%E9%93%81%E8%8F%9C%E9%80%BC%E7%9A%84%E7%BE%8E%E5%9B%A2CTF%E5%A4%8D%E7%8E%B0%E5%AE%9E%E5%BD%95/" class="archive-article-date">
-  	<time datetime="2022-09-18T05:16:02.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-09-18</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h3 id="Previously"><a href="#Previously" class="headerlink" title="Previously"></a>Previously</h3><p>坐！大！牢！</p>
-<p>然而，真的是纯纯坐大牢吗？</p>
-<p>还是我在某些方面犯蠢了呢？</p>
-<h3 id="Reverse"><a href="#Reverse" class="headerlink" title="Reverse"></a>Reverse</h3><h4 id="Small"><a href="#Small" class="headerlink" title="Small"></a>Small</h4><p>似乎是挺简单的一道汇编题，但是……？</p>
-<p>题目在许多渠道都无法正确反汇编甚至运行，比方说ida，die，甚至gdb都救不了，这里就不一一列举失败画面了。无奈只能字节码转汇编硬刚：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Tea_small.png"></p>
-<p>注意到loc_68的代码有些眼熟，又是左移4位又是右移5位，又有准确的delta和key，形似tea（tea加密相关可以看看<a target="_blank" rel="noopener" href="https://www.jianshu.com/p/4272e0805da3">人在码途的文章</a>，应该是处理原文的主要部分。还有这一段：</p>
-<pre><code>cmp     edx, 23h ; &#39;#&#39;
-jl      short loc_52
-</code></pre>
-<p>应该对应着tea的加密轮数，tea似乎稳了。但是，这只是我犯浑的开始——</p>
-<p>一开始读汇编代码的时候，我注意到被位运算的两个寄存器不一样，寄存器eax和ecx似乎是分存被处理数据的左半和右半。于是在一阵分析后认为这是对原先的tea进行修改，把加密方程变成了这样：</p>
-<pre><code>v0 += ((v1&lt;&lt;4) + KEY[0]) ^ (v1 + sum) ^ ((v0&gt;&gt;5) + KEY[1]);
-v1 += ((v0&lt;&lt;4) + KEY[2]) ^ (v0 + sum) ^ ((v1&gt;&gt;5) + KEY[3]);
-</code></pre>
-<p>但是我很显然忽略了一个问题，汇编语段里出现了一个ebp寄存器，这玩意的作用相当于开了一个栈，且ebp始终作为某一时刻这个栈的记录存在。在第一个方程过后出现了这样一个语句：</p>
-<pre><code>add     ebp, ecx
-mov     ecx, ebp
-</code></pre>
-<p>此时ecx作为左半边的处理结果入栈。而在之后又出现了一个诡异的场景：</p>
-<pre><code>mov     eax, ebp
-shl     eax, 4
-add     eax, 45h ; &#39;E&#39;
-xor     ecx, eax
-mov     eax, ebp
-</code></pre>
-<p>ebp的值同样在之后被用在了eax身上！结合上面的汇编代码，我们不难发现，eax只是被当作临时存储上一级运算结果的变量，真正存储每一次式子运算结果的，一直是ecx！而这也就说明……出题人根本没动过tea，动的是实现tea的方式……</p>
-<p>好了，既然认准了是原装的tea，那么直接搬脚本也是合情合理，问题来了，数据呢？要处理的数据呢？</p>
-<p>这就要提到我第二次麻瓜的地方了……就是这里。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/syscall_small.png"></p>
-<p>按说到了syscall这块，整个程序也就差不多结束了。但很显然，年轻的我并没有发现什么不对，因为当时那底下还有几个函数——</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/fakefunc_small.png"></p>
-<p>但是，字节码转汇编程序，某种意义上就是对凌乱数据的解读。而我在一堆函数里迟迟找不到原文或者密文的原因只有可能是一个——</p>
-<p>在找主函数的时候，我可能把原本作为数据的部分也转化了。</p>
-<p>果然，在跟着题解回滚之后，看到原本在那下面的地方果然是出题人藏都不打算藏的数据集：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/data_small.png"></p>
-<p>那么，该做啥也很清楚了。以下代码参考了<a target="_blank" rel="noopener" href="https://github.com/0x000000AC/Tiny-Encryption-Algorithm/blob/master/tea32.c">0x000000AC</a>和<a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s?__biz=Mzg4MjcxMTAwMQ==&mid=2247484276&idx=1&sn=bee6853198aaccecbc453d803f162847&chksm=cf53c3c2f8244ad473a9185a91a762924757d2b519d8ef7ce6dc9a0933d959717a4b4f9ec3db&mpshare=1&scene=23&srcid=0918QMQvjd7Z6vlkoy7vb2Qb&sharer_sharetime=1663468085244&sharer_shareid=6eea79ff6da57fc6752ab0bc570bf392#rd">Arr3stY0u</a>：</p>
-<pre><code>#include &lt;stdio.h&gt;
-#include &lt;stdint.h&gt;
-
-uint32_t KEY[4]=&#123;1,0x23,0x45,0x67&#125;;  // Key space for bit shifts
-int n;
-
-void encrypt(uint32_t* v) &#123;
-  uint32_t v0=v[0], v1=v[1], sum=0, i;             // set up
-  uint32_t delta=0x67452301;                       // a key schedule constant, but different in this topic 
-  for (i=0; i &lt; 35; i++) &#123;                         // basic cycle start
-    sum += delta;
-    v0 += ((v1&lt;&lt;4) + KEY[0]) ^ (v1 + sum) ^ ((v1&gt;&gt;5) + KEY[1]);
-    v1 += ((v0&lt;&lt;4) + KEY[2]) ^ (v0 + sum) ^ ((v0&gt;&gt;5) + KEY[3]);  
-  &#125;                                                // end cycle 
-  v[0]=v0; v[1]=v1;
-&#125;       
-
-void decrypt (uint32_t* v) &#123;
-    uint32_t v0=v[0], v1=v[1], sum=0x67452301*35, i;  // set up, the sum is different because delta
-    uint32_t delta=0x67452301;                     // a key schedule constant 
-    for (i=0; i&lt;35; i++) &#123;                         // basic cycle start 
-        v1 -= ((v0&lt;&lt;4) + KEY[2]) ^ (v0 + sum) ^ ((v0&gt;&gt;5) + KEY[3]);
-        v0 -= ((v1&lt;&lt;4) + KEY[0]) ^ (v1 + sum) ^ ((v1&gt;&gt;5) + KEY[1]);
-        sum -= delta;
-    &#125;                                              // end cycle 
-    v[0]=v0; v[1]=v1;
-&#125;
-
-void dumpdata(uint32_t* v)
-&#123;
-    for (int i=0;i&lt;n;i++)
-        for (int j=0;j&lt;sizeof(uint32_t)/sizeof(uint8_t);j++)
-            printf(&quot;%c&quot;,(v[i] &gt;&gt; (j*8)) &amp; 0xFF);
-    printf(&quot;\n&quot;);
-    return;
-&#125;
-
-int main()
-&#123;
-        uint32_t v[] = &#123; 0xde087143,0xc4f91bd2,0xdaf6dadc,0x6d9ed54c,0x75eb4ee7,0x5d1ddc04,0x511b0fd9,0x51dc88fb &#125;; 
-        n = sizeof(v)/sizeof(uint32_t);
-        
-        printf(&quot; Original Values: [&quot;);
-        for(int i=0;i&lt;n;i++)
-        	printf(&quot; %X&quot;, v[i]);
-        printf(&quot; ]&quot;);
-        
-//        for(int i=0;i&lt;n/2;i++)
-//        	encrypt(&amp;v[i*2]);
-//        	
-//        printf(&quot;\n Encrypted:       [&quot;);
-//        for(int i=0;i&lt;n;i++)
-//        	printf(&quot; %X&quot;, v[i]);
-//        printf(&quot; ]&quot;);
-//		dumpdata(v);							//there&#39;s no need encrypt xd
-
-        for(int i=0;i&lt;n/2;i++)
-        	decrypt(&amp;v[i*2]); 					//expand the operation to loop for more data
-        	
-        printf(&quot;\n Decrypted:       [&quot;);
-        for(int i=0;i&lt;n;i++)
-        	printf(&quot; %X&quot;, v[i]);
-        printf(&quot; ]\n&quot;);
-        dumpdata(v); 							//to print out data in string format
-        
-        return 0;
-&#125;
-</code></pre>
-<blockquote>
-<p>flag{327a6c4304ad5938eaf0efb6cc3e53dc}</p>
-</blockquote>
-<p>麻了，汇编一点不会，练底力去。</p>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="../../2022/09/18/%E4%B8%80%E4%B8%AA%E9%93%81%E8%8F%9C%E9%80%BC%E7%9A%84%E7%BE%8E%E5%9B%A2CTF%E5%A4%8D%E7%8E%B0%E5%AE%9E%E5%BD%95/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-    <article id="post-随便画画-2022-9-15" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="../../2022/09/15/%E9%9A%8F%E4%BE%BF%E7%94%BB%E7%94%BB-2022-9-15/">随便画画-2022/9/15</a>
-    </h1>
-  
-
-        
-        <a href="../../2022/09/15/%E9%9A%8F%E4%BE%BF%E7%94%BB%E7%94%BB-2022-9-15/" class="archive-article-date">
-  	<time datetime="2022-09-15T12:12:00.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-09-15</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>不知道为什么，我看到了我希腊神话书上前人留下的痕迹。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/IMG_20220915_154624.jpg"></p>
-<p>还在草稿阶段，还只画一半，血压高了然后我直接进行了一波重构：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/IMG_20220915_154628.jpg"></p>
-<p>虽然本人人体画渣，但是……勉强能看吧，希望以后的我不要打死自己</p>
-<p>以及，有人说这只狐娘像涂山酱，不知道为什么</p>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">杂谈</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="../../2022/09/15/%E9%9A%8F%E4%BE%BF%E7%94%BB%E7%94%BB-2022-9-15/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-    <article id="post-to-2022-9-6-更新内容" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="../../2022/09/06/to-2022-9-6-%E6%9B%B4%E6%96%B0%E5%86%85%E5%AE%B9/">to_2022/9/6-更新内容</a>
-    </h1>
-  
-
-        
-        <a href="../../2022/09/06/to-2022-9-6-%E6%9B%B4%E6%96%B0%E5%86%85%E5%AE%B9/" class="archive-article-date">
-  	<time datetime="2022-09-06T09:55:25.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-09-06</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>1、把NSILAB的几篇文章给搬了过来<br>2、同步更新了一期题解<br>3、更新了友链，还发现了当前模板如果填入空友链会报错的问题</p>
-<p>以上</p>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">杂谈</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="../../2022/09/06/to-2022-9-6-%E6%9B%B4%E6%96%B0%E5%86%85%E5%AE%B9/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-    <article id="post-vsCTF-2022-变态复现实录" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="../../2022/09/04/vsCTF-2022-%E5%8F%98%E6%80%81%E5%A4%8D%E7%8E%B0%E5%AE%9E%E5%BD%95/">vsCTF_2022-变态复现实录</a>
-    </h1>
-  
-
-        
-        <a href="../../2022/09/04/vsCTF-2022-%E5%8F%98%E6%80%81%E5%A4%8D%E7%8E%B0%E5%AE%9E%E5%BD%95/" class="archive-article-date">
-  	<time datetime="2022-09-04T08:42:03.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-09-04</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h3 id="Previously"><a href="#Previously" class="headerlink" title="Previously"></a>Previously</h3><p>我是真的会谢，明明vsCTF的知名度还算可以吧，结果国内搜索引擎基本没有Wp，外网一翻，全是Cry和Web的题解，Re的题解基本都是针对在线题，静态题题解寥寥无几。</p>
-<p>麻了，虽然菜，自己动手丰衣足食，就算煮出来的效果堪比雷电将军特殊料理，也好过没东西吃。</p>
-<h3 id="Reverse"><a href="#Reverse" class="headerlink" title="Reverse"></a>Reverse</h3><h4 id="Binary-Flood"><a href="#Binary-Flood" class="headerlink" title="Binary Flood"></a>Binary Flood</h4><p>焯，又是结构一毛一样巨量文件（我为甚么要说又）</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/same_BinaryFlood.png"></p>
-<p>但是好像就是一套单纯的输入数据-&gt;加密-&gt;判断的机制，并不是地图题（上次复现那套多文件地图题给我整出emotional damage了）。最终，每组数据的结果是一个加密过的串，存储在相对文件头偏移4020的位置：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/singleans_BinaryFlood.png"></p>
-<p>好嘛，虽然不知道怎么加密的，但是我知道，肯定得先把从file_ 0到file_ 1336这一堆东西导出来：</p>
-<pre><code>s = []
-
-for i in range(1337):
-    with open(f&#39;file_&#123;i&#125;&#39;, &#39;rb&#39;) as f:
-        l = f.read()
-        s.append(l[0x4020:0x4020+39].decode())
-    f.close()
-
-fw = open(&#39;pickedata.txt&#39;, &#39;w&#39;)
-for i in range(1337):
-    fw.write(str(s[i]))
-fw.close()
-</code></pre>
-<p>结果就是导出来的这一大串东西具有强烈的base64既视感……</p>
-<pre><code>NzPxDxwEv9TLmgFVNjCRjcEJgKMiCJBBvcY0mKoVM0wbgGMlNuvZCXZARwgIGFtIV+……
-</code></pre>
-<p>但是你先别急，虽然能确定完整的加密其中一步应该是base64，但还是先看看这玩意的加密到底是怎么回事。考虑到逆向后的代码有极强的不可读性，我们尝试动态调试。</p>
-<p>判定用的串长度为39，我们索性构造一个39长，辨识度还高的串进去测试，比方说abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLM，然后再把断点下在判定过后的任意位置，于是从rdi寄存器得到变换后的结果：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/debugging_BinaryFlood.png"></p>
-<p>再与原串进行比对：</p>
-<pre><code>abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLM
-FpGhHqIdJrKiLsMbtjuevkwaxlyfzmAcBnCgDoE
-</code></pre>
-<p>不难发现本体并没有进行base64的操作，而是进行了一个次序的变换。顺着这个思路，我们把原数据每39位进行如上规律的移位。考虑到python的list变量天然分割了这些数据，我们只需要在提取程序上稍作改造（以下代码部分参考<a target="_blank" rel="noopener" href="https://github.com/acdwas/ctf/blob/master/2022/vsCTF%202022/rev/Binary%20Flood/README.md">Jarosław Keller的题解</a>）：</p>
-<pre><code>s = []
-
-for i in range(1337):
-    with open(f&#39;file_&#123;i&#125;&#39;, &#39;rb&#39;) as f:
-        l = f.read()
-        s.append(l[0x4020:0x4020+39].decode())
-    f.close()
-
-
-l = &quot;abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLM&quot;
-a = &quot;abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLM&quot;
-b = &quot;FpGhHqIdJrKiLsMbtjuevkwaxlyfzmAcBnCgDoE&quot;
-# 干脆在动态调试结果的基础上机操规律，省人工
-d = []
-
-for c in l:
-    d.append((a.find(c), b.find(c)))
-# ----------------------------------
-x = b&#39;&#39;
-
-for t in s:
-    w = [&#39;&#39;] * 39
-    for a, b in d:
-        w[a] = t[b]
-    x += &#39;&#39;.join(w).encode()
-
-x += b&#39;==&#39;
-# --标记部分摘自Jarosław Keller dalao--
-fw = open(&#39;result.txt&#39;, &#39;w&#39;)
-fw.write(str(x))
-fw.close
-</code></pre>
-<p>然后把搓出来的合成肉扔进赛博厨房烧烤：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/cooked_BinaryFlood.png"></p>
-<p>最后得到一张pdf，往下多划拉划拉就可以找到这个flag：</p>
-<blockquote>
-<p>vsctf{templated_binaries_are_1337}</p>
-</blockquote>
-<h4 id="FunctionalCPP"><a href="#FunctionalCPP" class="headerlink" title="FunctionalCPP"></a>FunctionalCPP</h4><p>所以为什么这帮子老外总想着光看几张破图就能让人明白什么（</p>
-<p>看外网的题解，不知道为什么把断点下在0x555555555914那里动调，我们打开程序瞅瞅：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Rickrolled_FunctionalCPP.png"></p>
-<p>好嘛，经典诈骗链接。</p>
-<p>die看不出什么，直接搬进ida瞅一眼：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/inside_FunctionalCPP.png"></p>
-<p>这下真看不懂了（看我凌乱的注释就知道），还得请密码人出山。不过有没有什么让Re手也轻松做出来的办法呢？</p>
-<p>有肯定有，那就是暴力硬破，就是花的时间长了点。那么思路很明显了，暴力脚本+从断点输入数据，直接创碎这玩意。问题是……怎么知道自己创没创对位置呢？正常的判断只会对整个串判定T or F，如果要直接比对寄存器，总不能凭空掏出一个地址吧？！而且每一次动态调试出现的输入函数的地址都不相同，什么5582D32C5360、563611541050的都敢冒出来，我真的会谢。</p>
-<p>直到我去查找了一下资料，发现gdb可以直接输入start来读取程序的实际入口地址——</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Enter_FunctionalCPP.png"></p>
-<p>看来很接近了。于是我们看看在主函数的判断语句（忽略我凌乱的注释，那会误导你）：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Judge_FunctionalCPP.png"></p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/HuibianJ_FunctionalCPP.png"></p>
-<p>如果我们要通过修改被判断字串的值来爆破，看来是这了。对应判断条件secret位置在主函数偏移约0x497~0x498的位置，刚好是题解里说的玩意——0x555555555914。然后尝试用Python的gdb拓展尝试疯狂爆破。问题来了，用什么爆破呢？我们根据前面的代码可以得知：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/Jdg_FunctionalCPP.png"></p>
-<p>输入的是个字符串，至少输出去判断的也是个字符串，所以flag至少是可打印字符集。我们拿不易产生冲突的字符集浅试一手。</p>
-<p>下面的代码参考了<a target="_blank" rel="noopener" href="https://github.com/acdwas/ctf/tree/master/2022/vsCTF%202022/rev/Functional%20CPP">acdwas</a>和<a target="_blank" rel="noopener" href="https://segmentfault.com/a/1190000005718889">spacewander</a>的架构：</p>
-<pre><code># move.py
-# 1. 导入gdb模块来访问gdb提供的python接口
-import gdb
-
-# 2. 用户自定义命令需要继承自gdb.Command类
-class Move_Py(gdb.Command):
-
-    # 3. docstring里面的文本是不是很眼熟？gdb会提取该类的__doc__属性作为对应命令的文档
-    
-    def __init__(self):
-        # 4. 在构造函数中注册该命令的名字
-        super(Move_Py, self).__init__(&quot;mv&quot;, gdb.COMMAND_USER)
-
-    # 5. 在invoke方法中实现该自定义命令具体的功能
-    # args表示该命令后面所衔接的参数，这里通过string_to_argv转换成数组
-    def invoke(self, _unicode_args, _from_tty):
-        
-        strcomb = &#39;0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_+?&#123;&#125;&#39; #经典base64字符集
-        
-        w = &#39;AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&#39;
-        a = 0
-        
-        # 6. 使用gdb.execute来执行具体的命令
-        while a &lt; 58:
-            i = 0
-            while True:
-                wline = list(w)
-                wline[a] = strcomb[i]
-                gdb.execute(f&quot;r &lt;&lt;&lt; &#123;&#39;&#39;.join(wline)&#125;&quot;) #直接运行程序，同时把我们要输入的串塞进去
-                for j in range(a):
-                    gdb.execute(&#39;c&#39;) #原代码这个判断的断点是个循环，绕过断点继续运行，像极了你疯狂按enter急急国王的样子
-                
-                if int(gdb.parse_and_eval(&quot;$rbx&quot;)) == int(gdb.parse_and_eval(&quot;$rax&quot;)): #当场比较寄存器看看前缀是否相同
-                    w = &#39;&#39;.join(wline)
-                    print(w)
-                    a += 1
-                    break #行的话加入flag豪华午餐
-                i += 1
-
-# 7. 向gdb会话注册该自定义命令
-Move_Py()
-</code></pre>
-<p>于是乎，在把电脑干冒烟之后，你会得到一个flag：</p>
-<blockquote>
-<p>vsctf{1_b37_y0u_w1LL_n3v3r_u53_Func710n4L_C++_1n_ur_L1F3?}</p>
-</blockquote>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="../../2022/09/04/vsCTF-2022-%E5%8F%98%E6%80%81%E5%A4%8D%E7%8E%B0%E5%AE%9E%E5%BD%95/">展开全文 >></a>
         </p>
       
 
