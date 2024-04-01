@@ -166,6 +166,495 @@
           <div id="js-content" class="content-ll">
             
   
+    <article id="post-深入理解计算机系统学习笔记-第四篇（下）" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="../../2023/09/09/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E5%9B%9B%E7%AF%87%EF%BC%88%E4%B8%8B%EF%BC%89/">深入理解计算机系统学习笔记-第四篇（下）</a>
+    </h1>
+  
+
+        
+        <a href="../../2023/09/09/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E5%9B%9B%E7%AF%87%EF%BC%88%E4%B8%8B%EF%BC%89/" class="archive-article-date">
+  	<time datetime="2023-09-09T07:15:03.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-09-09</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h3 id="上回书说到"><a href="#上回书说到" class="headerlink" title="上回书说到"></a>上回书说到</h3><p>还上回书啥呢，趁热打铁，给大家来点想看的东西——存储结构的机器级表示。</p>
+<p>至于小娜……我安排她帮我过旷野之息的进度去了，这会估计还在跟远古机械斗智斗勇吧（笑），等我投个屏……</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E5%9B%9B%E7%AF%87%E4%B8%8B1.jpg"></p>
+<p>希望她新装的自动躲避系统没事……希望如此</p>
+<h3 id="回到正题——机器层面的数组"><a href="#回到正题——机器层面的数组" class="headerlink" title="回到正题——机器层面的数组"></a>回到正题——机器层面的数组</h3><p>我们已经不止一次提过数组的概念，熟悉程序逆向或者计算机工程的同学应该明白，包括之前提过不止一遍，内存可以视为一个大的数组。而这个数组的<strong>元素</strong>，最小单位就是字节。我们每次实际开的数组，都是取这个大数组中的一部分，再按我们需求的数据的<strong>单位长度</strong>进行元素的划分，比如我们开一个int数组就是每4字节为一个元素，etc。</p>
+<p>也因此，数组所需要与<strong>索引</strong>对应的地址的抽象概念，也就是<strong>指针</strong>，也是严格按照这种单位的运算模式来进行数据的索引的。指针的运动和指向，严格取决于你所定义的数据类型。</p>
+<p><em>ps.指针也可以被指向函数</em></p>
+<p>故我们需要面对的实际数组，理所应当的，每一个元素都对应着两个信息，一个是它本体存储的信息，另一个是其存储地址。而对于一个指针变量而言，如果需要在这些元素间跳转，其实也很简单，只需要搞到这个数组的起始地址，然后按照我们设定的单位长度，进行指针的累加或累减，运算表达式大致为(^*(E+N))（E为数组起始地址，N为索引）的格式。其地址则是起始地址+偏移量的格式，偏移量为索引值和数据单位长度的乘积。</p>
+<p>比方说我们想要搞到int数组ans的索引为2的元素，在高级语言层面我们使用<code>int a = ans[2]</code>，而在汇编层面，我们取<code>mov (%rdi,%rdx,4) %rax</code>即可，最低维索引值在rdx，而数组本体的地址在rdi中。从上述运算也可见，指针是依照其单位长度，而非最基础的单字节来增加或减少的。</p>
+<h4 id="数组嵌套"><a href="#数组嵌套" class="headerlink" title="数组嵌套"></a>数组嵌套</h4><p>就算是使用数组嵌套也是一个道理，只不过，原本M维的索引放到内存空间统统降维打击，指针也给你压缩成(<em>(E+N_1</em>N_{2max}+N_2*N_{3max}+……+N_{M-1}*N_{Mmax}+N_M))的格式。简单来讲，和原来的理解方式一样，嵌套数组不过是把上一维数组的单位元素变成了下一维的数组，但实现起来可能就有点让人抓狂，比方说逆向的地图题。</p>
+<p>而具体而言，例如int二维数组<code>M[x][y]</code>，x、y为常数，每个元素的地址都变成了诸如(&amp;M[i][j]&#x3D;M+L(y*i + j), L&#x3D;sizeof(int))的格式，二维数组被横向拉长成数个单位数组的拼接，而每个元素的索引值又是其所在的单位数组的索引+在所在单位数组中元素的索引，如下图：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E5%9B%9B%E7%AF%87%E4%B8%8B2.jpg"></p>
+<p>此时，两个维度的索引值分别在rsi和rdx中，数组本体的地址在rdi中。调用的时候，比方说我们需要调用<code>M[2][2]</code>，我们需要这么做：</p>
+<pre><code>lea (,%rsi,y) %rax //确定第一维的值i=2，令rax指向地址2y
+lea (%rdi,%rax,4) %rax //令rax指向地址(M+4(2y))
+mov (%rax,%rdx,4) %eax //引入第二维的值j=2，将地址(M+4(2y+2))的数据提至eax寄存器
+</code></pre>
+<p>整体过程大概就是：通过指针计算地址——&gt;指向地址上的元素——&gt;将元素提取出来。</p>
+<p>包括在循环过程中也是如此，遍历同一维度时，我们只需要对地址进行<code>add $4 %rax</code>，而遍历上一级维度，也只需要进行<code>lea (%rax,y,4) %rax</code>即可。</p>
+<p><em>ps.这里直接写y是为了更加直观，实际y可能存放于另一个寄存器中</em></p>
+<h4 id="变长数组"><a href="#变长数组" class="headerlink" title="变长数组"></a>变长数组</h4><p>包括长度随变量而变化的数组也逃不开这个过程。只是由于涉及到了更多的变量，我们不得不使用耗费更多算力的mul指令来计算地址，而不能再简单地通过表达式赋值。比方说倘若我们的M数组是一个大小为n*n的矩阵，rcx被赋值为n，则其元素调用方法变更如下：</p>
+<pre><code>imul %rsi %rcx //确定第一维的值i=2，同时指针参数赋值2n
+lea (%rdi,%rcx,4) %rax //令rax指向地址(M+4(2n))
+mov (%rax,%rdx,4) %eax //引入第二维的值j=2，将地址(M+4(2n+2))的数据提至eax寄存器
+</code></pre>
+<h4 id="编译优化"><a href="#编译优化" class="headerlink" title="编译优化"></a>编译优化</h4><p>但是，就像小娜不想算加密，编译器也不想给自己太大的负担，这样对开发者的血压也有好处。于是，一般对于定长数组，C语言优化等级为o1时会将源代码中的指定长度define为常量，这样调用数组长度就只需要调用这个常量，而不是四处乱放的立即数。譬如我们定义<code>int M[10][10]</code>时,系统就会自动加上:</p>
+<pre><code>#define N 10
+typedef int M[N][N];
+</code></pre>
+<hr>
+<h3 id="其它类型的存储结构"><a href="#其它类型的存储结构" class="headerlink" title="其它类型的存储结构"></a>其它类型的存储结构</h3><h4 id="结构体"><a href="#结构体" class="headerlink" title="结构体"></a>结构体</h4><p>如果数组还是个单位元素定长的数据结构，那C的<strong>结构体</strong>就是完完全全地随意发挥了。虽然还遵循着地址为起始地址+偏移量的标准，但内存空间的分配则是顺序的，按照你对结构体的定义分配，并且，偏移量也是不同数据类型的组合。就比如说你想要调用如下结构体中的数组中的第i个元素：</p>
+<pre><code>struct rec&#123;		//beginning address in rdi
+    int i
+    char j
+    int a[6]	//i in rsi
+    int *p
+&#125;cal; 
+</code></pre>
+<p>那它的内存引用值大概就是(4+1)(%rdi,%rsi,4)，即提前计算好的立即数+数组指针对应的地址偏移……吗？</p>
+<p>我们思维中就是如此，但计算机可不一定这么想。因为惯例上，不同数据类型的数据的地址，应当是其数据单位长度的整数倍。所以，对于这么一堆int中混入的char，编译器自然是对其进行填充处理，即自动填充一个长度为3的空隙。于是，实际的内存引用值就是8(%rdi,%rsi,4)。这个填充值会根据你实际定义的数据类型，数据的排列方式和硬件系统的操作数来进行变化。</p>
+<h4 id="联合"><a href="#联合" class="headerlink" title="联合"></a>联合</h4><p>我们联合！！！（逃</p>
+<p>如上，struct的构建方式会带来一个严重的问题，如果我们大量使用具有惯例上导致空间冲突的不同数据类型的结构体，那么，其产生的内存占用将会是灾难级的。如果我们想减少数据分配空间，避免爆内存，我们在开发中会不可避免地用上<strong>联合体</strong>（虽然我都没用过）。</p>
+<p>联合体的所有数据共享同一存储空间，其大小取决于其最大字段的大小，比如说上面那个struct，如果我们把它改成union：</p>
+<pre><code>union rec&#123;		//beginning address in rdi
+    int i
+    char j
+    int a[6]	//i in rsi
+    int *p
+&#125;cal; 
+</code></pre>
+<p>于是乎，原本需要&#x2F;(4+(1+3)+6<em>4+8&#x2F;)字节空间的数据，只需要6</em>4个字节就可以存下了。这种结构经常用于需要拓展子节点的树形结构等，并且，不知可以单独运用，你还可以在struct里套union，或者反过来套，防止内存溢出漏洞的同时也可以节省空间，就比如一个二叉树，你需要记录它的状态和左右子节点，那你就可以这么写来节省空间：</p>
+<pre><code>union node_t&#123;
+    struct&#123;
+        struct node_t *left;
+        struct node_t *right;
+    &#125;
+    char status;
+&#125;inf;
+</code></pre>
+<p>又比如，你想要完成数据转换，但又不希望强制数据转换带来的二进制位出错，你就可以使用union，创造一个可以以一种数据类型存储，另一种来访问的方法，也就是《深入理解》原书中188页提及的部分，本文不再赘述。</p>
+<hr>
+<h3 id="缓冲区溢出"><a href="#缓冲区溢出" class="headerlink" title="缓冲区溢出"></a>缓冲区溢出</h3><p>准确来讲，这一块内容应当叫“内存越界引用和缓冲区溢出”，但各路博主对于溢出漏洞及其利用，所引用的名词都非常的多元化，就按下不表了。</p>
+<p>C语言对于数组引用没有边界检查，对越界的数组元素进行写操作，就会导致栈中信息被修改，进行读操作就会导致程序中的一些不知名数据被读取。这个情况在pwn中非常明显，就比如经典的gets漏洞和printf漏洞，我们就可以通过写字符串来覆盖掉短小的字符串类型数据之外的一些指令。譬如如下代码：</p>
+<pre><code>void input()
+&#123;
+    char buf[8];
+    read(0, buf, 0x50);
+    printf(buf);
+    return;
+&#125;
+void cat_flag()
+&#123;
+    system(&quot;cat flag&quot;);
+&#125;
+int main()
+&#123;
+    input();
+    return 0;
+&#125;
+
+in linux assemble（省略堆栈平衡部分）:
+input:
+    mov     edx, 50h
+    mov     rsi, rbx
+    mov     edi, 0
+    call    _read
+    mov     rdi, rbx
+    mov     eax, 0
+    call    _printf
+    retn
+</code></pre>
+<p>在<code>call _read</code>处正常动态调试，当我们正常输入的时候，输出值并不会变化，堆栈上的数据和返回地址也显示正常。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E5%9B%9B%E7%AF%87%E4%B8%8B3.png"></p>
+<p>但当我们输入一串长度超过8的字符，比方说十几个字符全是a，我们看IDA：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E5%9B%9B%E7%AF%87%E4%B8%8B4.png"></p>
+<p>此时，因为缓冲区溢出导致先前入栈的返回地址异常，我们的程序已经无法正常返回main而暴毙。而倘若我们利用python，使得input时输入了一串字符，令覆写的区域成功覆盖了整个返回地址，并将其引至函数<code>cat_flag()</code>，我们再试试：</p>
+<pre><code>from pwn import *
+r = process(&#39;input2&#39;)
+cat_loc = 0x5642E4866188
+payload = 16*b&#39;a&#39; + 0x4*b&#39;a&#39; + p64(cat_loc)
+r.sendline(payload)
+r.interactive()
+</code></pre>
+<p>熟悉pwn的同学应该明白，这就是pwn的基本原理——通过一些溢出漏洞来获取信息。但是这段代码并没有成功，这是因为linux的编译器在编译时自行加上了一些奇怪的东西。这就要提到接下来的部分了：</p>
+<h4 id="如何保护你的代码"><a href="#如何保护你的代码" class="headerlink" title="如何保护你的代码"></a>如何保护你的代码</h4><p>书中列举了linux的gcc编译器使用的几种办法，来让你的代码免于遭受直接的缓冲区溢出攻击。</p>
+<p><strong>1、栈随机化：</strong></p>
+<p>顾名思义，每次运行时，栈的地址都会随机发生变化。实现方式是提前给栈分配一段0到n的随机大小的空间，程序不使用这段空间，但这段空间会使得整个栈的地址发生改变。这种防护技术在Linux系统中已经成为了常态化行为，称为“地址空间布局随机化”（ASLR）。</p>
+<p><strong>2、栈破坏检测：</strong></p>
+<p>编译器会在汇编代码中加入一种栈保护者的机制来检测缓冲区越界，即在缓冲区和栈保存的状态值之间存储一个特殊值，名为“金丝雀值”（canary），倘若因为缓冲区溢出导致这个值发生改变，那么程序产生异常中止。</p>
+<p><strong>3、限制可执行代码区域：</strong></p>
+<p>一种方法是限制哪些内存区域能存放可执行代码，例如AMD的64位处理器中含有的“NX”（不可执行）位，在不损失性能的前提下，由硬件完成是否可执行的判定（传统x86的硬件只能通过软件机制来阻止执行，这会使性能大打折扣）。</p>
+<p>另一种办法则是动态地，即时地产生代码，将可执行代码限制在由编译器创建原始程序时产生的部分中。比方说Java程序的运行。</p>
+<p><em>ps.在编写这一段的时候，我发现在gets外面再套一层指针有效地防止了我自己写出shell来：</em></p>
+<pre><code>char *input()
+&#123;
+    static char buf[8];
+    gets(buf);
+    return buf;
+&#125;
+void cat_flag()
+&#123;
+    system(&quot;cat flag&quot;);
+&#125;
+int main()
+&#123;
+    printf(&quot;%s\n&quot;, input());
+    return 0;
+&#125;
+</code></pre>
+<p><em>所以说，多套几层指针保护函数或许也是一种保护代码的策略？</em></p>
+<h4 id="但我们还是可以打进去"><a href="#但我们还是可以打进去" class="headerlink" title="但我们还是可以打进去"></a>但我们还是可以打进去</h4><p>众所周知，二进制方向有逆向（Reverse）和PWN两个分支，我们光靠逆向搞不定的事情，或许可以靠利用漏洞进行动态攻击来解决。接下来考虑对这种程序进行一个打。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E5%9B%9B%E7%AF%87%E4%B8%8B5.jpg"></p>
+<p>额……能不能待会再……停停！我说停亻——</p>
+<p>（不绝于耳的汤姆哀嚎）</p>
+<p>咳咳……额……所以，我们在弄不清保护方法的情况下该怎样利用漏洞呢？从上回我们疯狂输入A也可以看出来，从数组到返回地址的偏移量为16，我们可以考虑利用printf格式化漏洞来输出栈的数据，具体可以参考<a target="_blank" rel="noopener" href="https://introspelliam.github.io/2017/08/04/printf%E6%A0%BC%E5%BC%8F%E5%8C%96%E6%BC%8F%E6%B4%9E/">上善若水的文章</a>和<a target="_blank" rel="noopener" href="https://blog.csdn.net/qq_41202237/article/details/107662273">hollk的文章</a>。</p>
+<p>简单来说，就是printf在只设定了参数，没有设定输出内容的前提下，会自动在堆栈上向下查找数据，打印出接下来地址上的内容。当对应地址不存在时，这个程序就会boom。printf泄露最关键的参数之一就是%n,不输出字符，但是把已经成功输出的字符个数写入对应的整型指针参数所指的变量。</p>
+<p>如果我们要尝试爆出某个地址上的数据，那不妨多重复几遍参数%p：</p>
+<pre><code>from pwn import *
+
+r = process(&#39;input2&#39;)
+
+dist = 16
+payload1 = b&#39;aaaa&#39; + 12 * b&#39;%p&#39;
+
+r.sendline(payload1)
+r_recv = str(r.read())
+print(r_recv)
+</code></pre>
+<p>在ida动态调试时，软件产生了不同的栈地址，在这里泄露时也是一样（其实这一点在checksec里就能看出来，参考我老早以前的pwn题解）：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E5%9B%9B%E7%AF%87%E4%B8%8B6.png"></p>
+<p>如上，我们可以看到输入的<code>aaaa</code>在相对printf指令偏移为7的地址，即格式化字符串的第七个参数。如果你想定向找出某个偏移上的数据，那不妨使用参数<code>aaaa%7$p</code>。</p>
+<p>在后续调试过程中可以看出，改用短长度<code>&#39;%lx&#39;</code>语法段进行printf泄露的结果类似于“aaaa_[地址1]<em>50</em>[地址2]”的格式，并且，地址2无一例外都是以“0ed”后缀结尾。这里就要提到PIE的一大特性：</p>
+<blockquote>
+<p>程序每次运行，一些数据所在地址就会变更，但是这仅仅是libc的基地址发生变化，由于只是一个内存页的单位发生变化，那么地址的低三位就不会发生变化，即4KB(0x1000)不变。<br>——摘自<a target="_blank" rel="noopener" href="https://blog.fjt1.com/2019/11/18/pie%E4%BD%8E%E4%BD%8D%E8%A6%86%E7%9B%96/">Whitea的博客</a></p>
+</blockquote>
+<p>综上所述，我们可以构造printf，进而将新的返回地址溢出到返回值，从而完成调用。单纯的使用printf以及其它格式化输入输出的漏洞，对未开启NX保护的程序还算有效。但万一开了呢？又或者，程序并没有给出足够的系统指令来让你找到flag呢？</p>
+<h4 id="ret2libc"><a href="#ret2libc" class="headerlink" title="ret2libc"></a>ret2libc</h4><p>这种办法简单来说就是先泄漏出从<code>libc.so</code>调用的某些函数在内存中的地址，即got表中库函数的地址，然后再利用泄漏出的函数地址根据偏移量计算出<code>system()</code>函数和<code>/bin/sh</code> 字符串（有时没有，需要手动构造）在内存中的地址，然后执行由它们组成的payload，完事。</p>
+<p>从编译的角度来讲，这个过程讲究的就是一个“我打我自己”，即，用编译时封装给程序自身，或者库内含的函数，去探得或者直接调用实际运行时函数的内存地址。在程序本体缺斤少两时特别好用。</p>
+<p>我们先通过<code>objdump -R [程序名]</code>指令指令，得出各库函数的<strong>got表（全局函数表）</strong>：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E5%9B%9B%E7%AF%87%E4%B8%8B7.png"></p>
+<p>再去用<code>objdump -dj .plt input2</code>指令或者<code>objdump -d input2 | grep &quot;plt&quot;</code>得出函数的<strong>plt表（局部函数表）</strong>：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E5%9B%9B%E7%AF%87%E4%B8%8B8.png"></p>
+<p>这样，这个程序的静态信息就都显现出来了。当然，ida里面肯定是有的（笑）</p>
+<p>先前通过ldd指令集得知编译用的libc库是<code>/lib/x86_64-linux-gnu/libc.so.6</code>，虽然不一定用得上，但是至少在缺少泄露数据所需的库函数的时候，调用libc库是绝对需要的。另外，我们也可以通过python的LibcSearcher库来解决这个问题。</p>
+<p>详细的实例可以参考<a target="_blank" rel="noopener" href="https://blog.csdn.net/linyt/article/details/43643499">海枫的文章</a>和东林网安协会<a target="_blank" rel="noopener" href="https://www.0error.net/2021/10/46d4a28d.html">do1phin师傅的文章</a>，本文由于主要内容还是计算机系统组成，不多赘述，等到深入pwn的时候再研究。</p>
+<p><em>ps.我在自己研究这玩意的时候，可能因为编译环境等各种问题，自己没pwn出来自己的程序，看看各位是否能用同样的原码跑出一个能pwn的程序</em></p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">学习</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="../../2023/09/09/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E5%9B%9B%E7%AF%87%EF%BC%88%E4%B8%8B%EF%BC%89/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
+    <article id="post-深入理解计算机系统学习笔记-第四篇（中）" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="../../2023/09/09/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E5%9B%9B%E7%AF%87%EF%BC%88%E4%B8%AD%EF%BC%89/">深入理解计算机系统学习笔记-第四篇（中）</a>
+    </h1>
+  
+
+        
+        <a href="../../2023/09/09/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E5%9B%9B%E7%AF%87%EF%BC%88%E4%B8%AD%EF%BC%89/" class="archive-article-date">
+  	<time datetime="2023-09-09T07:14:10.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-09-09</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h3 id="上回书说到"><a href="#上回书说到" class="headerlink" title="上回书说到"></a>上回书说到</h3><p>我们刚刚才把程序的机器表示做了个初探，这回我们来讲讲如何理解一个汇编语言程序的其它语句。</p>
+<p>由于这次基本上都是各种指令的介绍，基本也忙不着小娜了。</p>
+<h3 id="数学运算"><a href="#数学运算" class="headerlink" title="数学运算"></a>数学运算</h3><p>正儿八经的x86-64架构下的汇编数学运算包括：</p>
+<h4 id="孤儿指令"><a href="#孤儿指令" class="headerlink" title="孤儿指令"></a>孤儿指令</h4><p><strong>lea(q) src dest：</strong>加载有效地址，实际上就是mov指令的变体，用于从内存读数据到寄存器，但实际原理不同于mov的数据转移，而是“地址复制”，即将源数据的引用地址转移到目的上。就有点类似于你在写C时这样做：</p>
+<pre><code>int *a, *b;
+&amp;a = b;
+</code></pre>
+<p>实际上就等价于<code>leaq %rbx %rax</code>。但有点不同的是，leaq也可以负责简单算式的复制，比方说如果我们把上一条指令改成<code>leaq 3(%rbx,%rbx,3) %rax</code>，那么rax被赋予的实际数值就是&#x2F;(3b+3&#x2F;)。</p>
+<h4 id="一元操作"><a href="#一元操作" class="headerlink" title="一元操作"></a>一元操作</h4><blockquote>
+<p><strong>inc dest：</strong>对目标+1<br><strong>dec dest：</strong>对目标-1<br><strong>neg dest：</strong>对目标取负<br><strong>not dest：</strong>对目标取补码</p>
+</blockquote>
+<h4 id="二元操作"><a href="#二元操作" class="headerlink" title="二元操作"></a>二元操作</h4><blockquote>
+<p><strong>add src dest：</strong>目的&#x3D;目的+源<br><strong>sub src dest：</strong>目的&#x3D;目的-源<br><strong>imul src dest：</strong>目的&#x3D;目的*源<br><strong>xor src dest：</strong>目的&#x3D;目的 异或 源<br><strong>or src dest：</strong>目的&#x3D;目的 或 源<br><strong>and src dest：</strong>目的&#x3D;目的 与 源</p>
+</blockquote>
+<h4 id="移位操作"><a href="#移位操作" class="headerlink" title="移位操作"></a>移位操作</h4><blockquote>
+<p><strong>sal k dest：</strong>算术左移k位<br><strong>shl k dest：</strong>逻辑左移k位（左移都是低位补0所以效果一样）<br><strong>sar k dest：</strong>算术右移k位（空位补符号位）<br><strong>shr k dest：</strong>逻辑右移k位（空位补0）</p>
+</blockquote>
+<h4 id="特殊操作"><a href="#特殊操作" class="headerlink" title="特殊操作"></a>特殊操作</h4><blockquote>
+<p><strong>imul(q) src (dest)：</strong>两个8字节数的有符号全乘法，对于积，rdx存放高64位，rax存放低64位<br><strong>mul(q) src (dest)：</strong>两个8字节数的无符号全乘法，同上<br><strong>cqto：</strong>转换为16字节数<br><strong>idiv(q) src：</strong>16字节数的有符号整除，rdx存放高64位，rax存放低64位，商转移至rax，余数转移至rdx<br><strong>div(q) src：</strong>无符号整除，同上</p>
+</blockquote>
+<hr>
+<h3 id="逻辑控制"><a href="#逻辑控制" class="headerlink" title="逻辑控制"></a>逻辑控制</h3><p>到上面那一块为止，我们还停留在整串代码直线运行的情况。但是，如果你看过ida就会发现，绝大多数的函数的逻辑都是树形结构。构成这些树形分支的，就是一连串的逻辑控制。逻辑控制是啥呢？回去看看你的if、else啥的，那就是了。</p>
+<p>在汇编中自然也有这些：</p>
+<h4 id="条件码"><a href="#条件码" class="headerlink" title="条件码"></a>条件码</h4><p>其实本质上，机器级别的代码控制都是硬件控制。就比方说我们的减法，就是拿<strong>算术逻辑单元ALU</strong>，去读两个寄存器的值进行运算的。而这个逻辑单元不但会运算，还会用计算结果去设置条件码寄存器：</p>
+<p>条件码寄存器由CPU维护，长度为单个位，描述最近的算术或逻辑操作的属性。在每次产生数据操作经过ALU时，这些寄存器的值会被重新设置。具体类别如下：</p>
+<blockquote>
+<p><strong>CF：</strong>进位标志，判断最近一个操作是否产生数据最高位进位，进位置1否则置0，常用于判断数据是否溢出<br><strong>ZF：</strong>零标志，判断最近一个操作的结果是否等于0，等于0则置1，否则置0<br><strong>SF：</strong>零标志，判断最近一个操作的结果是否小于0，小于0则置1，否则置0<br><strong>OF：</strong>溢出标志，判断最近一个操作是否使有符号数产生 <strong>正溢出 &#x2F; 负溢出</strong>，产生则置1，否则置0<br><strong>AF：</strong>辅助进位标志，判断最近一个字节操作是否发生低字节向高字节进位或借位，或者低四位向高四位进位或借位，发生置1，否则置0。<br><strong>PF：</strong>奇偶标志，记录最近一个操作的结果的二进制形式为1的位，若数量为偶数置1，否则置0<br><strong>DF：</strong>方向标志，决定串操作执行时有关寄存器发生调整的方向<br><strong>IF：</strong>中断标志，决定CPU是否相应CPU外部的可屏蔽中断发生的中断请求（但无法阻止不可屏蔽的外部请求和所有的内部请求，中断相关知识可以参考<a target="_blank" rel="noopener" href="https://blog.csdn.net/Ann_xia6/article/details/125767999">Ann_xia66的博客</a>），置1时可响应，置0时不可响应。<br><strong>TF：</strong>追踪标志，置1时程序单步步过，置0时程序正常运转（反汇编软件会不会就是写入了修改TF的shell来实现单步步过）  </p>
+</blockquote>
+<p>因此，一些运算会导致条件码寄存器的既定变更。例如异或操作必定会令CF和ZF置0、加&#x2F;减法必定会导致CF和OF的变更，etc.</p>
+<h4 id="逻辑判断"><a href="#逻辑判断" class="headerlink" title="逻辑判断"></a>逻辑判断</h4><p>需要用到条件码的不只是运算指令，还有比较指令cmp系列和test系列，以及set指令系。</p>
+<h5 id="cmp系"><a href="#cmp系" class="headerlink" title="cmp系"></a>cmp系</h5><p>大致格式为<code>cmp dest src</code>，根据两个操作数的差来设置ZF和CF条件码，但是不设置非条件码寄存器。</p>
+<p>目的操作数 &lt; 源操作数时，ZF置0，CF置1。<br>目的操作数 &gt; 源操作数时，ZF置0，CF置0。<br>目的操作数 &#x3D; 源操作数时，ZF置1，CF置0。  </p>
+<h5 id="test系"><a href="#test系" class="headerlink" title="test系"></a>test系</h5><p>大致格式为<code>test dest src</code>，同理，根据两个操作数与的结果来设置条件码。</p>
+<p>目的操作数&lt;源操作数时，ZF置0，CF置1。<br>目的操作数&lt;源操作数时，ZF置0，CF置1。<br>目的操作数&lt;源操作数时，ZF置0，CF置1。</p>
+<h5 id="set系"><a href="#set系" class="headerlink" title="set系"></a>set系</h5><p>set指令通过条件码的不同组合来设置对象的最低位。具体操作如下：</p>
+<blockquote>
+<p><strong>sete&#x2F;setz dest：</strong>ZF若为1则将目标寄存器低位置1，否则置0，多用于判断相等或零条件<br><strong>setne&#x2F;setnz dest：</strong>与上述相反，判断不等&#x2F;非零条件</p>
+<p><strong>sets dest：</strong>SF若为1则将目标寄存器低位置1，否则置0，多用于判断负数<br><strong>setns dest：</strong>与上述相反，判断非负</p>
+<p><strong>setg&#x2F;setnle dest：</strong>条件为<del>(SF ^ OF) &amp; ~ZF，判断大于<br><strong>setge&#x2F;setnl dest：</strong>条件为</del>(SF ^ OF)，判断大于等于<br><strong>setl&#x2F;setnge dest：</strong>条件为SF ^ OF，判断小于<br><strong>setle&#x2F;setng dest：</strong>条件为(SF ^ OF) | ZF，判断小于等于</p>
+<p><strong>seta&#x2F;setnbe dest：</strong>条件为<del>CF &amp; ~ZF，判断无符号大于<br><strong>setae&#x2F;setnb dest：</strong>条件为</del>CF，判断无符号大于等于<br><strong>setb&#x2F;setnae dest：</strong>条件为CF，判断无符号小于<br><strong>setbe&#x2F;setna dest：</strong>条件为CF | ZF，判断无符号小于等于</p>
+</blockquote>
+<p>所以一组完整的判断指令应该是cmp&#x2F;test指令和set指令、mov指令等的结合，以实现不同情况下的特殊判断。比方说我们要汇编实现一个比较函数，判断两个数是否相等：</p>
+<pre><code>int comp(data_t a, data_t b)
+</code></pre>
+<p>我们需要使用如下代码：</p>
+<pre><code>cmpq %rsi %rdi    //比较A和B
+sete %al          //然后查看ZF是否为0，若不为0则相等，al置1
+movzbl %al, %eax  //判定结果存入零拓展的a寄存器，高字节清零
+</code></pre>
+<h4 id="跳转指令"><a href="#跳转指令" class="headerlink" title="跳转指令"></a>跳转指令</h4><p>不过，光有逻辑指令可完不成实现复杂功能的逻辑判断，我们还需要跳转指令jmp系列，通过调用条件码来进行指令分支。</p>
+<p>基本格式形似<code>jmp dest</code>，跳转到目标地址进行接下来的运作。如果需要调用寄存器值进行间接跳转，还需要在目标前加上“*”标记，这样就可以读取目标寄存器中的值作为地址进行跳转。除此之外，还有各种逻辑跳转，具体操作如下：</p>
+<blockquote>
+<p><strong>jmp dest：</strong>直接跳转  </p>
+<p><strong>je&#x2F;jz dest：</strong>条件为ZF，相等时跳转<br><strong>jne&#x2F;jnz dest：</strong>条件为<del>ZF，不等时跳转<br><strong>js dest：</strong>条件为SF，为负时跳转<br><strong>jns dest：</strong>条件为</del>SF，非负时跳转</p>
+<p><strong>jg&#x2F;jnle dest：</strong>条件为<del>(SF ^ OF) &amp; ~ZF，大于时跳转<br><strong>jge&#x2F;jnl dest：</strong>条件为</del>(SF ^ OF)，大于等于时跳转<br><strong>jl&#x2F;jnge dest：</strong>条件为SF ^ OF，小于时跳转<br><strong>jle&#x2F;jng dest：</strong>条件为(SF ^ OF) | ZF，小于等于时跳转</p>
+<p><strong>ja&#x2F;jnbe dest：</strong>条件为<del>CF &amp; ~ZF，无符号大于时跳转<br><strong>jae&#x2F;jnb dest：</strong>条件为</del>CF，无符号大于等于时跳转<br><strong>jb&#x2F;jnae dest：</strong>条件为CF，无符号小于时跳转<br><strong>jbe&#x2F;jna dest：</strong>条件为CF | ZF，无符号小于等于时跳转</p>
+</blockquote>
+<p>所以说，我们要实现两个数是否相等的判定，也可以用汇编这么写</p>
+<pre><code>    cmpq %rsi %rdi
+    je L1.
+    movzbl %al 1
+    retn
+L1.
+    movzbl %al 0
+    retn
+</code></pre>
+<p>不过看上去有点麻烦。如果感兴趣，可以自己先用C写一个简单条件判断，再IDA打开看一眼。</p>
+<p>除此之外，如果学好了C，各位应该也知道，逻辑表达式也可以作为值被赋到变量上。比方说，判断两个数相等，我们能这么写：</p>
+<pre><code>int comp(data_t a, data_t b)&#123;
+    if(a==b)return 1;
+    return 0;
+&#125;
+</code></pre>
+<p>也可以这么写：</p>
+<pre><code>int comp(data_t a, data_t b)&#123;
+    int result = (a==b);
+    if(result)return 1;
+    return 0;
+&#125;
+</code></pre>
+<p>（各位压行人轻点喷，这段代码只是方便理解）</p>
+<p>同样地，除了逻辑跳转，汇编语言也自带逻辑赋值。具体操作如下：</p>
+<blockquote>
+<p><strong>cmove&#x2F;cmovz src dest：</strong>条件为ZF，相等时赋值<br><strong>cmovne&#x2F;cmovnz src dest：</strong>条件为<del>ZF，不等时赋值<br><strong>cmovs src dest：</strong>条件为SF，为负时赋值<br><strong>cmovns src dest：</strong>条件为</del>SF，非负时赋值</p>
+<p><strong>cmovg&#x2F;cmovnle src dest：</strong>条件为<del>(SF ^ OF) &amp; ~ZF，大于时赋值<br><strong>cmovge&#x2F;cmovnl src dest：</strong>条件为</del>(SF ^ OF)，大于等于时赋值<br><strong>cmovl&#x2F;cmovnge src dest：</strong>条件为SF ^ OF，小于时赋值<br><strong>cmovle&#x2F;cmovng src dest：</strong>条件为(SF ^ OF) | ZF，小于等于时赋值</p>
+<p><strong>cmova&#x2F;cmovnbe src dest：</strong>条件为<del>CF &amp; ~ZF，无符号大于时赋值<br><strong>cmovae&#x2F;cmovnb src dest：</strong>条件为</del>CF，无符号大于等于时赋值<br><strong>cmovb&#x2F;cmovnae src dest：</strong>条件为CF，无符号小于时赋值<br><strong>cmovbe&#x2F;cmovna src dest：</strong>条件为CF | ZF，无符号小于等于时赋值</p>
+</blockquote>
+<h4 id="逻辑控制的应用"><a href="#逻辑控制的应用" class="headerlink" title="逻辑控制的应用"></a>逻辑控制的应用</h4><p>不过，逻辑控制码这一堆玩意，能实现的东西不只是if else分支结构而已。比如说简单的while循环结构，你可以将一个寄存器设置为循环变量，再通过cmp一个立即数或者另外被赋值的寄存器来设置循环上限，jmp来进行程序的回环。比方说我们想实现一个朴素的2的N次幂，那么实现出来应该是类似如下的结构：</p>
+<pre><code>    (input in %rax)
+    mov $1 %rdi
+    mov %rax %rsi
+    ……
+L2.
+    imul $2 %rdi
+    sub $1 %rsi
+    cmp $1 %rsi
+    jg .L2
+    retn 
+</code></pre>
+<p>用阳间的高级语言翻译一下就是这样：</p>
+<pre><code>int func(int round)&#123;
+    int i = round, res = 1;
+    while(i)&#123;
+        res *= 2;
+        i--;
+    &#125;
+    return res;
+&#125;
+</code></pre>
+<p>这么一看，在某些地方，汇编语言确实比高级语言精简，但高级语言胜在视觉上的强逻辑性，以及长篇代码以至于整个项目的可读性，毕竟逆向手都明白，看汇编都够痛苦了，用汇编去堆屎山不是更加难于登天。</p>
+<p>运用类似的方法，你可以构造出for、do-while、switch等结构，这里就不一一演示了，各位感兴趣可以自行编译一个程序试试。</p>
+<hr>
+<h3 id="非常好逻辑控制，但是函数呢？"><a href="#非常好逻辑控制，但是函数呢？" class="headerlink" title="非常好逻辑控制，但是函数呢？"></a>非常好逻辑控制，但是函数呢？</h3><p>可是函数间的跳转，相对于函数内部各种要素的转移就显得有些麻烦。我们首先得理解函数这一概念的底层逻辑：</p>
+<h4 id="过程与栈调用"><a href="#过程与栈调用" class="headerlink" title="过程与栈调用"></a>过程与栈调用</h4><p>过程是对软件中被分割的不同功能块的一种抽象，它提供一种封装代码的方式，用一组指定参数和一个可选的返回值实现某种功能。简单来说，如果把代码比作一个农业合作社，过程就是将一个代码中的一个功能打包成一个工作小组，你可以安排给这个工作小组以它能够完成的特定任务，也就是<strong>参数传递（传参）</strong>，然后等待这个小组执行完任务，向你汇报结果或者自行消化，也就是<strong>返回值</strong>。</p>
+<p>所以，你可以想到，C、python之类语言的函数是过程，abap的子例程是一种过程，甚至连java的类也可以近似看作过程。</p>
+<p>在计算机中，正在执行的过程的数据是集中在栈里的。一个函数未被调用的时候，该函数及其调用链上下一级函数，也就是被它调用的函数，都处于挂起状态，当我们调用这个函数的时候，与函数相关的数据倘若光靠寄存器没办法存完，我们就需要调用栈空间，这部分空间被称为栈帧。</p>
+<p>举个例子，当你需要依靠C语言程序加密长文本，并且这个长文本好巧不巧是个局部变量，你不可能指望十几个寄存器能放下一整篇《傲慢与偏见》，于是函数只能开帧。</p>
+<p>具体而言，栈中存放的不只是你正在执行的函数的帧，还有被这个函数调用的函数的帧。帧中的内容包括各种直接数据和各种调用地址，尤其是函数的<strong>返回地址</strong>，这决定了如果这个函数是“被调用者”，那么在它结束流程后，“调用者”应该从何处继续它的任务。</p>
+<p>由于函数操作的复杂性，一般的push指令肯定是完成不了相应任务了，我们只好使用转移控制指令：</p>
+<h4 id="转移控制"><a href="#转移控制" class="headerlink" title="转移控制"></a>转移控制</h4><p>转移控制指令一般如下：</p>
+<blockquote>
+<p><strong>call dest：</strong>调用目标地址的函数<br><strong>ret(n)：</strong>从过程调用中返回</p>
+</blockquote>
+<p>指令call执行时，将目标函数第一个指令存入程序指令寄存器rip，并将返回地址压栈，函数开始执行。函数调用执行完毕之后，执行retn指令，返回地址出栈并被存入rip中，函数返回，继续执行先前位置之后的操作。</p>
+<p>至于传参的过程，传入的前六个参数可以使用%rdi、%rdx、%rsi、%rcx、%r8、%r9寄存器（后缀视操作数大小而定），之后的数据就要依靠栈寄存器来界定其指针位置。寄存器之后的后续数据所占用的栈空间视其数据类型和系统操作数而定。比方说你开了一个int那地址只会每隔一个数据+4，但long就是+8，etc。</p>
+<p>此外，如果一个局部变量使用地址运算符“&amp;”，那么栈上也必须强行为它开一个地址。</p>
+<p>转移控制的典型案例在《深入理解计算机系统》原书有提及，本文不再赘述。</p>
+<h4 id="寄存器中的局部存储空间"><a href="#寄存器中的局部存储空间" class="headerlink" title="寄存器中的局部存储空间"></a>寄存器中的局部存储空间</h4><p>不过，既然传参要用到寄存器，那么就不可避免的会有一个问题：寄存器是所有函数的公共资源，就像农业生产合作社里工具和劳动者的关系一样。只不过，合作社有使用工具的规章制度，寄存器的调用也有被刻入CPU的惯例。</p>
+<p>这个惯例规定，rbx、rbp和r12<del>r15寄存器作为被调用者保存寄存器，当函数被调用时，这些寄存器的值在调用过程开始被保存在栈中，在调用过程结束时出栈，恢复到原本的寄存器中，函数调用前后保持不变；rdi、rsi、rdx、rcx、rax、r8</del>r11作为调用者保存寄存器，这些寄存器的值在调用开始前就被预先保存，在调用完成后恢复到寄存器中。</p>
+<p>比方说，我们再回到2的n次幂那段代码上：</p>
+<pre><code>    (input in %rax)
+    mov $1 %rdi
+    mov %rax %rsi
+    ……
+L2.
+    imul $2 %rdi
+    sub $1 %rsi
+    cmp $1 %rsi
+    jg .L2
+    retn
+</code></pre>
+<p>如果我们要正儿八经地按照系统惯例实现，那么，这段代码大抵是这样的：</p>
+<pre><code>    (input in %rax)
+    push %rdi
+    push %rsi
+    mov $1 %rdi
+    mov %rax %rsi
+    call func_2mul
+    mov %rdi %rbx
+    pop %rsi
+    pop %rdi
+    ……
+func_2mul:
+L2.
+    imul $2 %rdi
+    sub $1 %rsi
+    cmp $1 %rsi
+    jg .L2
+    retn
+endp
+</code></pre>
+<p>如上，因为我们使用rdi和rsi这两个寄存器，所以一般而言，我们需要在调用函数前就将它们的数据入栈存储，在调用完毕后恢复。</p>
+<p>其它的案例在原书中以及各路dalao的资料里有体现，这里按下不表，仅作抛砖引玉。</p>
+<p>除此之外，函数也可以通过自己call自己实现递归调用，原理与函数内部的循环语句类似：</p>
+<pre><code>rfact:
+    push ……
+    sub $1 %rsi
+    cmp $1 %rsi
+    jg .L3
+    lea ……
+    call rfact
+.L3
+    pop ……
+    ret
+</code></pre>
+<hr>
+<p>如上，我们浅浅学习了一下关于机器码实现运算和逻辑控制、函数调用等操作。可能量有点大，但是忍一下，大的还在后头呢——</p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">学习</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="../../2023/09/09/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E5%9B%9B%E7%AF%87%EF%BC%88%E4%B8%AD%EF%BC%89/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
     <article id="post-深入理解计算机系统学习笔记-第四篇（上）" class="article article-type-post  article-index" itemscope itemprop="blogPost">
   <div class="article-inner">
     
@@ -2105,227 +2594,6 @@ public class ModCreativeModeTabs &#123;
       
         <p class="article-more-link">
           <a class="article-more-a" href="../../2023/03/24/%E4%BB%8E%E9%9B%B6%E5%BC%80%E5%A7%8B%E7%9A%84%E9%80%86%E5%90%91%E4%BA%BAmodding%E4%B9%8B%E8%B7%AF-E02/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-    <article id="post-从零开始的逆向人modding之路-E01" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="../../2023/03/24/%E4%BB%8E%E9%9B%B6%E5%BC%80%E5%A7%8B%E7%9A%84%E9%80%86%E5%90%91%E4%BA%BAmodding%E4%B9%8B%E8%B7%AF-E01/">从零开始的逆向人modding之路[E01]</a>
-    </h1>
-  
-
-        
-        <a href="../../2023/03/24/%E4%BB%8E%E9%9B%B6%E5%BC%80%E5%A7%8B%E7%9A%84%E9%80%86%E5%90%91%E4%BA%BAmodding%E4%B9%8B%E8%B7%AF-E01/" class="archive-article-date">
-  	<time datetime="2023-03-24T09:49:29.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-03-24</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>接下来，我们可以开始制作我们的第一个mod了。如果你还需要一个合适的java开发环境，你可以参考<a target="_blank" rel="noopener" href="https://www.youtube.com/watch?v=p-mp91zrlqo">Kaupenjoe的视频</a>以及网上其他博主和视频主的资料。这里还是建议使用intelij作为你的开发软件，一方面作为pycharm的同厂商软件，使用手感也与pycharm相近，另一方面，代码自动补全确实省事不少。</p>
-<h3 id="先从手头有的东西开始"><a href="#先从手头有的东西开始" class="headerlink" title="先从手头有的东西开始"></a>先从手头有的东西开始</h3><h4 id="API的开发模板"><a href="#API的开发模板" class="headerlink" title="API的开发模板"></a>API的开发模板</h4><p>我们既然需要通过一些插件作为跳板来开发模组，那么，相关工程的代码模板也必不可少。</p>
-<p>这里以forge mod开发举例，你可以很轻而易举地从github上pull一个forge的开发模板到本地环境。我这里使用的是1.19.3的mdk，实际开发中可能还需要针对你modding的目标版本使用不同的模板和编写方式，但大同小异。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_1.png"></p>
-<p>如图，src就是日后我们存储大部分相关源代码的地方，gradle相关的文件则用于自动构建项目，git相关则是用作之后在本地与git之间交互的。</p>
-<p>除此之外，那些README啥的txt你可以全扬了。</p>
-<p>关于模板内部的各类参数，我们等打开开发环境之后再说：</p>
-<h4 id="你的开发环境"><a href="#你的开发环境" class="headerlink" title="你的开发环境"></a>你的开发环境</h4><p>接下来，我们打开编辑软件，这里以intelij为例：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_2.png"></p>
-<p>我们需要做的就是等待gradle自行完成项目的建构，紧接着，你的forge模板上就会有一个完整的minecraft运行环境，里面包括了很多你会用到的东西。</p>
-<p>顺带，记得把你的gradle的默认java改成项目自带的Java环境，像这样：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_3.png"></p>
-<h4 id="minecraft本体的各类参数和函数"><a href="#minecraft本体的各类参数和函数" class="headerlink" title="minecraft本体的各类参数和函数"></a>minecraft本体的各类参数和函数</h4><p>如果你要尝试开发一个包含功能性方块、功能性物件、一套完整合成系统，甚至生物模型、AI、生态的大型mod，其工作量不亚于让你重新开发一个minecraft，但好消息是，minecraft本体当中为你提供了大量原生的代码，减轻了你自行编写函数的工作量。</p>
-<p>在gradle建构完成后，你可以在你的External Libaries文件夹看到客户端及其文件，在正式开发mod之前，建议细细翻阅，以免自己在编写（实为复现）的时候出现莫名的格式问题（毕竟不同版本之间可能会有大重构，就像1.19.2到1.19.3直接把物品分类大改了一样）：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_4.png"></p>
-<h4 id="让我们回到模板"><a href="#让我们回到模板" class="headerlink" title="让我们回到模板"></a>让我们回到模板</h4><p>src文件夹下包含两个关键的大类，一个是项目本体（java），存放实现功能的主要代码；一个是模组资源（resources），存放模组的各类模型等。</p>
-<p>在开始编程之前，我们需要认识我们的模板。</p>
-<h5 id="java类"><a href="#java类" class="headerlink" title="java类"></a>java类</h5><p>java类下有一个ExampleMod文件，那是一切的开始之一，我们点进去看看各项组件：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_5.png"></p>
-<p><strong>MODID</strong>：你的模组的ID，日后很多调用都需要以ID为关键参数。我们需要把它的内容替换为为全小写格式的，我们自己的模组名。这里就以tutorialmod为例。<em>Kaupenjoe习惯将此变量名改为MOD_ID，可能是后期编写的时候会与客户端源文件冲突？</em></p>
-<p><strong>LOGGER</strong>：一个简单日志门面的接口，关于slf4j的详细内容可以参考<a target="_blank" rel="noopener" href="https://56data.cc/1563.html">https://56data.cc/1563.html</a>，本文不作赘述。</p>
-<p><strong>BLOCKS、ITEMS、EXAMPLE_BLOCK、EXAMPLE_BLOCK_ITEM</strong>：forge提供的各类物件的注册模板，方便你快速在类中注册物品，但自己写的话多半用不上。</p>
-<p>以及下方的各类函数，其上都有一定的注释，这里不多赘述。但是需要注意一下EventBusSubscriber，这个组件涉及到forge、mod和minecraft本体之间的交互，因为mod本身也是一个项目，它需要通过订阅和消息处理来进行驱动。</p>
-<blockquote>
-<p>forge在加载了mod之后forge就会根据mod的订阅消息情况适时的发送消息。也就是说mod也是消息驱动的程序。当然开始一个mod的编程就要从消息处理开始。</p>
-<p>forge提供了一个特殊的Annotation来订阅消息。这个Annotation 就是@EventHandler</p>
-<p>————<a target="_blank" rel="noopener" href="https://www.261day.com/minecraft-mod%E6%95%99%E7%A8%8B-forge%E5%8E%9F%E7%90%86%E4%B8%8Eeventhandler/">摘自ManaGeryzy的博客</a></p>
-</blockquote>
-<p>EventBusScriber也有<a target="_blank" rel="noopener" href="https://developer.salesforce.com/docs/atlas.en-us.platform_events.meta/platform_events/sforce_api_objects_eventbussubscriber.htm">相应的教程</a>，需要的话可以查阅。</p>
-<p>还有一个关键组件是addCreative，这个比较好懂，与我们在创造模式的面板上能否看到我们写出来的物品相关联。</p>
-<p>所以，我们开发的第一件事情就是——把东西扬个干净。</p>
-<p>可能你会问，为什么呢？明明有这么多重要的内容和好用的模板。但我想说，一是这些东西可能不合你的代码风格，二是目前在离线开发阶段，我们并没有操作这些东西的必要，三是留太多反倒看得头疼，并且会让代码成为工友不友好型。</p>
-<p>回到正题，我们首先把主函数名称和文件名、以及所有次级调用改为自己的模组名（这里我用TutorialMod），然后把所有的MOD_ID改成自己想要的，接下来，官方模板应删尽删，留下MODID和LOGGER，注释应删尽删，函数内容应删尽删（但public TutorialMod()需要把modEventBus相关留下），由于我们目前离线开发，所以OnSeverStarting整个扬了，最后你会看到如下结果：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_6.png"></p>
-<p>清爽多了。</p>
-<h5 id="resources类"><a href="#resources类" class="headerlink" title="resources类"></a>resources类</h5><p>接下来是resources类，我们点开其中的mods.toml，这是我们模组的配置文件之一，其中包含如下要修改的内容：</p>
-<p><strong>license</strong>：模组工程的协议类型。由于我们只是在别人的基础上开发，所以用偏专利型的All Rights Reserved还是不稳妥，建议用MIT。</p>
-<p><strong>modId</strong>：不用多说</p>
-<p><strong>displayName</strong>：你的模组最后显示在mc里的名称，需要改成你自己的mod名称。</p>
-<p>authors、credits、description：作者、赞助、描述。这些看你心情。</p>
-<p><strong>dependencies.XXX</strong>：环境依赖，点后面记得改成你自己的模组id。</p>
-<h5 id="build-gradle"><a href="#build-gradle" class="headerlink" title="build.gradle"></a>build.gradle</h5><p>在主文件夹下还有一个build.gradle需要变动，这玩意涉及到你的项目build时候的一些参数：</p>
-<p><strong>version</strong>：模组版本</p>
-<p><strong>group</strong>：你的模组所处的类，这里建议配合你的java类起名进行修改，比方说你的模组程序文件在<code>net/drivenhank/tutorialmod</code>下，那么这里要同步为<code>net.drivenhank.tutorialmod</code>。</p>
-<p><strong>archivesBaseName</strong>：需要同步为你的模组id。</p>
-<p>除此之外，文件中所有examplemod都要同步为你的模组id。</p>
-<p>做完这些更改，你只需要点开右侧边栏的gradle项，重新加载所有的gradle项目，然后点击Tasks-&gt;forgegradle runs-&gt;run client，然后就可以看到在mc里头，我们的mod能够正常显示了：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_7.png"></p>
-<h4 id="各种精巧的小工具"><a href="#各种精巧的小工具" class="headerlink" title="各种精巧的小工具"></a>各种精巧的小工具</h4><p>首先是intelij自带的git工具，非常方便你在开发时存档。你只需要把你的mod给share on github或者直接push上去：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_8.png"></p>
-<p>在github上自动存档力</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_9.png"></p>
-<p>然后是<a target="_blank" rel="noopener" href="https://misode.github.io/loot-table/">misode的各种generator</a>，方便开发时构建各类物品的json：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/E01_10.png"></p>
-<p>至于模型制作，如果局限于原版构型，我比较建议用ps硬画，但是如果要实现复杂模型，Blockbench也许是一个不错的选择。</p>
-<hr>
-<p>先讲到这里。下一回，我们将实现mod的部分功能：做出一些普通的方块和物品。</p>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color2">mc模组开发</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="../../2023/03/24/%E4%BB%8E%E9%9B%B6%E5%BC%80%E5%A7%8B%E7%9A%84%E9%80%86%E5%90%91%E4%BA%BAmodding%E4%B9%8B%E8%B7%AF-E01/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-    <article id="post-从零开始的逆向人modding之路-E00" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="../../2023/03/24/%E4%BB%8E%E9%9B%B6%E5%BC%80%E5%A7%8B%E7%9A%84%E9%80%86%E5%90%91%E4%BA%BAmodding%E4%B9%8B%E8%B7%AF-E00/">从零开始的逆向人modding之路[E00]</a>
-    </h1>
-  
-
-        
-        <a href="../../2023/03/24/%E4%BB%8E%E9%9B%B6%E5%BC%80%E5%A7%8B%E7%9A%84%E9%80%86%E5%90%91%E4%BA%BAmodding%E4%B9%8B%E8%B7%AF-E00/" class="archive-article-date">
-  	<time datetime="2023-03-24T09:49:28.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-03-24</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h3 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h3><p>其实说句实在话，我必须承认的一点是，一开始加入网安协会，我颇有点“动机不纯”的意味在。在加入之前，我一直笃信自己的最大目标是制作一款属于自己的独立游戏。但随着阅历渐长，发现自己的美工、建模、代码能力都技不如人，加上各类竞赛、社团的时长愈发占据我生活的一大比重，乃至于在网安协会里愈发感受到了当代游戏公司对于软件安全方面的无力，我终于还是放下了这种想法，回来踏踏实实学技术。</p>
-<p>所以，尝试mc模组开发，在某种意义上也算是我的一种不忘初心了？</p>
-<p>要开发一个好模组，你就必须知己知彼。不但要提升自己的写代码能力，还要去了解自己的开发语言、开发平台等，其实和做一个项目也没什么两样，本质上，写mc mod和写各式插件一样，都是一个痛苦的屎叠屎的过程。</p>
-<h3 id="首先从所需要用到的语言说起"><a href="#首先从所需要用到的语言说起" class="headerlink" title="首先从所需要用到的语言说起"></a>首先从所需要用到的语言说起</h3><h4 id="Java"><a href="#Java" class="headerlink" title="Java"></a>Java</h4><p>Java是一门面向对象编程语言，摒弃了C++里难以理解的多继承、指针等概念。其优势就是突出一个莫得指针的干净整洁，以及强大的可移植性和更高的编译效率，但代价就是面向对象所导致的，在开发项目的过程中所需要的强大抽象思维，以及在构建过程中更高的产生屎山的概率（说的就是你麻将）</p>
-<p>java为了其可移植性，特意设计了一套专为自身打造的虚拟机<strong>jvm</strong>和中间字节码系统。对于没有java运行的硬件条件的设备也非常友好，当然，过于明显的特征使得java代码本身对于逆向手也十分友好，你甚至可以直接用JDK内置的Javap解决问题……在没有混淆的前提下。</p>
-<h4 id="json"><a href="#json" class="headerlink" title="json"></a>json</h4><p>准确地从定义上来讲，json并不是一个编程语言，它在维基的定义上是一种<strong>轻量级资料交换格式</strong>，相比于编程语言，更像是一种被统一格式化的参数集合，以便被各类编程语言更好利用。它语句简单，格式明晰，在开发时非常舒服，但也因为特征过于明显，结构过于简单，很容易成为逆向或攻击的突破口之一。</p>
-<h4 id="golang（？？？）"><a href="#golang（？？？）" class="headerlink" title="golang（？？？）"></a>golang（？？？）</h4><p>说句实在话，我知道golang泛用性高，没想到golang还能稳稳地插在mc这一坨屎山上，直到我看到了<a target="_blank" rel="noopener" href="https://github.com/Tnze/go-mc">这个项目</a></p>
-<p>正如之前所说，golang专为服务器，尤其是游戏服务器设计，并且简单高效，如果对mc服务器有兴趣的可以尝试一波，本文目前由于主要针对离线模组开发，不多赘述。</p>
-<h3 id="然后，是我们构建模组所需的加载和兼容插件"><a href="#然后，是我们构建模组所需的加载和兼容插件" class="headerlink" title="然后，是我们构建模组所需的加载和兼容插件"></a>然后，是我们构建模组所需的加载和兼容插件</h3><p>其实现存的模组开发插件，基本都是基于一种“注入字节码”的思路去的。以经典的forge为例，它大概是这样往游戏本体添加mod数据的：</p>
-<blockquote>
-<p>要知道minecraft是基于java的，java的类加载器一旦加载了一个类到java虚拟机中，这个类就不可能被外部修改了，但是加载之前的类的字节码可不是这样被严格的保护的，那些字节码处于一种谁想强X就强X的程度。forge本身通过修改启动器的json（1.6以后是这样，而1.6之前是直接修改jar文件）而优先于minecraft加载，并且forge会在minecraft加载的时候调教那些正要被加载的字节码。</p>
-<p>——摘自<a target="_blank" rel="noopener" href="https://www.261day.com/minecraft-mod%E6%95%99%E7%A8%8B-forge%E5%8E%9F%E7%90%86%E4%B8%8Eeventhandler/">MANAGERYZY的博客</a></p>
-</blockquote>
-<p>听起来很像鲍师傅在隔壁mrfz开科技经常干的事情。同样是囸字节码，同样是修改游戏数据，但是从细节上来讲还是有些差别，Arknights的hack是通过插件直接去修改游戏本身的字节码，而minecraft的modding是通过插件先将forge自己的一部分注入到游戏的字节码中，再通过forge将符合条件的mod类导入游戏的jvm中，是额外添加本体不具有的数据。</p>
-<p>而实现这一切的forge则是一系列工具链整合成的结果，从负责java源代码反编译、修复乃至于修复映射、注释的部分，再到Java项目的加载、运行。感兴趣可以查阅<a target="_blank" rel="noopener" href="https://izzel.io/">IzzelAliz的博客</a></p>
-<p>由于网络上的资料复杂，关于forge本身的详细运作原理，我能寻得的有效资料哪怕是爬管子也及其有限，至于fabric的原理相关更是大海捞针，望各位dalao补充。</p>
-<hr>
-<p>到此，我们粗略的了解了一下我们modding需要用到的工具。接下来的文章，我们将来讲讲modding的基础操作，以及我们如何编写一个至少能正常显示的mod。</p>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color2">mc模组开发</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="../../2023/03/24/%E4%BB%8E%E9%9B%B6%E5%BC%80%E5%A7%8B%E7%9A%84%E9%80%86%E5%90%91%E4%BA%BAmodding%E4%B9%8B%E8%B7%AF-E00/">展开全文 >></a>
         </p>
       
 

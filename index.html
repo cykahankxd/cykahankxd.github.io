@@ -254,6 +254,597 @@
 
 
   
+    <article id="post-FlareOn6做题合集" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="2024/04/01/FlareOn6%E5%81%9A%E9%A2%98%E5%90%88%E9%9B%86/">FlareOn6做题合集</a>
+    </h1>
+  
+
+        
+        <a href="2024/04/01/FlareOn6%E5%81%9A%E9%A2%98%E5%90%88%E9%9B%86/" class="archive-article-date">
+  	<time datetime="2024-04-01T04:28:19.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-04-01</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h3 id="demo"><a href="#demo" class="headerlink" title="demo"></a>demo</h3><p>打开来，是一个FlareOn的3D模型：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn6%5Ddemo_pic1.png"></p>
+<p>看似没什么东西，所以我们要从程序里头找点跟这个模型相关的东西出来，有可能是一些色调和背景融为一体的东西，也有可能是内容删减啥的，etc……</p>
+<p>但是且慢，我们先介绍一种逃课打法——NinjaRipper。这个东西可以直接dump出程序中的模型文件，其高版本在永劫无间的模型吧里经常出现。这边建议使用1.7.1的老版本，高版本提出来的东西要看起来比较麻烦。</p>
+<p>你还需要下载<a target="_blank" rel="noopener" href="https://richwhitehouse.com/index.php?content=inc_projects.php&filemirror=noesisv4473.zip">Noesis</a>，并且使用NinjaRipper相关的<a target="_blank" rel="noopener" href="https://www.vg-resource.com/thread-24983-post-554391.html#pid554391">演示插件</a>才能正常显示。正常来讲你会在dump出来的东西中得到flag：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn6%5Ddemo_pic2.png"></p>
+<p>但是，逃课打法要用，正儿八经的做法也要用，这样才算得上健全。</p>
+<p>我们先来了解一下在题目使用的 DirectX 9 架构下的模型文件，具体内容可以参考<a target="_blank" rel="noopener" href="https://blog.csdn.net/qq_36286899/article/details/113802530">mesh文件加载相关</a>和<a target="_blank" rel="noopener" href="https://blog.csdn.net/konkon2012/article/details/120935115">DirectX开发相关</a>，这里简单说明一下，一个DirectX模型文件当中的基本图元，也就是组成一个模型的基本单元都是三角形，而在导入模型的时候，都是先导入各个三角形的顶点坐标，然后当即开始绘制，这可能也是早期游戏模型大多都十分尖锐的原因。</p>
+<p>而相关的模型参数其实涉及了大量的数学运算，最主要的就是坐标系和邻接矩阵的概念，所以，如果我们能找到模型的位置偏移相关的坐标数值，也就能找到模型的位置。</p>
+<p>问题来了，这东西在程序中的哪里呢？我们把目光方向DirectX的D3DXMatrixTranslation函数，这玩意可以即刻生成一个模型对坐标系的平移量。具体格式如下：</p>
+<pre><code>D3DXMATRIX* D3DXMatrixTranslation(
+  _Inout_ D3DXMATRIX *pOut,		// 存储矩阵的变量
+  _In_    FLOAT      x,			// 三维坐标
+  _In_    FLOAT      y,
+  _In_    FLOAT      z
+);
+</code></pre>
+<p>估计就是这个导致了flag模型飞出窗口。于是乎我们直接IDA，启……什么也没有？</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn6%5Ddemo_pic3.png"></p>
+<p>似乎是文件头格式的问题，那我们只能x32动调看内存了。不管它加了什么壳，运行到一定程度断住，转到正确地址时，总会把符号表给加载干净，我们在其中发现了一个诡异的Direct3DX库，其中就有我们需要的函数：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn6%5Ddemo_pic4.png"></p>
+<p>下断点找到调用它的位置：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn6%5Ddemo_pic5.png"></p>
+<p>导致flag消失的罪魁祸首找到了，出题人设置了一个巨大的x轴偏移，改成0便是：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn6%5Ddemo_pic6.png"></p>
+<p>但是实际运行起来，flag的模型还有飞速转动的问题。这时候我们就要找找另一个函数：D3DXMatrixRotationY，这玩意可以控制模型旋转，而这个demo在经过几次动调之后可以确定，它是通过暴力循环加载模型来实现旋转的效果（这也解释了它性能为什么这么低），因此，我们只需要把这里下个断点，问题迎刃而解：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn6%5Ddemo_pic7.png"></p>
+<p>（虽然有点不大清晰就是了）</p>
+<blockquote>
+<p><a href="mailto:&#x6d;&#x6f;&#97;&#x72;&#x5f;&#112;&#x6f;&#x75;&#101;&#116;&#x72;&#121;&#64;&#102;&#x6c;&#97;&#x72;&#101;&#x2d;&#x6f;&#110;&#x2e;&#x63;&#111;&#109;">&#x6d;&#x6f;&#97;&#x72;&#x5f;&#112;&#x6f;&#x75;&#101;&#116;&#x72;&#121;&#64;&#102;&#x6c;&#97;&#x72;&#101;&#x2d;&#x6f;&#110;&#x2e;&#x63;&#111;&#109;</a></p>
+</blockquote>
+<h3 id="DnsChess"><a href="#DnsChess" class="headerlink" title="DnsChess"></a>DnsChess</h3><p>看上去只是个很简单的下棋而已，谁知道跑了一下就不动了——</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn6%5DDnsChess_pic1.png"></p>
+<p>算了，如果这玩意其实是一个联机软件，那先看一下流量包里的交互吧：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn6%5DDnsChess_pic2.png"></p>
+<p>似乎也只是本机跟远程AI的交互，但是每一个操作对应的Answers似乎都来自另外的IP。我们总结起来看一下（如下是我手搓的部分结果）：</p>
+<pre><code>车 c3-&gt;c6 127.150.96.223
+马 g1-&gt;f3 127.252.212.90
+卒 c2-&gt;c4 127.215.177.38
+马 c7-&gt;d5 127.118.118.207
+象 f1-&gt;e2 127.89.38.84
+车 a1-&gt;g1 127.109.155.97
+……
+</code></pre>
+<p>看着像一个只剩半截的棋谱，并且开头怎样还不清不楚，毕竟谁家好人车一开始从C3走。这下不得不逆了。先来看一眼UI：</p>
+<pre><code>  qword_D118 = gtk_target_entry_new(&quot;x-chessblaster/move&quot;, 1LL, 0LL);
+  qword_D108 = gtk_target_list_new(qword_D118, 1LL);
+  v3 = gtk_application_new(&quot;com.flare-on.chessblaster&quot;, 0LL);
+  g_signal_connect_data(v3, &quot;activate&quot;, sub_3AB0, 0LL, 0LL, 0LL);
+  type = g_application_get_type();
+  v5 = g_type_check_instance_cast(v3, type);
+  v6 = g_application_run(v5, a1, a2);
+  g_object_unref(v3);
+  return v6;
+</code></pre>
+<p>我们可以得知，前端使用的是GTK toolkit架构，并且，从<code>sub_3AB0</code>里得知，主要行为跟so库里的<code>getAiName</code>、<code>getAiGreeting</code>、<code>getNextMove</code>有关系。</p>
+<p>其中最主要的是<code>getNextMove</code>，我们发现这玩意似乎在远程端读取某个IP上的操作码并进行识别：</p>
+<pre><code>  strcat(dest, &quot;.game-of-thrones.flare-on.com&quot;);
+  v9 = gethostbyname(dest);
+  if ( !v9 )
+    return 2LL;
+  v10 = *v9-&gt;h_addr_list;
+  if ( *v10 != 127 || (v10[3] &amp; 1) != 0 || a1 != (v10[2] &amp; 0xF) )  // 确认读取的ip开头是否为127，且结尾是否为偶数
+    return 2LL;
+  sleep(1u);
+// 对操作进行某种不知名的二对一异或解密
+  byte_4060[2 * a1] = v10[1] ^ byte_2020[2 * a1];
+  byte_4060[2 * a1 + 1] = v10[1] ^ byte_2020[2 * a1 + 1];
+// 解密结果存入byte_4060后在a1=14时输出
+  *(_DWORD *)a5 = (unsigned __int8)v10[2] &gt;&gt; 4;
+  *(_DWORD *)(a5 + 4) = (unsigned __int8)v10[3] &gt;&gt; 1;
+  strcpy((char *)(a5 + 8), off_4120[a1]);
+  return (unsigned __int8)v10[3] &gt;&gt; 7;
+</code></pre>
+<p>a1的作用在这里应该类似于循环变量，或者步数计数器之类的。跟到输出会发现，似乎拿4位IP的第二位解密出来的结果会逐个输出并存入<code>byte_4060</code>，并在最后一起输出，而<code>byte_4060</code>的末尾刚好就是@flare-on.com，也就是flag格式：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn6%5DDnsChess_pic3.png"></p>
+<p>虽然不知道这么一解密会发生什么，但这么一看，原包中似乎有成堆的不合规IP，我们筛选过后只剩下这么多：</p>
+<pre><code>1	马 g1-&gt;f3 127.252.212.90
+2	卒 c2-&gt;c4 127.215.177.38
+3	象 f1-&gt;e2 127.89.38.84
+4	象 c1-&gt;f4 127.217.37.102
+5	象 c6-&gt;a8 127.49.59.14
+6	卒 e2-&gt;e4 127.182.147.24
+7	卒 e5-&gt;e6 127.200.76.108
+8	后 d1-&gt;h5 127.99.253.122
+9	象 f3-&gt;c6 127.25.74.92
+10	象 f4-&gt;g3 127.108.24.10
+11	卒 e4-&gt;e5 127.34.217.88
+12	后 h5-&gt;f7 127.141.14.174
+13	象 e2-&gt;f3 127.230.231.104
+14	马 b1-&gt;c3 127.159.162.42
+15	卒 d2-&gt;d4 127.53.176.56
+</code></pre>
+<p>看着清楚多了，不过要按顺序排布清楚似乎也不简单。不过，根据正常的国象逻辑，不管对方怎么走，我们总得先动能动的子，直到字符串产生能看的结果，比方说第一步肯定是先走第二行的卒。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn6%5DDnsChess_pic4.png"></p>
+<p>能行！第一步是d2的卒的话，我们按照逻辑和解码的结果，一个个排下去……且慢，如果这玩意才15个步数，那最后的全排列就是15的阶乘，甚至使用深搜还能剪枝，我们直接写一个简单的爆破脚本：</p>
+<pre><code>#include &lt;bits/stdc++.h&gt;
+using namespace std;
+char ID_sec_list[] = &#123;252, 215, 89, 217, 49, 182, 200, 99, 25, 108, 34, 141, 230, 159, 53&#125;;
+bool ID_usable[15];
+char data[] = &#123;121, 90, 184, 188, 236, 211, 223, 221, 153, 165,
+        182, 172, 21, 54, 133, 141, 9, 8, 119, 82,
+        77, 113, 84, 125, 167, 167, 8, 22, 253, 215&#125;;
+char word[35];
+int check(int add, char c)
+&#123;
+    char c1 = data[add*2] ^ c, c2 = data[add*2+1] ^ c;
+    if(c1 &gt; 32 &amp;&amp; c1 &lt; 128 &amp;&amp; c2 &gt; 32 &amp;&amp; c2 &lt; 128)
+        return 1;
+    return 0;
+&#125;
+void dfs(int stp)
+&#123;
+    if (stp == 15)&#123;
+        printf(&quot;%s@flare-on.com\n&quot;,word);
+        return;
+    &#125;
+    for(int i=0;i&lt;15;i++)&#123;
+        if(ID_usable[i] == true &amp;&amp; check(stp, ID_sec_list[i]))&#123;
+            ID_usable[i] = false;
+            word[stp*2] = data[stp*2] ^ ID_sec_list[i];
+            word[stp*2+1] = data[stp*2+1] ^ ID_sec_list[i];
+            dfs(stp+1);
+            word[stp*2] = word[stp*2+1] = 0;
+            ID_usable[i] = true;
+        &#125;
+    &#125;
+&#125;
+int main()
+&#123;
+    freopen(&quot;output.txt&quot;,&quot;w&quot;,stdout);
+    memset(word, 0, sizeof(word));
+    memset(ID_usable, true, sizeof(ID_usable));
+    dfs(0);
+    return 0;
+&#125;
+</code></pre>
+<p>然后从中找到一个跟刚才的结果对的上，又看得过去的，就是flag了：</p>
+<blockquote>
+<p><a href="mailto:&#76;&#x6f;&#111;&#x6b;&#115;&#x4c;&#x69;&#x6b;&#x65;&#89;&#x6f;&#117;&#x4c;&#111;&#x63;&#107;&#101;&#x64;&#85;&#112;&#x54;&#104;&#x65;&#x4c;&#x6f;&#x6f;&#107;&#x75;&#112;&#90;&#x40;&#102;&#108;&#x61;&#x72;&#x65;&#x2d;&#111;&#110;&#x2e;&#99;&#x6f;&#109;">&#76;&#x6f;&#111;&#x6b;&#115;&#x4c;&#x69;&#x6b;&#x65;&#89;&#x6f;&#117;&#x4c;&#111;&#x63;&#107;&#101;&#x64;&#85;&#112;&#x54;&#104;&#x65;&#x4c;&#x6f;&#x6f;&#107;&#x75;&#112;&#90;&#x40;&#102;&#108;&#x61;&#x72;&#x65;&#x2d;&#111;&#110;&#x2e;&#99;&#x6f;&#109;</a></p>
+</blockquote>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="2024/04/01/FlareOn6%E5%81%9A%E9%A2%98%E5%90%88%E9%9B%86/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
+    <article id="post-FlareOn3做题合集" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="2024/04/01/FlareOn3%E5%81%9A%E9%A2%98%E5%90%88%E9%9B%86/">FlareOn3做题合集</a>
+    </h1>
+  
+
+        
+        <a href="2024/04/01/FlareOn3%E5%81%9A%E9%A2%98%E5%90%88%E9%9B%86/" class="archive-article-date">
+  	<time datetime="2024-04-01T04:27:56.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-04-01</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h3 id="Previously"><a href="#Previously" class="headerlink" title="Previously"></a>Previously</h3><p>大概是去年年底，想着到春节应该还有一段比赛真空期，至少把FlareOn3的逆全刷一遍吧，结果一看除了签到题全是活</p>
+<hr>
+<h3 id="Challenge1"><a href="#Challenge1" class="headerlink" title="Challenge1"></a>Challenge1</h3><p>刚进die乱翻就看到了一个形似base64换表的东西——</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn3%5DChallenge1_pic1.png"></p>
+<p>那我们直接把另一边看起来很像数据的东西放进赛博厨子试试——</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn3%5DChallenge1_pic2.png"></p>
+<p>啊？</p>
+<p>不过这种暴力猜测还是不可取，我们正儿八经地看看算法——</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn3%5DChallenge1_pic3.png"></p>
+<p>位运算，三份对四份，这特征b64没跑了，问题就出在密码表上。</p>
+<p>很符合我对签到题的想象.jpg</p>
+<h3 id="DukeLocker"><a href="#DukeLocker" class="headerlink" title="DukeLocker"></a>DukeLocker</h3><p>上来给了咱一个内容物意义不明的doc文档，怀疑是什么被加密的文件，或者是RE里面塞misc啥的。但隔壁还有个exe，既然都逆向题了那肯定先看可执行文件——</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn3%5DDudeLocker_pic1.png"></p>
+<p>虽然它运行时似乎会产生中间文件，但是不动调单步的话程序一下子就过去了，我们干脆拿x64dbg直接一步到胃——</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn3%5DDudeLocker_pic2.png"></p>
+<p>但是无事发生。那就考虑换个思路，既然它不是自己产文件，那就直接创一个Briefcase文件夹，然后把doc放进去，为了防止扫的是绝对路径，干脆直接在桌面上也放一个——</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn3%5DDudeLocker_pic3.png"></p>
+<p>还是无事发生。</p>
+<p>这时候应该就是我们的理解问题了。我们再来看一遍程序——</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn3%5DDudeLocker_pic4.png"></p>
+<p>byd我知道火绒为什么老是把你关小黑屋了，扫我硬件是吧？我直接进函数先把你硬件码掀了（比较在取硬件码之后，汇编也很好找，动调改完进1A94地址就是成了）——</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn3%5DDudeLocker_pic5.png"></p>
+<p>然后快进到异或之后，函数会输出一组数据，想来就是之前那一串加密数据的明文——</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn3%5DDudeLocker_pic6.png"></p>
+<p>接着步过到生成图片的位置，如果你亲手动调步过你会发现这玩意是存在你桌面上的Briefcase，那第一次取地址应该就是取的桌面的地址。不过这些都不重要，关键是这个图片写了什么——</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/ve_vant_ze_money.jpg"></p>
+<p>虽然那个莫名其妙的doc是被加密的结果是真，然而RSA-4096就是纯纯误导，正儿八经的加密逻辑还得看回程序，然而，这也是最折磨的部分，因为你还得疯狂翻阅Windows相关加密函数的文档一个个对：</p>
+<p>首先是sub_401180对传入的lpMem进行加密，经查表得为SHA1，结果存入hProv，顺带生成一个AES256的hKey——</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn3%5DDudeLocker_pic7.png"></p>
+<p>然后加密结果在第二次扫文件的时候经过两轮加密，第一轮是sub_401770的MD5——</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn3%5DDudeLocker_pic8.png"></p>
+<p>第二轮就显得比较迷惑，前面生成的又是AES的key，到这里表现出来的特征又像DES的分块加密，每次最多取到0x4000，再加上还有KP_BLOCKLEN的参数，这玩意又突然谜起来了。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn3%5DDudeLocker_pic9.png"></p>
+<p>虽然后来又突然发现前面MD5的时候其实把它的KP_MODE定义为了CRYPT_MODE_CBC（1）：</p>
+<pre><code>if ( CryptGetHashParam(phHash, 2u, (BYTE *)*a3, &amp;v10, 0) )
+      &#123;
+        if ( CryptSetKeyParam(*a1, 1u, *a3, 0) )
+        &#123;
+          CryptDestroyHash(phHash);
+          return 1;
+        &#125;
+</code></pre>
+<p>但不管这个key最后是用在AES还是DES上，不明了的地方就一个，大不了挨个试一遍。于是，整个解密逻辑大致就有了，还是跟之前一样用明文sha1完MD5当后续的key，然后解密AES和DES二选一（最后实际上确实是DES），代码参考<a target="_blank" rel="noopener" href="https://papayawd.github.io/2020/10/23/BUU-FlareOn3-DudeLocker/">Papaya的博客</a>，对着逆出来的代码就是一顿照猫画虎——</p>
+<pre><code>#include &lt;stdio.h&gt;
+#include &lt;windef.h&gt;
+#include &lt;windows.h&gt;
+#include &lt;wincrypt.h&gt;
+int main()
+&#123;
+    char* filename = &quot;businesspapers.doc&quot;;
+    char* str = &quot;thosefilesreallytiedthefoldertogether&quot;;
+    BYTE md5_data[100] = &#123;0&#125;;
+    DWORD md5_len = 16;
+    DWORD dwDataLen = 37;
+    BYTE pbData[4];
+    *(DWORD *)pbData = 1;
+    HCRYPTKEY phKey = 0;
+    HCRYPTPROV phProv = 0;
+    HCRYPTHASH phHash = 0;
+    DWORD NumberOfBytesRead=0;
+    HANDLE hFile = 0;
+    HANDLE  hObject = 0;
+    BYTE lpBuffer[0x5000]=&#123;0&#125;;
+    int v18 = 0;
+    if (!CryptAcquireContextW(&amp;phProv, 0, 0, 0x18u, 0))&#123;
+        printf(&quot;ERR_ON_SHA1\n&quot;);
+        return 0;
+    &#125;
+    // sub_401180
+    CryptCreateHash(phProv, 0x8004u, 0, 0, &amp;phHash);
+    CryptHashData(phHash, (BYTE*)str, dwDataLen, 0);
+    CryptDeriveKey(phProv, 0x6610u, phHash, 1u, &amp;phKey);
+    CryptDestroyHash(phHash);
+    // sub_401080
+    CryptSetKeyParam(phKey, 4u, pbData, 0);
+    // sub_401770
+    phHash = 0;
+    CryptCreateHash(phProv, 0x8003u, 0, 0, &amp;phHash);
+    CryptHashData(phHash, (BYTE*)filename, strlen(filename), 0);
+    CryptGetHashParam(phHash, 2u, md5_data, &amp;md5_len, 0);
+    if(!CryptSetKeyParam(phKey, 1u, md5_data, 0))&#123;
+        printf(&quot;ERR_ON_MD5\n&quot;);
+        return 0;
+    &#125;
+    CryptDestroyHash(phHash);
+    // sub_401500
+    hFile = CreateFile(&quot;Briefcase\\BusinessPapers.doc&quot;, 0x80000000, 3u, 0, 3u, 0x80u, 0);
+    if(hFile == (HANDLE)-1)&#123;
+        printf(&quot;ERR_ON_SCANNING_DOC\n&quot;);
+        return 0;
+    &#125;
+    hObject = CreateFile(&quot;Briefcase\\output.txt&quot;, 0x40000004u, 3u, 0, 3u, 0x80u, 0);
+    if(hObject == (HANDLE)-1)&#123;
+        printf(&quot;ERR_ON_CONDUCTING_OUTPUT\n&quot;);
+        return 0;
+    &#125;
+    while (ReadFile(hFile, lpBuffer,0x4000, &amp;NumberOfBytesRead, 0))&#123;
+        if ( NumberOfBytesRead &lt; 0x4000) &#123; v18 = 1;&#125;
+        CryptDecrypt(phKey, 0, v18, 0, (BYTE *)lpBuffer, &amp;NumberOfBytesRead);
+        //CryptEncrypt(phKey, 0, v18, 0, (BYTE *)lpBuffer, &amp;NumberOfBytesRead, 0x4010);
+        WriteFile(hObject, lpBuffer, NumberOfBytesRead, &amp;NumberOfBytesRead, 0);
+        if ( v18 )
+            break;
+    &#125;
+    return 0;
+&#125;
+</code></pre>
+<p>最后随便拿个什么十六进制查看器一看，是个图片，改个后缀——</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/DukeLockeroutput.jpg"></p>
+<p>好家伙，拿个逆向的flag怎么跟做密码一样。</p>
+<h3 id="hashes"><a href="#hashes" class="headerlink" title="hashes"></a>hashes</h3><p>这玩意咋看咋像go：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn3%5Dhashes_pic1.png"></p>
+<p>但是无所谓，IDAGolangHelper会出手……</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn3%5Dhashes_pic2.png"></p>
+<p>找不到模块数据？啥情况？kali打开看了才发现是golang7，太过古老。算了直接硬看汇编吧，这里还有一个小寄巧，库函数不多的时候可以通过查看出题人到底调用了什么，来推测出题人的意图。比方说，我们发现出题人调用了<code>crypto_sha1_New</code>和<code>go_string_slice</code>，跟过去看一眼：</p>
+<p><code>sub_8049CFB</code>调用了<code>crypto_sha1_New</code>，并且循环了三遍，想来是要对参数进行三次sha1了（话说回来怎么这B出题人这么喜欢sha1）：</p>
+<pre><code>mov     dword ptr [ebp-0Ch], 0
+cmp     dword ptr [ebp-0Ch], 2
+jle     loc_8049D5E
+……
+call    _crypto_sha1_New
+……
+add     dword ptr [ebp-0Ch], 1
+</code></pre>
+<p>而这玩意唯一的调用点就是主函数，我们可以发现<code>string_slice</code>刚好就在前面：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn3%5Dhashes_pic3.png"></p>
+<p>与此同时，随便乱翻字符串的时候还发现了更前面调用的<code>sub_8049F6D</code>有一个诡异的字符集，对应着一个<code>strings_ContainsAny</code>，应该是用来检查密文或者原文的的字符是否在字符集里面。</p>
+<pre><code>mov     ebx, offset aAbcdefghijklmn ;
+mov     esi, 22h ; &#39;&quot;&#39;
+……
+push    esi
+push    ebx
+call    _strings_ContainsAny
+……
+xor     eax, 1
+test    al, al
+jz      short loc_8049FFD
+</code></pre>
+<p>并且前面在<code>___go_int_to_string</code>调用时调用的参数有[ebp-28h]，这玩意在main里面也出现过，那就权当是输入数据的长度为30吧——</p>
+<pre><code>sub_8049F6D:
+lea     eax, [ebp-28h]
+sub     esp, 8
+push    edi
+push    eax
+call    ___go_int_to_string
+
+main_main:
+cmp     dword ptr [ebp-28h], 1Eh
+setz    al
+test    al, al
+jz      short loc_804A10D
+</code></pre>
+<p>在调用<code>sub_8049F6D</code>之后，切分字符串之前，传入的ecx还对这个长度除以过一次，之后作为切分的参数输了进去。</p>
+<pre><code>mov     ecx, 6
+cmp     ecx, 0FFFFFFFFh
+jnz     short loc_804A1EE
+……
+mov     eax, [ebp-28h]
+cdq
+idiv    ecx
+……
+push    ecx
+</code></pre>
+<p>所以合理推测，这玩意实际上是把一个长30的串拿去等分，每段长度为6（golang slices一般没有数量参数来着），然后拿去连着三次sha1，最后把得到的哈希值和程序里头的数据比对。</p>
+<p>可问题又来了，我数据呢？</p>
+<p>一种可能的思路是，你既然都打FlareOn了，它的flag格式肯定是邮箱，尾巴肯定是@flare-on.com，最后两个slice也解决了，数据也能找了，多好。可问题就在这里，静态环境下根本没法从IDA里面找到这些数据，那这些数据八成还要过一遍解密或者生成才能拿到手。</p>
+<p>另一种办法肯定就是动调到指定位置拿到对应数据了。但是鉴于之前几道题目都动调的我头快飞了，故拿数据的方式肯定没这么粗暴。再加上golang7，这么古老的玩意，现在linux下载源都找不到库了，我也配不上来啊QAQ</p>
+<p>还有一种方式是生啃汇编，当然效率肯定高不到哪去，因为解密逻辑在这里显得及其的迷幻：</p>
+<pre><code>sub_804A53B:
+push    ebp
+……
+push    ecx
+push    1CDh
+push    1000h
+push    edx
+push    eax
+call    sub_8049EE7
+
+sub_8049EE7:
+mov     eax, [ebp-10h]
+cmp     eax, [ebp+18h]
+jl      short loc_8049F10
+loc_8049F10:
+mov     edx, [ebp-0Ch]
+mov     eax, [ebp+14h]
+add     eax, edx
+cmp     dword ptr [ebp+10h], 0FFFFFFFFh
+jnz     short loc_8049F26
+loc_8049F26:
+cmp     dword ptr [ebp+10h], 0
+jnz     short loc_8049F3B
+loc_8049F3B:
+cdq
+idiv    dword ptr [ebp+10h]
+mov     ebx, edx
+mov     eax, ebx
+mov     [ebp-0Ch], eax
+mov     eax, [ebp-0Ch]
+cdq
+push    edx
+push    eax
+push    dword ptr [ebp+8]
+push    offset unk_804CE40
+call    ___go_send_small
+add     esp, 10h
+add     dword ptr [ebp-10h], 1
+</code></pre>
+<p><em>byd，我在做这到这里的时候刚好在听脑浆炸裂少女，结果我自己脑子真的快炸了（笑</em></p>
+<p>不过我突然想到一件事情，刚才入栈的第四个元素，也就是<code>ebp-0xC</code>，就是刚才push进来的0x1CD。这玩意在idiv取余之后每次还要加回来，再加上其他传进去的参数也可能是数据集的地址，以及push了一个意义不明的0x1000进来，这玩意可能就是在一个大小为0x1000的数据集里面找一个下标，给他驳到某个东西上组成哈希值。</p>
+<p>哪里可能存在一个长度刚好为0x1000的数据集呢？在乱翻了一阵常量之后，我找到了<code>unk_804BB80</code>，这玩意完美满足条件。</p>
+<p>算法上如果要胡诌一通也好说，那就可能是以一定基础下标为准，每次取出一个数然后加上0x1CD，然后越界了mod一个0x1000，直到组成一个sha1的哈希值，然后接着弄下一个哈希值。</p>
+<p>只是没有动态调试的环境，我暂时没法亲自验证它的正确性（而且按理来说如果动调顺利，那么几个未知变量的问题也解决了）。而且，这么猜想的话，初始下标也是个问题，毕竟都爆破了，6个字符，就算情况固定，也得要O(m^6)的复杂度，大概有15亿种情况，你再多爆一个1000的变量，那电脑得先跟你爆了。</p>
+<p>不对，好像不需要动态调试，也还有办法。记得刚才提到过尾巴是”@flare-on.com”，那我们只需要用上面一样的办法算出sha1，然后再用sha1值从尾到头逐字比对，寻找所有可能值然后记下偏移，就可以找出终位置和变化规律，然后从尾到头生成哈希值。</p>
+<p><a target="_blank" rel="noopener" href="https://mislusnys.github.io/post/flareon3/">Mindaugas佬的题解</a>至少从代码上看是这么干的，下面是我根据他的题解改的，py3以上也能用的爆破代码（毕竟题目还是py2时代的文物）——</p>
+<pre><code>import binascii
+import hashlib
+
+
+def trip_sha1(s):
+    return hashlib.sha1(hashlib.sha1((hashlib.sha1(s).digest())).digest()).hexdigest()
+
+
+const = 0x1cd
+current = 0x450  # 这个下标估计得人工确定
+
+blob = [你提出来的0x1000大小的数据集]
+hashes = [[], [], [], [], []]
+
+for h in reversed(range(5)):  # 从最后一个hash值及其终位置反过来推前面的
+    for b in range(20):
+        byte = blob[current]
+        current -= 0x1cd
+        if current &lt; 0:
+            current += 0x1000
+        hashes[h] = [byte] + hashes[h]  # 包括新加入的数据也是从前面插入
+
+h_str = [binascii.hexlify(b&#39;&#39;.join([chr(b).encode() for b in h])) for h in hashes]
+
+alphabet = &#39;abcdefghijklmnopqrstuvwxyz@-._1234&#39;
+
+for c1 in alphabet:  # 剩下的就是硬爆所有可能的六位字符，去找哈希值存在的那几个
+    for c2 in alphabet:
+        for c3 in alphabet:
+            for c4 in alphabet:
+                for c5 in alphabet:
+                    for c6 in alphabet:
+                        six = &#39;&#39;.join([c1, c2, c3, c4, c5, c6])
+                        if trip_sha1(six.encode()).encode() in h_str:
+                            print(six, trip_sha1(six))
+</code></pre>
+<p>（佬在题解里表示用这玩意他也爆了整整20min，何其恐怖的计算量，反正我跑了好一会没跑通，各位谁有超算的可以整一整，我是不想再折磨我的电脑了）</p>
+<blockquote>
+<p><a href="mailto:&#x68;&#x34;&#115;&#x68;&#51;&#100;&#x5f;&#x74;&#x68;&#x33;&#95;&#104;&#x34;&#115;&#104;&#x33;&#115;&#64;&#102;&#x6c;&#x61;&#114;&#101;&#45;&#x6f;&#x6e;&#x2e;&#99;&#x6f;&#x6d;">&#x68;&#x34;&#115;&#x68;&#51;&#100;&#x5f;&#x74;&#x68;&#x33;&#95;&#104;&#x34;&#115;&#104;&#x33;&#115;&#64;&#102;&#x6c;&#x61;&#114;&#101;&#45;&#x6f;&#x6e;&#x2e;&#99;&#x6f;&#x6d;</a></p>
+</blockquote>
+<p><em>我就纳闷了，flareon你们怎么都喜欢玩这么抽象的底力题</em></p>
+<h3 id="Unknown"><a href="#Unknown" class="headerlink" title="Unknown"></a>Unknown</h3><p>一上来，pe32，想着应该不会有啥花活吧，但看FlareOn那尿性还真说不准。这一看果不其然，符号表里面的信息显示这道题表面的程序名和实际运行时符号表里的程序名好像是两个东西——</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/FlareOn3_RE_unknown_pic1.png"></p>
+<p>从die里看内含字符串还能看到debug信息，看来这玩意真的只是个被重命名的，从原程序<code>extraspecial</code>的pdb里扒出来的内存映射之类的东西吧。</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/FlareOn3_RE_unknown_pic2.png"></p>
+<p>但是这玩意有什么用呢？我们先分析一下程序：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/FlareOn3_RE_unknown_pic3.png"></p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/FlareOn3_RE_unknown_pic4.png"></p>
+<p>也就是说，这鬼玩意的本体实际上是个哈希比对。我们理论上直接把这个简单哈希搬过来用就完事了：</p>
+<pre><code>import numpy
+
+flare = &#39;FLARE On!&#39;
+between_c = ord(&#39;_&#39;)
+hexlist = []
+
+
+def cal(Str):
+    Sum = numpy.uint32(0)
+    for i in Str:
+        Sum = numpy.uint32(ord(i) + 37 * Sum)
+    return Sum
+
+
+flag = &#39;&#39;
+for i in range(26):
+    between_c += 1
+    for j in range(ord(&#39; &#39;), 127):
+        Str = chr(j) + chr(between_c) + flare
+        Sum = cal(Str)
+        if Sum == hexlist[i]:
+            flag += chr(j)
+            break
+
+print(flag)
+</code></pre>
+<p>但是用上述代码中原装的数据是解不出东西的。那真正的数据呢？</p>
+<p>我们回到刚才的代码，发现中间那段未知代码实际上有点像把v23的处理结果跟我们的数据串掉了个。而且，v23就是代码的十六进制中RSDS最后出现位置的后缀（因为没有break中间夹断），于是我们拉进Winhex看一眼：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/FlareOn3_RE_unknown_pic5.png"></p>
+<p>好消息，我们有pdb文件的原始地址了。坏消息，我数据呢？</p>
+<p>结果外网的题解简直是一个模子里刻出来的，都说地址有了，数据就有了。可是这道题就没给出啥额外信息，直到我<a target="_blank" rel="noopener" href="https://github.com/dotnet/runtime/blob/main/docs/design/specs/PE-COFF.md">乱翻github时看到了</a>：</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/FlareOn3_RE_unknown_pic6.png"></p>
+<p>对啊，好像可以借由GUID去找对应PDB，然后再从对应PDB里面找我们要的数据。但是很遗憾，寻找了数个解决方案之后，它们在我的电脑环境下都行不通。</p>
+<p>直到我在数次动调之后突然发现，这玩意好像没有正确的文件名是过不去start的检测的。那么，之前拿到的文件名应该能用得上了，重命名成extraspecial.exe试试——</p>
+<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/FlareOn3_RE_unknown_pic7.png"></p>
+<p>哟西，能跑通，但是就是卡在了某个判定。那我们直接在x64dbg上大跨步动调到0x4027a0，也就是主函数的地址上（别问为什么不用ida，问就是寄，以及，很多地方需要动调的时候手动过，因为有反patch），接着看哪里是那个意义不明的形似加密和换表的东西，一遍给它过过去——</p>
+<p>然而悲伤的事情发生了，这玩意似乎加了亿些异常分发和反调试，导致你反调试不是一个萝卜一个坑，而是你一个萝卜拔出来，地下还埋着几个土豆。然后从网上下了SharpOD，结果SharpOD也不好使，碰到反patch进程直接炸了。甚至我现在想截个图都得担心哪里会不会突然给我整炸了，哪里出个参数判断哪里出个Dispatch，boom，你进程没了。</p>
+<p>出题人我XX你个X</p>
+<blockquote>
+<p><a href="mailto:&#x4f;&#104;&#x73;&#48;&#112;&#101;&#x63;&#x31;&#97;&#x6c;&#x70;&#119;&#x64;&#64;&#102;&#x6c;&#x61;&#114;&#x65;&#x2d;&#x6f;&#x6e;&#x2e;&#x63;&#111;&#x6d;">&#x4f;&#104;&#x73;&#48;&#112;&#101;&#x63;&#x31;&#97;&#x6c;&#x70;&#119;&#x64;&#64;&#102;&#x6c;&#x61;&#114;&#x65;&#x2d;&#x6f;&#x6e;&#x2e;&#x63;&#111;&#x6d;</a> </p>
+</blockquote>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">CTF</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="2024/04/01/FlareOn3%E5%81%9A%E9%A2%98%E5%90%88%E9%9B%86/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
     <article id="post-菜狗Hank的『天堂之门』学习记录" class="article article-type-post  article-index" itemscope itemprop="blogPost">
   <div class="article-inner">
     
@@ -1335,7 +1926,7 @@ Stack[00000840]:000DFF5C dd offset kernel32_ReadFile
 <p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%5BFlareOn4%5Dnotepad_pic4.png"></p>
 <p>反正怎么顺手怎么来。最后的flag一定是：</p>
 <blockquote>
-<p><a href="mailto:&#x62;&#108;&#52;&#x35;&#55;&#95;&#x66;&#114;&#x30;&#x6d;&#x5f;&#x74;&#x68;&#51;&#x5f;&#112;&#x34;&#x35;&#55;&#x40;&#x66;&#108;&#x61;&#x72;&#101;&#x2d;&#111;&#x6e;&#46;&#99;&#111;&#109;">&#x62;&#108;&#52;&#x35;&#55;&#95;&#x66;&#114;&#x30;&#x6d;&#x5f;&#x74;&#x68;&#51;&#x5f;&#112;&#x34;&#x35;&#55;&#x40;&#x66;&#108;&#x61;&#x72;&#101;&#x2d;&#111;&#x6e;&#46;&#99;&#111;&#109;</a></p>
+<p><a href="mailto:&#98;&#x6c;&#52;&#53;&#55;&#x5f;&#x66;&#114;&#x30;&#109;&#95;&#x74;&#x68;&#x33;&#x5f;&#112;&#x34;&#53;&#x37;&#64;&#x66;&#108;&#x61;&#x72;&#101;&#x2d;&#x6f;&#110;&#x2e;&#x63;&#x6f;&#x6d;">&#98;&#x6c;&#52;&#53;&#55;&#x5f;&#x66;&#114;&#x30;&#109;&#95;&#x74;&#x68;&#x33;&#x5f;&#112;&#x34;&#53;&#x37;&#64;&#x66;&#108;&#x61;&#x72;&#101;&#x2d;&#x6f;&#110;&#x2e;&#x63;&#x6f;&#x6d;</a></p>
 </blockquote>
 <p><em>谁家好人会用自己出过的题目当题目内容，还放在C盘占空间的啊kora</em></p>
 <h3 id="shell"><a href="#shell" class="headerlink" title="shell"></a>shell</h3><p>看到代码的一瞬间，我有点害怕这玩意会不会有什么php特性：</p>
@@ -1610,7 +2201,7 @@ hx__ayo3@
 </code></pre>
 <p>这不但验证了我们之前对key尾的猜想，还把前面完完整整的吐出来了。所以最后的结果应该是：</p>
 <blockquote>
-<p>th3_ xOr_ is_ waaaay_ too_ <a href="mailto:&#x77;&#x33;&#52;&#x6b;&#x40;&#102;&#x6c;&#x61;&#x72;&#x65;&#45;&#111;&#x6e;&#x2e;&#x63;&#111;&#x6d;">&#x77;&#x33;&#52;&#x6b;&#x40;&#102;&#x6c;&#x61;&#x72;&#x65;&#45;&#111;&#x6e;&#x2e;&#x63;&#111;&#x6d;</a></p>
+<p>th3_ xOr_ is_ waaaay_ too_ <a href="mailto:&#x77;&#51;&#52;&#x6b;&#64;&#102;&#x6c;&#x61;&#x72;&#101;&#45;&#111;&#110;&#46;&#x63;&#x6f;&#x6d;">&#x77;&#51;&#52;&#x6b;&#64;&#102;&#x6c;&#x61;&#x72;&#101;&#45;&#111;&#110;&#46;&#x63;&#x6f;&#x6d;</a></p>
 </blockquote>
 <p>顺带，你把这个key放到php运行器上解密，你会发现这些明文都是p01老哥的杰作……套了些不明所谓的玩意。</p>
 <p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/buu_%5BFlareOn2017%5D_shell_pic5.png"></p>
@@ -1822,7 +2413,7 @@ Bet you didn&#39;t know he could speak hexadecimal! :-)
 </code></pre>
 <p>flag到手！</p>
 <blockquote>
-<p>flag{<a href="mailto:&#x6d;&#x75;&#x64;&#100;&#49;&#110;&#103;&#95;&#x62;&#x79;&#95;&#121;&#48;&#117;&#114;&#53;&#51;&#x6c;&#112;&#104;&#x40;&#x66;&#x6c;&#x61;&#x72;&#x65;&#45;&#x6f;&#110;&#46;&#x63;&#111;&#x6d;">&#x6d;&#x75;&#x64;&#100;&#49;&#110;&#103;&#95;&#x62;&#x79;&#95;&#121;&#48;&#117;&#114;&#53;&#51;&#x6c;&#112;&#104;&#x40;&#x66;&#x6c;&#x61;&#x72;&#x65;&#45;&#x6f;&#110;&#46;&#x63;&#111;&#x6d;</a>}</p>
+<p>flag{<a href="mailto:&#x6d;&#117;&#100;&#x64;&#49;&#x6e;&#x67;&#x5f;&#x62;&#121;&#x5f;&#x79;&#x30;&#x75;&#114;&#53;&#51;&#x6c;&#x70;&#104;&#x40;&#102;&#x6c;&#97;&#x72;&#101;&#x2d;&#111;&#110;&#46;&#x63;&#x6f;&#109;">&#x6d;&#117;&#100;&#x64;&#49;&#x6e;&#x67;&#x5f;&#x62;&#121;&#x5f;&#x79;&#x30;&#x75;&#114;&#53;&#51;&#x6c;&#x70;&#104;&#x40;&#102;&#x6c;&#97;&#x72;&#101;&#x2d;&#111;&#110;&#46;&#x63;&#x6f;&#109;</a>}</p>
 </blockquote>
 
       
@@ -2228,495 +2819,6 @@ int main()
       
         <p class="article-more-link">
           <a class="article-more-a" href="2023/09/16/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E4%BA%94%E7%AF%87%EF%BC%88%E4%B8%8B%EF%BC%89/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-    <article id="post-深入理解计算机系统学习笔记-第四篇（下）" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="2023/09/09/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E5%9B%9B%E7%AF%87%EF%BC%88%E4%B8%8B%EF%BC%89/">深入理解计算机系统学习笔记-第四篇（下）</a>
-    </h1>
-  
-
-        
-        <a href="2023/09/09/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E5%9B%9B%E7%AF%87%EF%BC%88%E4%B8%8B%EF%BC%89/" class="archive-article-date">
-  	<time datetime="2023-09-09T07:15:03.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-09-09</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h3 id="上回书说到"><a href="#上回书说到" class="headerlink" title="上回书说到"></a>上回书说到</h3><p>还上回书啥呢，趁热打铁，给大家来点想看的东西——存储结构的机器级表示。</p>
-<p>至于小娜……我安排她帮我过旷野之息的进度去了，这会估计还在跟远古机械斗智斗勇吧（笑），等我投个屏……</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E5%9B%9B%E7%AF%87%E4%B8%8B1.jpg"></p>
-<p>希望她新装的自动躲避系统没事……希望如此</p>
-<h3 id="回到正题——机器层面的数组"><a href="#回到正题——机器层面的数组" class="headerlink" title="回到正题——机器层面的数组"></a>回到正题——机器层面的数组</h3><p>我们已经不止一次提过数组的概念，熟悉程序逆向或者计算机工程的同学应该明白，包括之前提过不止一遍，内存可以视为一个大的数组。而这个数组的<strong>元素</strong>，最小单位就是字节。我们每次实际开的数组，都是取这个大数组中的一部分，再按我们需求的数据的<strong>单位长度</strong>进行元素的划分，比如我们开一个int数组就是每4字节为一个元素，etc。</p>
-<p>也因此，数组所需要与<strong>索引</strong>对应的地址的抽象概念，也就是<strong>指针</strong>，也是严格按照这种单位的运算模式来进行数据的索引的。指针的运动和指向，严格取决于你所定义的数据类型。</p>
-<p><em>ps.指针也可以被指向函数</em></p>
-<p>故我们需要面对的实际数组，理所应当的，每一个元素都对应着两个信息，一个是它本体存储的信息，另一个是其存储地址。而对于一个指针变量而言，如果需要在这些元素间跳转，其实也很简单，只需要搞到这个数组的起始地址，然后按照我们设定的单位长度，进行指针的累加或累减，运算表达式大致为(^*(E+N))（E为数组起始地址，N为索引）的格式。其地址则是起始地址+偏移量的格式，偏移量为索引值和数据单位长度的乘积。</p>
-<p>比方说我们想要搞到int数组ans的索引为2的元素，在高级语言层面我们使用<code>int a = ans[2]</code>，而在汇编层面，我们取<code>mov (%rdi,%rdx,4) %rax</code>即可，最低维索引值在rdx，而数组本体的地址在rdi中。从上述运算也可见，指针是依照其单位长度，而非最基础的单字节来增加或减少的。</p>
-<h4 id="数组嵌套"><a href="#数组嵌套" class="headerlink" title="数组嵌套"></a>数组嵌套</h4><p>就算是使用数组嵌套也是一个道理，只不过，原本M维的索引放到内存空间统统降维打击，指针也给你压缩成(<em>(E+N_1</em>N_{2max}+N_2*N_{3max}+……+N_{M-1}*N_{Mmax}+N_M))的格式。简单来讲，和原来的理解方式一样，嵌套数组不过是把上一维数组的单位元素变成了下一维的数组，但实现起来可能就有点让人抓狂，比方说逆向的地图题。</p>
-<p>而具体而言，例如int二维数组<code>M[x][y]</code>，x、y为常数，每个元素的地址都变成了诸如(&amp;M[i][j]&#x3D;M+L(y*i + j), L&#x3D;sizeof(int))的格式，二维数组被横向拉长成数个单位数组的拼接，而每个元素的索引值又是其所在的单位数组的索引+在所在单位数组中元素的索引，如下图：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E5%9B%9B%E7%AF%87%E4%B8%8B2.jpg"></p>
-<p>此时，两个维度的索引值分别在rsi和rdx中，数组本体的地址在rdi中。调用的时候，比方说我们需要调用<code>M[2][2]</code>，我们需要这么做：</p>
-<pre><code>lea (,%rsi,y) %rax //确定第一维的值i=2，令rax指向地址2y
-lea (%rdi,%rax,4) %rax //令rax指向地址(M+4(2y))
-mov (%rax,%rdx,4) %eax //引入第二维的值j=2，将地址(M+4(2y+2))的数据提至eax寄存器
-</code></pre>
-<p>整体过程大概就是：通过指针计算地址——&gt;指向地址上的元素——&gt;将元素提取出来。</p>
-<p>包括在循环过程中也是如此，遍历同一维度时，我们只需要对地址进行<code>add $4 %rax</code>，而遍历上一级维度，也只需要进行<code>lea (%rax,y,4) %rax</code>即可。</p>
-<p><em>ps.这里直接写y是为了更加直观，实际y可能存放于另一个寄存器中</em></p>
-<h4 id="变长数组"><a href="#变长数组" class="headerlink" title="变长数组"></a>变长数组</h4><p>包括长度随变量而变化的数组也逃不开这个过程。只是由于涉及到了更多的变量，我们不得不使用耗费更多算力的mul指令来计算地址，而不能再简单地通过表达式赋值。比方说倘若我们的M数组是一个大小为n*n的矩阵，rcx被赋值为n，则其元素调用方法变更如下：</p>
-<pre><code>imul %rsi %rcx //确定第一维的值i=2，同时指针参数赋值2n
-lea (%rdi,%rcx,4) %rax //令rax指向地址(M+4(2n))
-mov (%rax,%rdx,4) %eax //引入第二维的值j=2，将地址(M+4(2n+2))的数据提至eax寄存器
-</code></pre>
-<h4 id="编译优化"><a href="#编译优化" class="headerlink" title="编译优化"></a>编译优化</h4><p>但是，就像小娜不想算加密，编译器也不想给自己太大的负担，这样对开发者的血压也有好处。于是，一般对于定长数组，C语言优化等级为o1时会将源代码中的指定长度define为常量，这样调用数组长度就只需要调用这个常量，而不是四处乱放的立即数。譬如我们定义<code>int M[10][10]</code>时,系统就会自动加上:</p>
-<pre><code>#define N 10
-typedef int M[N][N];
-</code></pre>
-<hr>
-<h3 id="其它类型的存储结构"><a href="#其它类型的存储结构" class="headerlink" title="其它类型的存储结构"></a>其它类型的存储结构</h3><h4 id="结构体"><a href="#结构体" class="headerlink" title="结构体"></a>结构体</h4><p>如果数组还是个单位元素定长的数据结构，那C的<strong>结构体</strong>就是完完全全地随意发挥了。虽然还遵循着地址为起始地址+偏移量的标准，但内存空间的分配则是顺序的，按照你对结构体的定义分配，并且，偏移量也是不同数据类型的组合。就比如说你想要调用如下结构体中的数组中的第i个元素：</p>
-<pre><code>struct rec&#123;		//beginning address in rdi
-    int i
-    char j
-    int a[6]	//i in rsi
-    int *p
-&#125;cal; 
-</code></pre>
-<p>那它的内存引用值大概就是(4+1)(%rdi,%rsi,4)，即提前计算好的立即数+数组指针对应的地址偏移……吗？</p>
-<p>我们思维中就是如此，但计算机可不一定这么想。因为惯例上，不同数据类型的数据的地址，应当是其数据单位长度的整数倍。所以，对于这么一堆int中混入的char，编译器自然是对其进行填充处理，即自动填充一个长度为3的空隙。于是，实际的内存引用值就是8(%rdi,%rsi,4)。这个填充值会根据你实际定义的数据类型，数据的排列方式和硬件系统的操作数来进行变化。</p>
-<h4 id="联合"><a href="#联合" class="headerlink" title="联合"></a>联合</h4><p>我们联合！！！（逃</p>
-<p>如上，struct的构建方式会带来一个严重的问题，如果我们大量使用具有惯例上导致空间冲突的不同数据类型的结构体，那么，其产生的内存占用将会是灾难级的。如果我们想减少数据分配空间，避免爆内存，我们在开发中会不可避免地用上<strong>联合体</strong>（虽然我都没用过）。</p>
-<p>联合体的所有数据共享同一存储空间，其大小取决于其最大字段的大小，比如说上面那个struct，如果我们把它改成union：</p>
-<pre><code>union rec&#123;		//beginning address in rdi
-    int i
-    char j
-    int a[6]	//i in rsi
-    int *p
-&#125;cal; 
-</code></pre>
-<p>于是乎，原本需要&#x2F;(4+(1+3)+6<em>4+8&#x2F;)字节空间的数据，只需要6</em>4个字节就可以存下了。这种结构经常用于需要拓展子节点的树形结构等，并且，不知可以单独运用，你还可以在struct里套union，或者反过来套，防止内存溢出漏洞的同时也可以节省空间，就比如一个二叉树，你需要记录它的状态和左右子节点，那你就可以这么写来节省空间：</p>
-<pre><code>union node_t&#123;
-    struct&#123;
-        struct node_t *left;
-        struct node_t *right;
-    &#125;
-    char status;
-&#125;inf;
-</code></pre>
-<p>又比如，你想要完成数据转换，但又不希望强制数据转换带来的二进制位出错，你就可以使用union，创造一个可以以一种数据类型存储，另一种来访问的方法，也就是《深入理解》原书中188页提及的部分，本文不再赘述。</p>
-<hr>
-<h3 id="缓冲区溢出"><a href="#缓冲区溢出" class="headerlink" title="缓冲区溢出"></a>缓冲区溢出</h3><p>准确来讲，这一块内容应当叫“内存越界引用和缓冲区溢出”，但各路博主对于溢出漏洞及其利用，所引用的名词都非常的多元化，就按下不表了。</p>
-<p>C语言对于数组引用没有边界检查，对越界的数组元素进行写操作，就会导致栈中信息被修改，进行读操作就会导致程序中的一些不知名数据被读取。这个情况在pwn中非常明显，就比如经典的gets漏洞和printf漏洞，我们就可以通过写字符串来覆盖掉短小的字符串类型数据之外的一些指令。譬如如下代码：</p>
-<pre><code>void input()
-&#123;
-    char buf[8];
-    read(0, buf, 0x50);
-    printf(buf);
-    return;
-&#125;
-void cat_flag()
-&#123;
-    system(&quot;cat flag&quot;);
-&#125;
-int main()
-&#123;
-    input();
-    return 0;
-&#125;
-
-in linux assemble（省略堆栈平衡部分）:
-input:
-    mov     edx, 50h
-    mov     rsi, rbx
-    mov     edi, 0
-    call    _read
-    mov     rdi, rbx
-    mov     eax, 0
-    call    _printf
-    retn
-</code></pre>
-<p>在<code>call _read</code>处正常动态调试，当我们正常输入的时候，输出值并不会变化，堆栈上的数据和返回地址也显示正常。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E5%9B%9B%E7%AF%87%E4%B8%8B3.png"></p>
-<p>但当我们输入一串长度超过8的字符，比方说十几个字符全是a，我们看IDA：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E5%9B%9B%E7%AF%87%E4%B8%8B4.png"></p>
-<p>此时，因为缓冲区溢出导致先前入栈的返回地址异常，我们的程序已经无法正常返回main而暴毙。而倘若我们利用python，使得input时输入了一串字符，令覆写的区域成功覆盖了整个返回地址，并将其引至函数<code>cat_flag()</code>，我们再试试：</p>
-<pre><code>from pwn import *
-r = process(&#39;input2&#39;)
-cat_loc = 0x5642E4866188
-payload = 16*b&#39;a&#39; + 0x4*b&#39;a&#39; + p64(cat_loc)
-r.sendline(payload)
-r.interactive()
-</code></pre>
-<p>熟悉pwn的同学应该明白，这就是pwn的基本原理——通过一些溢出漏洞来获取信息。但是这段代码并没有成功，这是因为linux的编译器在编译时自行加上了一些奇怪的东西。这就要提到接下来的部分了：</p>
-<h4 id="如何保护你的代码"><a href="#如何保护你的代码" class="headerlink" title="如何保护你的代码"></a>如何保护你的代码</h4><p>书中列举了linux的gcc编译器使用的几种办法，来让你的代码免于遭受直接的缓冲区溢出攻击。</p>
-<p><strong>1、栈随机化：</strong></p>
-<p>顾名思义，每次运行时，栈的地址都会随机发生变化。实现方式是提前给栈分配一段0到n的随机大小的空间，程序不使用这段空间，但这段空间会使得整个栈的地址发生改变。这种防护技术在Linux系统中已经成为了常态化行为，称为“地址空间布局随机化”（ASLR）。</p>
-<p><strong>2、栈破坏检测：</strong></p>
-<p>编译器会在汇编代码中加入一种栈保护者的机制来检测缓冲区越界，即在缓冲区和栈保存的状态值之间存储一个特殊值，名为“金丝雀值”（canary），倘若因为缓冲区溢出导致这个值发生改变，那么程序产生异常中止。</p>
-<p><strong>3、限制可执行代码区域：</strong></p>
-<p>一种方法是限制哪些内存区域能存放可执行代码，例如AMD的64位处理器中含有的“NX”（不可执行）位，在不损失性能的前提下，由硬件完成是否可执行的判定（传统x86的硬件只能通过软件机制来阻止执行，这会使性能大打折扣）。</p>
-<p>另一种办法则是动态地，即时地产生代码，将可执行代码限制在由编译器创建原始程序时产生的部分中。比方说Java程序的运行。</p>
-<p><em>ps.在编写这一段的时候，我发现在gets外面再套一层指针有效地防止了我自己写出shell来：</em></p>
-<pre><code>char *input()
-&#123;
-    static char buf[8];
-    gets(buf);
-    return buf;
-&#125;
-void cat_flag()
-&#123;
-    system(&quot;cat flag&quot;);
-&#125;
-int main()
-&#123;
-    printf(&quot;%s\n&quot;, input());
-    return 0;
-&#125;
-</code></pre>
-<p><em>所以说，多套几层指针保护函数或许也是一种保护代码的策略？</em></p>
-<h4 id="但我们还是可以打进去"><a href="#但我们还是可以打进去" class="headerlink" title="但我们还是可以打进去"></a>但我们还是可以打进去</h4><p>众所周知，二进制方向有逆向（Reverse）和PWN两个分支，我们光靠逆向搞不定的事情，或许可以靠利用漏洞进行动态攻击来解决。接下来考虑对这种程序进行一个打。</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E5%9B%9B%E7%AF%87%E4%B8%8B5.jpg"></p>
-<p>额……能不能待会再……停停！我说停亻——</p>
-<p>（不绝于耳的汤姆哀嚎）</p>
-<p>咳咳……额……所以，我们在弄不清保护方法的情况下该怎样利用漏洞呢？从上回我们疯狂输入A也可以看出来，从数组到返回地址的偏移量为16，我们可以考虑利用printf格式化漏洞来输出栈的数据，具体可以参考<a target="_blank" rel="noopener" href="https://introspelliam.github.io/2017/08/04/printf%E6%A0%BC%E5%BC%8F%E5%8C%96%E6%BC%8F%E6%B4%9E/">上善若水的文章</a>和<a target="_blank" rel="noopener" href="https://blog.csdn.net/qq_41202237/article/details/107662273">hollk的文章</a>。</p>
-<p>简单来说，就是printf在只设定了参数，没有设定输出内容的前提下，会自动在堆栈上向下查找数据，打印出接下来地址上的内容。当对应地址不存在时，这个程序就会boom。printf泄露最关键的参数之一就是%n,不输出字符，但是把已经成功输出的字符个数写入对应的整型指针参数所指的变量。</p>
-<p>如果我们要尝试爆出某个地址上的数据，那不妨多重复几遍参数%p：</p>
-<pre><code>from pwn import *
-
-r = process(&#39;input2&#39;)
-
-dist = 16
-payload1 = b&#39;aaaa&#39; + 12 * b&#39;%p&#39;
-
-r.sendline(payload1)
-r_recv = str(r.read())
-print(r_recv)
-</code></pre>
-<p>在ida动态调试时，软件产生了不同的栈地址，在这里泄露时也是一样（其实这一点在checksec里就能看出来，参考我老早以前的pwn题解）：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E5%9B%9B%E7%AF%87%E4%B8%8B6.png"></p>
-<p>如上，我们可以看到输入的<code>aaaa</code>在相对printf指令偏移为7的地址，即格式化字符串的第七个参数。如果你想定向找出某个偏移上的数据，那不妨使用参数<code>aaaa%7$p</code>。</p>
-<p>在后续调试过程中可以看出，改用短长度<code>&#39;%lx&#39;</code>语法段进行printf泄露的结果类似于“aaaa_[地址1]<em>50</em>[地址2]”的格式，并且，地址2无一例外都是以“0ed”后缀结尾。这里就要提到PIE的一大特性：</p>
-<blockquote>
-<p>程序每次运行，一些数据所在地址就会变更，但是这仅仅是libc的基地址发生变化，由于只是一个内存页的单位发生变化，那么地址的低三位就不会发生变化，即4KB(0x1000)不变。<br>——摘自<a target="_blank" rel="noopener" href="https://blog.fjt1.com/2019/11/18/pie%E4%BD%8E%E4%BD%8D%E8%A6%86%E7%9B%96/">Whitea的博客</a></p>
-</blockquote>
-<p>综上所述，我们可以构造printf，进而将新的返回地址溢出到返回值，从而完成调用。单纯的使用printf以及其它格式化输入输出的漏洞，对未开启NX保护的程序还算有效。但万一开了呢？又或者，程序并没有给出足够的系统指令来让你找到flag呢？</p>
-<h4 id="ret2libc"><a href="#ret2libc" class="headerlink" title="ret2libc"></a>ret2libc</h4><p>这种办法简单来说就是先泄漏出从<code>libc.so</code>调用的某些函数在内存中的地址，即got表中库函数的地址，然后再利用泄漏出的函数地址根据偏移量计算出<code>system()</code>函数和<code>/bin/sh</code> 字符串（有时没有，需要手动构造）在内存中的地址，然后执行由它们组成的payload，完事。</p>
-<p>从编译的角度来讲，这个过程讲究的就是一个“我打我自己”，即，用编译时封装给程序自身，或者库内含的函数，去探得或者直接调用实际运行时函数的内存地址。在程序本体缺斤少两时特别好用。</p>
-<p>我们先通过<code>objdump -R [程序名]</code>指令指令，得出各库函数的<strong>got表（全局函数表）</strong>：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E5%9B%9B%E7%AF%87%E4%B8%8B7.png"></p>
-<p>再去用<code>objdump -dj .plt input2</code>指令或者<code>objdump -d input2 | grep &quot;plt&quot;</code>得出函数的<strong>plt表（局部函数表）</strong>：</p>
-<p><img src="https://raw.githubusercontent.com/cykahankxd/cykapicxd/main/img/%E7%AC%AC%E5%9B%9B%E7%AF%87%E4%B8%8B8.png"></p>
-<p>这样，这个程序的静态信息就都显现出来了。当然，ida里面肯定是有的（笑）</p>
-<p>先前通过ldd指令集得知编译用的libc库是<code>/lib/x86_64-linux-gnu/libc.so.6</code>，虽然不一定用得上，但是至少在缺少泄露数据所需的库函数的时候，调用libc库是绝对需要的。另外，我们也可以通过python的LibcSearcher库来解决这个问题。</p>
-<p>详细的实例可以参考<a target="_blank" rel="noopener" href="https://blog.csdn.net/linyt/article/details/43643499">海枫的文章</a>和东林网安协会<a target="_blank" rel="noopener" href="https://www.0error.net/2021/10/46d4a28d.html">do1phin师傅的文章</a>，本文由于主要内容还是计算机系统组成，不多赘述，等到深入pwn的时候再研究。</p>
-<p><em>ps.我在自己研究这玩意的时候，可能因为编译环境等各种问题，自己没pwn出来自己的程序，看看各位是否能用同样的原码跑出一个能pwn的程序</em></p>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">学习</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="2023/09/09/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E5%9B%9B%E7%AF%87%EF%BC%88%E4%B8%8B%EF%BC%89/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-    <article id="post-深入理解计算机系统学习笔记-第四篇（中）" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="2023/09/09/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E5%9B%9B%E7%AF%87%EF%BC%88%E4%B8%AD%EF%BC%89/">深入理解计算机系统学习笔记-第四篇（中）</a>
-    </h1>
-  
-
-        
-        <a href="2023/09/09/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E5%9B%9B%E7%AF%87%EF%BC%88%E4%B8%AD%EF%BC%89/" class="archive-article-date">
-  	<time datetime="2023-09-09T07:14:10.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2023-09-09</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h3 id="上回书说到"><a href="#上回书说到" class="headerlink" title="上回书说到"></a>上回书说到</h3><p>我们刚刚才把程序的机器表示做了个初探，这回我们来讲讲如何理解一个汇编语言程序的其它语句。</p>
-<p>由于这次基本上都是各种指令的介绍，基本也忙不着小娜了。</p>
-<h3 id="数学运算"><a href="#数学运算" class="headerlink" title="数学运算"></a>数学运算</h3><p>正儿八经的x86-64架构下的汇编数学运算包括：</p>
-<h4 id="孤儿指令"><a href="#孤儿指令" class="headerlink" title="孤儿指令"></a>孤儿指令</h4><p><strong>lea(q) src dest：</strong>加载有效地址，实际上就是mov指令的变体，用于从内存读数据到寄存器，但实际原理不同于mov的数据转移，而是“地址复制”，即将源数据的引用地址转移到目的上。就有点类似于你在写C时这样做：</p>
-<pre><code>int *a, *b;
-&amp;a = b;
-</code></pre>
-<p>实际上就等价于<code>leaq %rbx %rax</code>。但有点不同的是，leaq也可以负责简单算式的复制，比方说如果我们把上一条指令改成<code>leaq 3(%rbx,%rbx,3) %rax</code>，那么rax被赋予的实际数值就是&#x2F;(3b+3&#x2F;)。</p>
-<h4 id="一元操作"><a href="#一元操作" class="headerlink" title="一元操作"></a>一元操作</h4><blockquote>
-<p><strong>inc dest：</strong>对目标+1<br><strong>dec dest：</strong>对目标-1<br><strong>neg dest：</strong>对目标取负<br><strong>not dest：</strong>对目标取补码</p>
-</blockquote>
-<h4 id="二元操作"><a href="#二元操作" class="headerlink" title="二元操作"></a>二元操作</h4><blockquote>
-<p><strong>add src dest：</strong>目的&#x3D;目的+源<br><strong>sub src dest：</strong>目的&#x3D;目的-源<br><strong>imul src dest：</strong>目的&#x3D;目的*源<br><strong>xor src dest：</strong>目的&#x3D;目的 异或 源<br><strong>or src dest：</strong>目的&#x3D;目的 或 源<br><strong>and src dest：</strong>目的&#x3D;目的 与 源</p>
-</blockquote>
-<h4 id="移位操作"><a href="#移位操作" class="headerlink" title="移位操作"></a>移位操作</h4><blockquote>
-<p><strong>sal k dest：</strong>算术左移k位<br><strong>shl k dest：</strong>逻辑左移k位（左移都是低位补0所以效果一样）<br><strong>sar k dest：</strong>算术右移k位（空位补符号位）<br><strong>shr k dest：</strong>逻辑右移k位（空位补0）</p>
-</blockquote>
-<h4 id="特殊操作"><a href="#特殊操作" class="headerlink" title="特殊操作"></a>特殊操作</h4><blockquote>
-<p><strong>imul(q) src (dest)：</strong>两个8字节数的有符号全乘法，对于积，rdx存放高64位，rax存放低64位<br><strong>mul(q) src (dest)：</strong>两个8字节数的无符号全乘法，同上<br><strong>cqto：</strong>转换为16字节数<br><strong>idiv(q) src：</strong>16字节数的有符号整除，rdx存放高64位，rax存放低64位，商转移至rax，余数转移至rdx<br><strong>div(q) src：</strong>无符号整除，同上</p>
-</blockquote>
-<hr>
-<h3 id="逻辑控制"><a href="#逻辑控制" class="headerlink" title="逻辑控制"></a>逻辑控制</h3><p>到上面那一块为止，我们还停留在整串代码直线运行的情况。但是，如果你看过ida就会发现，绝大多数的函数的逻辑都是树形结构。构成这些树形分支的，就是一连串的逻辑控制。逻辑控制是啥呢？回去看看你的if、else啥的，那就是了。</p>
-<p>在汇编中自然也有这些：</p>
-<h4 id="条件码"><a href="#条件码" class="headerlink" title="条件码"></a>条件码</h4><p>其实本质上，机器级别的代码控制都是硬件控制。就比方说我们的减法，就是拿<strong>算术逻辑单元ALU</strong>，去读两个寄存器的值进行运算的。而这个逻辑单元不但会运算，还会用计算结果去设置条件码寄存器：</p>
-<p>条件码寄存器由CPU维护，长度为单个位，描述最近的算术或逻辑操作的属性。在每次产生数据操作经过ALU时，这些寄存器的值会被重新设置。具体类别如下：</p>
-<blockquote>
-<p><strong>CF：</strong>进位标志，判断最近一个操作是否产生数据最高位进位，进位置1否则置0，常用于判断数据是否溢出<br><strong>ZF：</strong>零标志，判断最近一个操作的结果是否等于0，等于0则置1，否则置0<br><strong>SF：</strong>零标志，判断最近一个操作的结果是否小于0，小于0则置1，否则置0<br><strong>OF：</strong>溢出标志，判断最近一个操作是否使有符号数产生 <strong>正溢出 &#x2F; 负溢出</strong>，产生则置1，否则置0<br><strong>AF：</strong>辅助进位标志，判断最近一个字节操作是否发生低字节向高字节进位或借位，或者低四位向高四位进位或借位，发生置1，否则置0。<br><strong>PF：</strong>奇偶标志，记录最近一个操作的结果的二进制形式为1的位，若数量为偶数置1，否则置0<br><strong>DF：</strong>方向标志，决定串操作执行时有关寄存器发生调整的方向<br><strong>IF：</strong>中断标志，决定CPU是否相应CPU外部的可屏蔽中断发生的中断请求（但无法阻止不可屏蔽的外部请求和所有的内部请求，中断相关知识可以参考<a target="_blank" rel="noopener" href="https://blog.csdn.net/Ann_xia6/article/details/125767999">Ann_xia66的博客</a>），置1时可响应，置0时不可响应。<br><strong>TF：</strong>追踪标志，置1时程序单步步过，置0时程序正常运转（反汇编软件会不会就是写入了修改TF的shell来实现单步步过）  </p>
-</blockquote>
-<p>因此，一些运算会导致条件码寄存器的既定变更。例如异或操作必定会令CF和ZF置0、加&#x2F;减法必定会导致CF和OF的变更，etc.</p>
-<h4 id="逻辑判断"><a href="#逻辑判断" class="headerlink" title="逻辑判断"></a>逻辑判断</h4><p>需要用到条件码的不只是运算指令，还有比较指令cmp系列和test系列，以及set指令系。</p>
-<h5 id="cmp系"><a href="#cmp系" class="headerlink" title="cmp系"></a>cmp系</h5><p>大致格式为<code>cmp dest src</code>，根据两个操作数的差来设置ZF和CF条件码，但是不设置非条件码寄存器。</p>
-<p>目的操作数 &lt; 源操作数时，ZF置0，CF置1。<br>目的操作数 &gt; 源操作数时，ZF置0，CF置0。<br>目的操作数 &#x3D; 源操作数时，ZF置1，CF置0。  </p>
-<h5 id="test系"><a href="#test系" class="headerlink" title="test系"></a>test系</h5><p>大致格式为<code>test dest src</code>，同理，根据两个操作数与的结果来设置条件码。</p>
-<p>目的操作数&lt;源操作数时，ZF置0，CF置1。<br>目的操作数&lt;源操作数时，ZF置0，CF置1。<br>目的操作数&lt;源操作数时，ZF置0，CF置1。</p>
-<h5 id="set系"><a href="#set系" class="headerlink" title="set系"></a>set系</h5><p>set指令通过条件码的不同组合来设置对象的最低位。具体操作如下：</p>
-<blockquote>
-<p><strong>sete&#x2F;setz dest：</strong>ZF若为1则将目标寄存器低位置1，否则置0，多用于判断相等或零条件<br><strong>setne&#x2F;setnz dest：</strong>与上述相反，判断不等&#x2F;非零条件</p>
-<p><strong>sets dest：</strong>SF若为1则将目标寄存器低位置1，否则置0，多用于判断负数<br><strong>setns dest：</strong>与上述相反，判断非负</p>
-<p><strong>setg&#x2F;setnle dest：</strong>条件为<del>(SF ^ OF) &amp; ~ZF，判断大于<br><strong>setge&#x2F;setnl dest：</strong>条件为</del>(SF ^ OF)，判断大于等于<br><strong>setl&#x2F;setnge dest：</strong>条件为SF ^ OF，判断小于<br><strong>setle&#x2F;setng dest：</strong>条件为(SF ^ OF) | ZF，判断小于等于</p>
-<p><strong>seta&#x2F;setnbe dest：</strong>条件为<del>CF &amp; ~ZF，判断无符号大于<br><strong>setae&#x2F;setnb dest：</strong>条件为</del>CF，判断无符号大于等于<br><strong>setb&#x2F;setnae dest：</strong>条件为CF，判断无符号小于<br><strong>setbe&#x2F;setna dest：</strong>条件为CF | ZF，判断无符号小于等于</p>
-</blockquote>
-<p>所以一组完整的判断指令应该是cmp&#x2F;test指令和set指令、mov指令等的结合，以实现不同情况下的特殊判断。比方说我们要汇编实现一个比较函数，判断两个数是否相等：</p>
-<pre><code>int comp(data_t a, data_t b)
-</code></pre>
-<p>我们需要使用如下代码：</p>
-<pre><code>cmpq %rsi %rdi    //比较A和B
-sete %al          //然后查看ZF是否为0，若不为0则相等，al置1
-movzbl %al, %eax  //判定结果存入零拓展的a寄存器，高字节清零
-</code></pre>
-<h4 id="跳转指令"><a href="#跳转指令" class="headerlink" title="跳转指令"></a>跳转指令</h4><p>不过，光有逻辑指令可完不成实现复杂功能的逻辑判断，我们还需要跳转指令jmp系列，通过调用条件码来进行指令分支。</p>
-<p>基本格式形似<code>jmp dest</code>，跳转到目标地址进行接下来的运作。如果需要调用寄存器值进行间接跳转，还需要在目标前加上“*”标记，这样就可以读取目标寄存器中的值作为地址进行跳转。除此之外，还有各种逻辑跳转，具体操作如下：</p>
-<blockquote>
-<p><strong>jmp dest：</strong>直接跳转  </p>
-<p><strong>je&#x2F;jz dest：</strong>条件为ZF，相等时跳转<br><strong>jne&#x2F;jnz dest：</strong>条件为<del>ZF，不等时跳转<br><strong>js dest：</strong>条件为SF，为负时跳转<br><strong>jns dest：</strong>条件为</del>SF，非负时跳转</p>
-<p><strong>jg&#x2F;jnle dest：</strong>条件为<del>(SF ^ OF) &amp; ~ZF，大于时跳转<br><strong>jge&#x2F;jnl dest：</strong>条件为</del>(SF ^ OF)，大于等于时跳转<br><strong>jl&#x2F;jnge dest：</strong>条件为SF ^ OF，小于时跳转<br><strong>jle&#x2F;jng dest：</strong>条件为(SF ^ OF) | ZF，小于等于时跳转</p>
-<p><strong>ja&#x2F;jnbe dest：</strong>条件为<del>CF &amp; ~ZF，无符号大于时跳转<br><strong>jae&#x2F;jnb dest：</strong>条件为</del>CF，无符号大于等于时跳转<br><strong>jb&#x2F;jnae dest：</strong>条件为CF，无符号小于时跳转<br><strong>jbe&#x2F;jna dest：</strong>条件为CF | ZF，无符号小于等于时跳转</p>
-</blockquote>
-<p>所以说，我们要实现两个数是否相等的判定，也可以用汇编这么写</p>
-<pre><code>    cmpq %rsi %rdi
-    je L1.
-    movzbl %al 1
-    retn
-L1.
-    movzbl %al 0
-    retn
-</code></pre>
-<p>不过看上去有点麻烦。如果感兴趣，可以自己先用C写一个简单条件判断，再IDA打开看一眼。</p>
-<p>除此之外，如果学好了C，各位应该也知道，逻辑表达式也可以作为值被赋到变量上。比方说，判断两个数相等，我们能这么写：</p>
-<pre><code>int comp(data_t a, data_t b)&#123;
-    if(a==b)return 1;
-    return 0;
-&#125;
-</code></pre>
-<p>也可以这么写：</p>
-<pre><code>int comp(data_t a, data_t b)&#123;
-    int result = (a==b);
-    if(result)return 1;
-    return 0;
-&#125;
-</code></pre>
-<p>（各位压行人轻点喷，这段代码只是方便理解）</p>
-<p>同样地，除了逻辑跳转，汇编语言也自带逻辑赋值。具体操作如下：</p>
-<blockquote>
-<p><strong>cmove&#x2F;cmovz src dest：</strong>条件为ZF，相等时赋值<br><strong>cmovne&#x2F;cmovnz src dest：</strong>条件为<del>ZF，不等时赋值<br><strong>cmovs src dest：</strong>条件为SF，为负时赋值<br><strong>cmovns src dest：</strong>条件为</del>SF，非负时赋值</p>
-<p><strong>cmovg&#x2F;cmovnle src dest：</strong>条件为<del>(SF ^ OF) &amp; ~ZF，大于时赋值<br><strong>cmovge&#x2F;cmovnl src dest：</strong>条件为</del>(SF ^ OF)，大于等于时赋值<br><strong>cmovl&#x2F;cmovnge src dest：</strong>条件为SF ^ OF，小于时赋值<br><strong>cmovle&#x2F;cmovng src dest：</strong>条件为(SF ^ OF) | ZF，小于等于时赋值</p>
-<p><strong>cmova&#x2F;cmovnbe src dest：</strong>条件为<del>CF &amp; ~ZF，无符号大于时赋值<br><strong>cmovae&#x2F;cmovnb src dest：</strong>条件为</del>CF，无符号大于等于时赋值<br><strong>cmovb&#x2F;cmovnae src dest：</strong>条件为CF，无符号小于时赋值<br><strong>cmovbe&#x2F;cmovna src dest：</strong>条件为CF | ZF，无符号小于等于时赋值</p>
-</blockquote>
-<h4 id="逻辑控制的应用"><a href="#逻辑控制的应用" class="headerlink" title="逻辑控制的应用"></a>逻辑控制的应用</h4><p>不过，逻辑控制码这一堆玩意，能实现的东西不只是if else分支结构而已。比如说简单的while循环结构，你可以将一个寄存器设置为循环变量，再通过cmp一个立即数或者另外被赋值的寄存器来设置循环上限，jmp来进行程序的回环。比方说我们想实现一个朴素的2的N次幂，那么实现出来应该是类似如下的结构：</p>
-<pre><code>    (input in %rax)
-    mov $1 %rdi
-    mov %rax %rsi
-    ……
-L2.
-    imul $2 %rdi
-    sub $1 %rsi
-    cmp $1 %rsi
-    jg .L2
-    retn 
-</code></pre>
-<p>用阳间的高级语言翻译一下就是这样：</p>
-<pre><code>int func(int round)&#123;
-    int i = round, res = 1;
-    while(i)&#123;
-        res *= 2;
-        i--;
-    &#125;
-    return res;
-&#125;
-</code></pre>
-<p>这么一看，在某些地方，汇编语言确实比高级语言精简，但高级语言胜在视觉上的强逻辑性，以及长篇代码以至于整个项目的可读性，毕竟逆向手都明白，看汇编都够痛苦了，用汇编去堆屎山不是更加难于登天。</p>
-<p>运用类似的方法，你可以构造出for、do-while、switch等结构，这里就不一一演示了，各位感兴趣可以自行编译一个程序试试。</p>
-<hr>
-<h3 id="非常好逻辑控制，但是函数呢？"><a href="#非常好逻辑控制，但是函数呢？" class="headerlink" title="非常好逻辑控制，但是函数呢？"></a>非常好逻辑控制，但是函数呢？</h3><p>可是函数间的跳转，相对于函数内部各种要素的转移就显得有些麻烦。我们首先得理解函数这一概念的底层逻辑：</p>
-<h4 id="过程与栈调用"><a href="#过程与栈调用" class="headerlink" title="过程与栈调用"></a>过程与栈调用</h4><p>过程是对软件中被分割的不同功能块的一种抽象，它提供一种封装代码的方式，用一组指定参数和一个可选的返回值实现某种功能。简单来说，如果把代码比作一个农业合作社，过程就是将一个代码中的一个功能打包成一个工作小组，你可以安排给这个工作小组以它能够完成的特定任务，也就是<strong>参数传递（传参）</strong>，然后等待这个小组执行完任务，向你汇报结果或者自行消化，也就是<strong>返回值</strong>。</p>
-<p>所以，你可以想到，C、python之类语言的函数是过程，abap的子例程是一种过程，甚至连java的类也可以近似看作过程。</p>
-<p>在计算机中，正在执行的过程的数据是集中在栈里的。一个函数未被调用的时候，该函数及其调用链上下一级函数，也就是被它调用的函数，都处于挂起状态，当我们调用这个函数的时候，与函数相关的数据倘若光靠寄存器没办法存完，我们就需要调用栈空间，这部分空间被称为栈帧。</p>
-<p>举个例子，当你需要依靠C语言程序加密长文本，并且这个长文本好巧不巧是个局部变量，你不可能指望十几个寄存器能放下一整篇《傲慢与偏见》，于是函数只能开帧。</p>
-<p>具体而言，栈中存放的不只是你正在执行的函数的帧，还有被这个函数调用的函数的帧。帧中的内容包括各种直接数据和各种调用地址，尤其是函数的<strong>返回地址</strong>，这决定了如果这个函数是“被调用者”，那么在它结束流程后，“调用者”应该从何处继续它的任务。</p>
-<p>由于函数操作的复杂性，一般的push指令肯定是完成不了相应任务了，我们只好使用转移控制指令：</p>
-<h4 id="转移控制"><a href="#转移控制" class="headerlink" title="转移控制"></a>转移控制</h4><p>转移控制指令一般如下：</p>
-<blockquote>
-<p><strong>call dest：</strong>调用目标地址的函数<br><strong>ret(n)：</strong>从过程调用中返回</p>
-</blockquote>
-<p>指令call执行时，将目标函数第一个指令存入程序指令寄存器rip，并将返回地址压栈，函数开始执行。函数调用执行完毕之后，执行retn指令，返回地址出栈并被存入rip中，函数返回，继续执行先前位置之后的操作。</p>
-<p>至于传参的过程，传入的前六个参数可以使用%rdi、%rdx、%rsi、%rcx、%r8、%r9寄存器（后缀视操作数大小而定），之后的数据就要依靠栈寄存器来界定其指针位置。寄存器之后的后续数据所占用的栈空间视其数据类型和系统操作数而定。比方说你开了一个int那地址只会每隔一个数据+4，但long就是+8，etc。</p>
-<p>此外，如果一个局部变量使用地址运算符“&amp;”，那么栈上也必须强行为它开一个地址。</p>
-<p>转移控制的典型案例在《深入理解计算机系统》原书有提及，本文不再赘述。</p>
-<h4 id="寄存器中的局部存储空间"><a href="#寄存器中的局部存储空间" class="headerlink" title="寄存器中的局部存储空间"></a>寄存器中的局部存储空间</h4><p>不过，既然传参要用到寄存器，那么就不可避免的会有一个问题：寄存器是所有函数的公共资源，就像农业生产合作社里工具和劳动者的关系一样。只不过，合作社有使用工具的规章制度，寄存器的调用也有被刻入CPU的惯例。</p>
-<p>这个惯例规定，rbx、rbp和r12<del>r15寄存器作为被调用者保存寄存器，当函数被调用时，这些寄存器的值在调用过程开始被保存在栈中，在调用过程结束时出栈，恢复到原本的寄存器中，函数调用前后保持不变；rdi、rsi、rdx、rcx、rax、r8</del>r11作为调用者保存寄存器，这些寄存器的值在调用开始前就被预先保存，在调用完成后恢复到寄存器中。</p>
-<p>比方说，我们再回到2的n次幂那段代码上：</p>
-<pre><code>    (input in %rax)
-    mov $1 %rdi
-    mov %rax %rsi
-    ……
-L2.
-    imul $2 %rdi
-    sub $1 %rsi
-    cmp $1 %rsi
-    jg .L2
-    retn
-</code></pre>
-<p>如果我们要正儿八经地按照系统惯例实现，那么，这段代码大抵是这样的：</p>
-<pre><code>    (input in %rax)
-    push %rdi
-    push %rsi
-    mov $1 %rdi
-    mov %rax %rsi
-    call func_2mul
-    mov %rdi %rbx
-    pop %rsi
-    pop %rdi
-    ……
-func_2mul:
-L2.
-    imul $2 %rdi
-    sub $1 %rsi
-    cmp $1 %rsi
-    jg .L2
-    retn
-endp
-</code></pre>
-<p>如上，因为我们使用rdi和rsi这两个寄存器，所以一般而言，我们需要在调用函数前就将它们的数据入栈存储，在调用完毕后恢复。</p>
-<p>其它的案例在原书中以及各路dalao的资料里有体现，这里按下不表，仅作抛砖引玉。</p>
-<p>除此之外，函数也可以通过自己call自己实现递归调用，原理与函数内部的循环语句类似：</p>
-<pre><code>rfact:
-    push ……
-    sub $1 %rsi
-    cmp $1 %rsi
-    jg .L3
-    lea ……
-    call rfact
-.L3
-    pop ……
-    ret
-</code></pre>
-<hr>
-<p>如上，我们浅浅学习了一下关于机器码实现运算和逻辑控制、函数调用等操作。可能量有点大，但是忍一下，大的还在后头呢——</p>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">学习</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="2023/09/09/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%B3%BB%E7%BB%9F%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0-%E7%AC%AC%E5%9B%9B%E7%AF%87%EF%BC%88%E4%B8%AD%EF%BC%89/">展开全文 >></a>
         </p>
       
 
